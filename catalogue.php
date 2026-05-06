@@ -1,77 +1,72 @@
-<?php 
-include 'header.php'; 
+<?php
+include 'header.php';
+require 'config.php';
 
-// Gestion dynamique du nom de l'IA selon le sexe
-$nomIA = "Vanessa"; // Par défaut
-if (isset($_SESSION['sexe']) && $_SESSION['sexe'] == 'femme') {
-    $nomIA = "Daniel";
-}
-$role = $_SESSION['role'] ?? 'invite'; 
+// Récupération de toutes les prestations de la base de données
+$stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone, u.ville, u.quartier 
+                     FROM prestations p 
+                     JOIN users u ON p.id_coiffeur = u.id 
+                     ORDER BY p.id_prestation DESC");
+$prestations = $stmt->fetchAll();
 ?>
 
-<main style="background-color: #121212; min-height: 100vh; padding-bottom: 50px;">
+<section class="py-5" style="background-color: #000; min-height: 90vh;">
+    <div class="container mt-4">
+        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">CATALOGUE DES STYLES</h2>
 
-    <div class="container py-5 text-center">
-        <h2 class="text-warning display-5 fw-bold">CATALOGUE</h2>
-        <p class="text-secondary">
-            <?php 
-                if($role == 'coiffeur') echo "Gérez vos styles et vos tarifs pour attirer plus de clients.";
-                else echo "Choisissez votre style, nous trouvons l'expert idéal pour vous.";
-            ?>
-        </p>
-    </div>
+        <div class="row g-4">
+            <?php if (empty($prestations)): ?>
+                <p class="text-secondary text-center py-5">Aucune coiffure n'a été ajoutée pour le moment.</p>
+            <?php else: ?>
+                <?php foreach ($prestations as $p): ?>
+                    <div class="col-md-4">
+                        <div class="card h-100 shadow-lg" style="background-color: #111; border-radius: 20px; overflow: hidden; border: 1px solid var(--gold);">
 
-    <?php if($role == 'coiffeur'): ?>
-    <div class="container mb-5">
-        <div class="card p-4 border-warning bg-dark shadow-lg mb-5">
-            <h4 class="text-warning mb-3">➕ Ajouter une nouvelle coiffure</h4>
-            <form action="traitement_catalogue.php" method="POST" enctype="multipart/form-data" class="row g-3">
-                <div class="col-md-4">
-                    <input type="file" name="photo" class="form-control" required>
-                </div>
-                <div class="col-md-3">
-                    <input type="text" name="nom_style" class="form-control" placeholder="Nom du style" required>
-                </div>
-                <div class="col-md-3">
-                    <input type="number" name="prix" class="form-control" placeholder="Prix (FCFA)" required>
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-gold w-100">Publier</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    <?php endif; ?>
+                            <?php if (!empty($p['photo_style']) && file_exists($p['photo_style'])): ?>
+                                <img src="<?php echo $p['photo_style']; ?>" class="card-img-top" style="height: 230px; object-fit: cover;" alt="Style de coiffure">
+                            <?php else: ?>
+                                <div class="bg-secondary text-center py-5 text-white">
+                                    <i class="bi bi-image" style="font-size: 3rem;"></i>
+                                </div>
+                            <?php endif; ?>
 
-    <?php if($role != 'coiffeur'): ?>
-    <div class="container mb-5">
-        <div class="p-4 rounded-4 border border-warning text-center" style="background: linear-gradient(45deg, #000, #1a1a1a);">
-            <h3 class="text-warning">✨ Analyse par IA avec <?php echo $nomIA; ?></h3>
-            <p class="text-light">Besoin d'aide ? Discutez par écrit ou par **voix** avec <?php echo $nomIA; ?> pour trouver votre style.</p>
-            <button class="btn btn-outline-warning px-4" onclick="toggleChat()">Discuter avec <?php echo $nomIA; ?></button>
-        </div>
-    </div>
-    <?php endif; ?>
+                            <div class="card-body">
+                                <h5 class="text-warning mb-1"><?php echo htmlspecialchars($p['nom_style']); ?></h5>
+                                <p class="text-success fw-bold fs-5 mb-2"><?php echo number_format($p['prix'], 0, ',', ' '); ?> FCFA</p>
+                                <p class="text-light small mb-3"><?php echo htmlspecialchars($p['description']); ?></p>
 
-    <div class="container">
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">
-            <div class="col">
-                <div class="card h-100 shadow-sm" style="background-color: #1e1e1e; border: 1px solid #333; border-radius: 15px; overflow: hidden;">
-                    <img src="images/ara.jpg" class="card-img-top" style="height: 280px; object-fit: cover;">
-                    <div class="card-body text-center">
-                        <h4 class="text-white">SISCO</h4>
-                        <span class="text-warning fw-bold d-block mb-3">À partir de 2.500 FCFA</span>
-                        
-                        <?php if($role == 'coiffeur'): ?>
-                            <button class="btn btn-outline-danger btn-sm w-100">Supprimer de mon profil</button>
-                        <?php else: ?>
-                            <a href="choisir_coiffeur.php?style=sisco" class="btn btn-gold w-100">RÉSERVER</a>
-                        <?php endif; ?>
+                                <hr class="border-warning my-2">
+
+                                <p class="text-secondary small mb-1">
+                                    <i class="bi bi-person-fill text-warning"></i> Coiffeur : <strong><?php echo htmlspecialchars(strtoupper($p['nom'] . ' ' . $p['prenom'])); ?></strong>
+                                </p>
+                                <p class="text-secondary small mb-0">
+                                    <i class="bi bi-geo-alt-fill text-warning"></i> Localisation : <?php echo htmlspecialchars($p['ville'] . ' - ' . $p['quartier']); ?>
+                                </p>
+                            </div>
+
+                            <div class="card-footer bg-dark border-top border-warning text-center">
+                                <a href="reserver.php?coiffeur_id=<?php echo $p['id_coiffeur']; ?>&presta_id=<?php echo $p['id_prestation']; ?>"
+                                    class="btn btn-warning btn-sm w-100 py-2 fw-bold text-dark">
+                                    <i class="bi bi-calendar-check"></i> Réserver cette coiffure
+                                </a>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
     </div>
-</main>
+</section>
+
+<style>
+    .card {
+        transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+    }
+</style>
 
 <?php include 'footer.php'; ?>

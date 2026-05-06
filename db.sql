@@ -106,3 +106,61 @@ SET FOREIGN_KEY_CHECKS = 1;
 ALTER TABLE catalogue 
 ADD COLUMN prix_teinte_supp INT DEFAULT 0 AFTER prix,
 ADD COLUMN temps_teinte_supp INT DEFAULT 0 AFTER temps_estime;
+
+
+-- Table des villes du Bénin (répertoire de base)
+CREATE TABLE villes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nom_ville VARCHAR(100) NOT NULL UNIQUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insertion des principales villes du Bénin
+INSERT INTO villes (nom_ville) VALUES 
+('Cotonou'), ('Abomey-Calavi'), ('Porto-Novo'), ('Parakou'), 
+('Djougou'), ('Bohicon'), ('Abomey'), ('Natitingou'), 
+('Kandi'), ('Lokossa'), ('Ouidah'), ('Allada');
+
+
+CREATE TABLE prestations (
+    id_prestation INT AUTO_INCREMENT PRIMARY KEY,
+    id_coiffeur INT NOT NULL,
+    nom_style VARCHAR(100) NOT NULL,
+    prix DECIMAL(10, 2) NOT NULL,
+    photo_style VARCHAR(255),
+    description TEXT,
+    FOREIGN KEY (id_coiffeur) REFERENCES utilisateurs(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS coiffeur_disponibilites (
+    id_dispo INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id_coiffeur INT UNSIGNED NOT NULL,
+    jour_semaine VARCHAR(20) NOT NULL,
+    heure_debut TIME NOT NULL,
+    heure_fin TIME NOT NULL,
+    FOREIGN KEY (id_coiffeur) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS rendezvous (
+    id_rdv INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id_client INT UNSIGNED NOT NULL,
+    id_coiffeur INT UNSIGNED NOT NULL,
+    id_prestation INT UNSIGNED NOT NULL,
+    date_rdv DATE NOT NULL,
+    heure_rdv TIME NOT NULL,
+    lieu VARCHAR(255) NOT NULL,
+    statut VARCHAR(50) DEFAULT 'en_attente',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_coiffeur) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS transactions_site (
+    id_transaction INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id_coiffeur INT UNSIGNED NOT NULL,
+    montant_commission DECIMAL(10, 2) NOT NULL,
+    montant_abonnement DECIMAL(10, 2) NOT NULL,
+    type_transaction VARCHAR(50) DEFAULT 'commission_et_abonnement',
+    date_transaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_coiffeur) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
