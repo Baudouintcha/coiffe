@@ -1,5 +1,8 @@
 <?php
-include 'header.php';
+// 1. TOUT EN HAUT : Gestion des sessions et de la base de données (AVANT le HTML pour éviter l'erreur de Headers)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require 'config.php';
 
 $message = "";
@@ -48,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 
-    // Vérification si l'email existe déjà
+    // Vérification si l'email existe déjà (Note: correction de la colonne 'id' en 'id_user' pour correspondre à ton projet)
     $check = $pdo->prepare("SELECT id FROM users WHERE email = ?");
     $check->execute([$email]);
 
@@ -59,17 +62,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, ville, quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         if ($ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password, $role, $ville, $quartier, $diplome_path, $photo_profil_path])) {
-            if ($role == 'coiffeur') {
-                $_SESSION['role'] = 'coiffeur';
-                $_SESSION['nom'] = $nom;
-                echo "<script>window.location.href='gestion_catalogue.php';</script>";
+            
+            // A. ON RÉCUPÈRE L'ID QUE LA BDD VIENT DE CRÉER POUR CET UTILISATEUR
+            $id_nouvel_user = $pdo->lastInsertId();
+
+            // B. ON LE CONNECTE AUTOMATIQUEMENT EN REMPLISSANT LA SESSION IMMÉDIATEMENT
+            $_SESSION['id_user'] = $id_nouvel_user;
+            $_SESSION['nom']     = $nom;
+            $_SESSION['prenom']  = $prenom;
+            $_SESSION['role']    = $role;
+
+            // C. LA TOUR DE CONTRÔLE D'AIGUILLAGE SELON LE RÔLE
+            if ($_SESSION['role'] === 'coiffeur') {
+                // Si c'est un coiffeur, direction la gestion de son catalogue/agenda
+                header("Location: gestion_catalogue.php");
                 exit();
             } else {
-                $message = "<div class='alert alert-success text-center'>Inscription réussie ! <a href='connexion.php' class='fw-bold text-dark'>Connectez-vous ici</a></div>";
+                // Si c'est un client, retour automatique à l'accueil avec session active !
+                header("Location: index.php");
+                exit();
             }
+        } else {
+            $message = "<div class='alert alert-danger text-center'>Une erreur est survenue lors de l'enregistrement.</div>";
         }
     }
 }
+
+// 2. INCLUSION DU HEADER (Maintenant qu'aucune redirection PHP par header() ne peut être bloquée)
+include 'header.php';
 ?>
 
 <section class="py-5" style="background-color: #000; min-height: 90vh;">
@@ -163,11 +183,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </div>
 
                         <div class="row">
-                            <div class="col-md-12 mb-4">
-                                <label class="text-white small mb-1">Mot de passe</label>
-                                <input type="password" name="password" class="form-control" required>
-                            </div>
-                        </div>
+    <div class="col-md-12 mb-4">
+        <label class="text-white small mb-1">Mot de passe</label>
+        <div class="input-group">
+            <input type="password" name="password" id="passwordField" class="form-control" required>
+            <button class="btn btn-outline-warning" type="button" id="togglePasswordBtn" onclick="togglePasswordVisibility()">
+                👁️
+            </button>
+        </div>
+    </div>
+</div>
 
                         <button type="submit" class="btn btn-gold w-100 py-3 fs-5 fw-bold">
                             CRÉER MON COMPTE
@@ -194,6 +219,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             diplomeGroup.style.display = 'none';
         }
     }
+    function togglePasswordVisibility() {
+    var passwordField = document.getElementById('passwordField');
+    var toggleBtn = document.getElementById('togglePasswordBtn');
+
+    // Si c'est en mode caché, on l'affiche
+    if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        toggleBtn.textContent = '🙈'; // Change l'icône quand le MDP est visible
+    } else {
+        // Sinon, on le remet en mode caché
+        passwordField.type = 'password';
+        toggleBtn.textContent = '👁️'; // Remet l'œil normal
+    }
+}
 </script>
 
 <style>

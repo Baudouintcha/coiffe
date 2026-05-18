@@ -1,70 +1,73 @@
 <?php 
-include 'header.php'; 
+// 1. D'ABORD LE TRAITEMENT PHP
 require 'config.php'; 
 
 $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $email = htmlspecialchars($_POST['email']);
+    $email = htmlspecialchars(trim($_POST['email']));
     $password = $_POST['password'];
 
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch();
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
 
-    // ... (Ici tu as ton code HTML et le début de ta vérification de formulaire) ...
+        if ($user && password_verify($password, $user['password'])) {
+            
+            $_SESSION['id_user']  = $user['id'];
+            $_SESSION['nom']      = $user['nom'];
+            $_SESSION['prenom']   = $user['prenom'];
+            $_SESSION['role']     = $user['role']; 
 
-// Exemple de vérification après avoir récupéré l'utilisateur en BDD :
-if ($user && password_verify($password_saisi, $user['password'])) {
-    
-    // 1. On enregistre les informations de la personne dans la Session
-    $_SESSION['id_user']  = $user['id'];
-    $_SESSION['nom']      = $user['nom'];
-    $_SESSION['prenom']   = $user['prenom'];
-    $_SESSION['role']     = $user['role']; // C'est cette colonne qui contient 'admin', 'coiffeur' ou 'client'
+            if ($_SESSION['role'] === 'admin') {
+                header("Location: admin_dashboard.php");
+                exit();
+            } elseif ($_SESSION['role'] === 'coiffeur') {
+                header("Location: tableau_coiffeur.php"); 
+                exit();
+            } else {
+                header("Location: index.php"); 
+                exit();
+            }
 
-    // 2. L'AIGUILLAGE AUTOMATIQUE : On redirige selon le rôle
-    if ($_SESSION['role'] === 'admin') {
-        // Si c'est un admin, il part directement vers le dashboard admin
-        header("Location: admin_dashboard.php");
-        exit();
-    } elseif ($_SESSION['role'] === 'coiffeur') {
-        // Si c'est un coiffeur, il part vers son espace de gestion de salon
-        header("Location: tableau_coiffeur.php"); 
-        exit();
-    } else {
-        // Si c'est un client (ou tout autre rôle par défaut), il va sur la page d'accueil du catalogue
-        header("Location: index.php"); 
-        exit();
+        } else {
+            $error = "Adresse e-mail ou mot de passe incorrect.";
+        }
+    } catch (PDOException $e) {
+        $error = "Erreur de base de données : " . $e->getMessage();
     }
+}
 
-} else {
-    // Si le mot de passe ou le numéro est faux
-    $erreur = "Numéro de téléphone ou mot de passe incorrect.";
-}
-}
+// 2. ENFUITE L'INCLUSION DU HEADER ET DU VISUEL HTML
+include 'header.php'; 
 ?>
 
 <section class="py-5" style="background-color: #000; min-height: 80vh;">
     <div class="container mt-5">
         <div class="row justify-content-center">
             <div class="col-md-5">
-                <div class="card p-4 shadow-lg" style="background-color: #111; border: 1px solid var(--gold); border-radius: 20px;">
+                <div class="card p-4 shadow-lg" style="background-color: #111; border: 1px solid #D4AF37; border-radius: 20px;">
                     <h2 class="text-center text-warning mb-4">CONNEXION</h2>
                     
                     <?php if($error): ?>
                         <div class="alert alert-danger py-2 small"><?php echo $error; ?></div>
                     <?php endif; ?>
 
-                    <form method="POST">
+                    <form method="POST" action="">
                         <div class="mb-3">
                             <label class="text-white small mb-1">Email</label>
-                            <input type="email" name="email" class="form-control" required>
+                            <input type="email" name="email" class="form-control" placeholder="Ex: votreemail@cft.bj" required>
                         </div>
 
                         <div class="mb-4">
                             <label class="text-white small mb-1">Mot de passe</label>
-                            <input type="password" name="password" class="form-control" required>
+                            <div class="input-group">
+                                <input type="password" name="password" id="password" class="form-control" placeholder="Votre mot de passe" style="border-top-right-radius: 0; border-bottom-right-radius: 0;" required>
+                                <button class="btn btn-outline-warning" type="button" id="togglePassword" style="border-top-right-radius: 8px; border-bottom-right-radius: 8px; background-color: #fff; border: 1px solid #ccc; color: #333;">
+                                    <i class="bi bi-eye" id="eyeIcon"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <button type="submit" class="btn btn-gold w-100 py-2 fw-bold">
@@ -86,5 +89,18 @@ if ($user && password_verify($password_saisi, $user['password'])) {
     .btn-gold { background-color: #D4AF37; color: #000; border: none; transition: 0.3s; }
     .btn-gold:hover { background-color: #f1c40f; transform: scale(1.02); }
 </style>
+
+<script>
+    const togglePassword = document.querySelector('#togglePassword');
+    const passwordInput = document.querySelector('#password');
+    const eyeIcon = document.querySelector('#eyeIcon');
+
+    togglePassword.addEventListener('click', function () {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        eyeIcon.classList.toggle('bi-eye');
+        eyeIcon.classList.toggle('bi-eye-slash');
+    });
+</script>
 
 <?php include 'footer.php'; ?>

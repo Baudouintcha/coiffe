@@ -1,4 +1,6 @@
-<?php session_start(); ?>
+<?php if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+} ?>
 <!doctype html>
 <html lang="fr">
 
@@ -122,11 +124,10 @@
 
         <a href="catalogue.php"><i class="bi bi-images"></i> Catalogue des styles</a>
 
-        <?php if (!isset($_SESSION['user_id'])): ?>
+        <?php if (!isset($_SESSION['id_user'])): ?>
             <a href="inscription.php"><i class="bi bi-person-plus"></i> Créer un compte</a>
             <a href="connexion.php"><i class="bi bi-box-arrow-in-right"></i> Se connecter</a>
         <?php else: ?>
-
             <?php if ($_SESSION['role'] == 'client'): ?>
                 <a href="mes_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes RDV</a>
                 <a href="profil.php"><i class="bi bi-person-circle"></i> Mon Profil</a>
@@ -139,7 +140,7 @@
                 <a href="portefeuille.php"><i class="bi bi-wallet2"></i> Mes gains</a>
             <?php endif; ?>
 
-            <a href="deconnexion.php" class="text-danger mt-4"><i class="bi bi-power"></i> Déconnexion</a>
+            <a href="deconnexion.php" class="text-danger fw-bold border border-danger rounded text-center m-3 py-2"><i class="bi bi-power"></i> Déconnexion</a>
         <?php endif; ?>
 
         <a href="https://wa.me/2290100000000" target="_blank" class="mt-2 small text-secondary text-decoration-none">
@@ -199,6 +200,7 @@
             document.getElementById("mainOverlay").style.display = "block";
         }
 
+        // Ajout de la fermeture de la sidebar après clic
         function closeNav() {
             document.getElementById("mySidebar").style.width = "0";
             document.getElementById("mainOverlay").style.display = "none";

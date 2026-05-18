@@ -1,21 +1,28 @@
 <?php
-include 'header.php';
-require 'config.php';
+// 1. TOUT EN HAUT : Sécurité et Session (AVANT d'inclure le header)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Sécurité : réservé aux clients connectés
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'client') {
-    header('Location: connexion.php');
+// Sécurité : Si l'utilisateur n'est pas connecté ou n'est pas un client, redirection radicale sans plantage
+if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
+    echo "<script>window.location.href='connexion.php';</script>";
     exit();
 }
 
-$id_client = $_SESSION['user_id'];
+// Maintenant que la sécurité est passée, on inclut le visuel et la configuration
+include 'header.php';
+require 'config.php';
 
-// Récupération de l'historique des réservations du client
+// Utilisation de la clé de session harmonisée
+$id_client = $_SESSION['id_user'];
+
+// Récupération de l'historique avec TES vrais attributs : client_id, coiffeur_id, coiffure_id, statut_rdv
 $stmt = $pdo->prepare("SELECT r.*, p.nom_style, p.prix, u.nom AS coiffeur_nom, u.prenom AS coiffeur_prenom, u.telephone AS coiffeur_telephone 
-                       FROM rendezvous r 
-                       JOIN prestations p ON r.id_prestation = p.id_prestation 
-                       JOIN users u ON r.id_coiffeur = u.id 
-                       WHERE r.id_client = ? 
+                       FROM rendez_vous r 
+                       JOIN prestations p ON r.coiffure_id = p.id_prestation 
+                       JOIN users u ON r.coiffeur_id = u.id 
+                       WHERE r.client_id = ? 
                        ORDER BY r.date_rdv DESC, r.heure_rdv DESC");
 $stmt->execute([$id_client]);
 $rendezvous = $stmt->fetchAll();
@@ -56,16 +63,16 @@ $rendezvous = $stmt->fetchAll();
                                 <td><?php echo htmlspecialchars(strtoupper($rdv['coiffeur_nom'] . ' ' . $rdv['coiffeur_prenom'])); ?></td>
                                 <td><?php echo htmlspecialchars($rdv['nom_style']); ?></td>
                                 <td class="text-success fw-bold"><?php echo number_format($rdv['prix'], 0, ',', ' '); ?> FCFA</td>
-                                <td><?php echo htmlspecialchars($rdv['lieu']); ?></td>
+                                <td><?php echo htmlspecialchars($rdv['adresse_prestation']); ?></td>
                                 <td>
-                                    <?php if ($rdv['statut'] == 'en_attente'): ?>
+                                    <?php if ($rdv['statut_rdv'] == 'en_attente'): ?>
                                         <span class="badge bg-warning text-dark">En attente de validation</span>
-                                    <?php elseif ($rdv['statut'] == 'confirme'): ?>
+                                    <?php elseif ($rdv['statut_rdv'] == 'confirme'): ?>
                                         <span class="badge bg-primary">Confirmé</span>
-                                    <?php elseif ($rdv['statut'] == 'termine'): ?>
+                                    <?php elseif ($rdv['statut_rdv'] == 'termine'): ?>
                                         <span class="badge bg-success">Terminé</span>
                                     <?php else: ?>
-                                        <span class="badge bg-secondary"><?php echo htmlspecialchars($rdv['statut']); ?></span>
+                                        <span class="badge bg-secondary"><?php echo htmlspecialchars($rdv['statut_rdv']); ?></span>
                                     <?php endif; ?>
                                 </td>
                                 <td>

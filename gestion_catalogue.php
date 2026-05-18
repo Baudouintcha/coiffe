@@ -1,14 +1,21 @@
 <?php
-include 'header.php';
-require 'config.php';
+// 1. TOUT EN HAUT : Sécurité et Session (AVANT d'inclure quoi que ce soit)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Sécurité : seul un coiffeur peut accéder à cette page
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'coiffeur') {
-    header('Location: connexion.php');
+// Sécurité : Seul un coiffeur connecté peut accéder à cette page
+// CORRIGÉ : Utilisation de id_user au lieu de user_id + redirection JavaScript
+if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+    echo "<script>window.location.href='connexion.php';</script>";
     exit();
 }
 
-$coiffeur_id = $_SESSION['user_id'];
+// 2. Maintenant que la sécurité est OK, on inclut le visuel et la BDD
+include 'header.php';
+require 'config.php';
+
+$coiffeur_id = $_SESSION['id_user']; // CORRIGÉ : id_user
 $message = "";
 
 // Ajout d'une prestation

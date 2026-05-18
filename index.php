@@ -1,4 +1,14 @@
-<?php include 'header.php'; ?>
+<?php 
+// Lancement intelligent de la session avant d'inclure le header si ce n'est pas déjà fait
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+include 'header.php'; 
+
+// Définition de la page de destination selon le statut de connexion
+// Si connecté, on l'envoie vers la suite (ex: mes_rendezvous.php), sinon vers l'inscription
+$lien_bouton = isset($_SESSION['id_user']) ? "mes_rendezvous.php" : "inscription.php";
+?>
 
 <main>
     <section class="py-5 text-center container">
@@ -12,7 +22,9 @@
                     Coiffe chez toi vous permet de prendre un rendez-vous ,
                     d'avoir votre coiffeur et votre coiffure chez vous sans vous déplacer
                     et celà juste en quelques clics .</p>
-                <p><a href="inscription.php" class="btn btn-gold btn-lg my-2 px-5">Prenez rendez-vous</a></p>
+                <p>
+                    <a href="<?php echo $lien_bouton; ?>" class="btn btn-gold btn-lg my-2 px-5">Prenez rendez-vous</a>
+                </p>
             </div>
         </div>
     </section>
@@ -31,7 +43,7 @@
                                 chaque deux semaines pour garder frais et surtout brossez regulièrement . Cette coupe peut varier
                                 selon la quantité de cheveux que vous voulez . Peut être accompagnée de teinte de couleurs variées (noire,
                                 blanc,or etc)</p>
-                            <a href="inscription.php" class="btn btn-gold w-100">Prendre RDV</a>
+                            <a href="<?php echo $lien_bouton; ?>" class="btn btn-gold w-100">Prendre RDV</a>
                         </div>
                     </div>
                 </div>
@@ -46,7 +58,7 @@
                                 chaque deux semaines pour garder frais et surtout brossez regulièrement . Cette coupe peut varier
                                 selon la quantité de cheveux que vous voulez . Peut être accompagnée de teinte de couleurs variées (noire,
                                 blanc,or etc) .</p>
-                            <a href="inscription.php" class="btn btn-gold w-100">Prendre RDV</a>
+                            <a href="<?php echo $lien_bouton; ?>" class="btn btn-gold w-100">Prendre RDV</a>
                         </div>
                     </div>
                 </div>
@@ -61,7 +73,7 @@
                                 ovale , allongé) . Entretenez régulierement
                                 chaque deux semaines pour garder frais.Peut être accompagnée de teinte de couleurs variées (noire,
                                 blanc,or etc) .</p>
-                            <a href="inscription.php" class="btn btn-gold w-100">Prendre RDV</a>
+                            <a href="<?php echo $lien_bouton; ?>" class="btn btn-gold w-100">Prendre RDV</a>
                         </div>
                     </div>
                 </div>
@@ -76,7 +88,7 @@
                                 chaque deux semaines pour garder frais .Idéale pour visage carrés ou rond. soyez conscient que cette
                                 coupe demande qu'on rase une grande partie sur les cotés .Peut être accompagnée de teinte de couleurs variées (noire,
                                 blanc,or etc) .</p>
-                            <a href="inscription.php" class="btn btn-gold w-100">Prendre RDV</a>
+                            <a href="<?php echo $lien_bouton; ?>" class="btn btn-gold w-100">Prendre RDV</a>
                         </div>
                     </div>
                 </div>
@@ -89,7 +101,7 @@
                             <p class="card-text">Coupe dégradée dame moderne.TWA(Teeny Weeny Afro) communément appelée afro est une coupe dégradée dame très moderne et chic qui peut avoir
                                 plusieurs variations et comme ici peut être teinté et degradé et de manière raisonnable . Requiert des cheveux crépus
                                 pour un rendu plus optimal et de l'entretien pour les ondulés .</p>
-                            <a href="inscription.php" class="btn btn-gold w-100">Prendre RDV</a>
+                            <a href="<?php echo $lien_bouton; ?>" class="btn btn-gold w-100">Prendre RDV</a>
                         </div>
                     </div>
                 </div>
@@ -103,7 +115,7 @@
                                 progressif et peu avoir plusieurs variantes selon la taille de vos cheveux , la forme de votre tête aussi .
                                 Adaptée à tout types de visages et tout les sexes .Entretenez régulierement
                                 chaque deux semaines pour garder frais . </p>
-                            <a href="inscription.php" class="btn btn-gold w-100">Prendre RDV</a>
+                            <a href="<?php echo $lien_bouton; ?>" class="btn btn-gold w-100">Prendre RDV</a>
                         </div>
                     </div>
                 </div>
