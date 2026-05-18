@@ -12,23 +12,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
-    if ($user && password_verify($password, $user['password'])) {
-        // ON STOCKO LES INFOS CLÉS EN SESSION
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['nom']     = $user['nom'];
-        $_SESSION['role']    = $user['role'];
-        $_SESSION['sexe']    = $user['sexe']; // Détermine si c'est Vanessa ou Daniel
+    // ... (Ici tu as ton code HTML et le début de ta vérification de formulaire) ...
 
-        // Redirection selon le rôle
-        if ($user['role'] == 'coiffeur') {
-            header("Location: catalogue.php"); // Il pourra gérer ses coupes
-        } else {
-            header("Location: index.php");
-        }
+// Exemple de vérification après avoir récupéré l'utilisateur en BDD :
+if ($user && password_verify($password_saisi, $user['password'])) {
+    
+    // 1. On enregistre les informations de la personne dans la Session
+    $_SESSION['id_user']  = $user['id'];
+    $_SESSION['nom']      = $user['nom'];
+    $_SESSION['prenom']   = $user['prenom'];
+    $_SESSION['role']     = $user['role']; // C'est cette colonne qui contient 'admin', 'coiffeur' ou 'client'
+
+    // 2. L'AIGUILLAGE AUTOMATIQUE : On redirige selon le rôle
+    if ($_SESSION['role'] === 'admin') {
+        // Si c'est un admin, il part directement vers le dashboard admin
+        header("Location: admin_dashboard.php");
+        exit();
+    } elseif ($_SESSION['role'] === 'coiffeur') {
+        // Si c'est un coiffeur, il part vers son espace de gestion de salon
+        header("Location: tableau_coiffeur.php"); 
         exit();
     } else {
-        $error = "Email ou mot de passe incorrect.";
+        // Si c'est un client (ou tout autre rôle par défaut), il va sur la page d'accueil du catalogue
+        header("Location: index.php"); 
+        exit();
     }
+
+} else {
+    // Si le mot de passe ou le numéro est faux
+    $erreur = "Numéro de téléphone ou mot de passe incorrect.";
+}
 }
 ?>
 
