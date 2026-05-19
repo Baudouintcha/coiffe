@@ -1,106 +1,114 @@
-<?php 
-// 1. D'ABORD LE TRAITEMENT PHP
-require 'config.php'; 
+<?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require 'config.php';
+include 'header.php';
 
 $error = "";
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $email = htmlspecialchars(trim($_POST['email']));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
+    $email = trim(htmlspecialchars($_POST['email']));
     $password = $_POST['password'];
 
-    try {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+    if (!empty($email) && !empty($password)) {
+        // Recherche de l'utilisateur (on récupère l'ID, le nom, le rôle ET la ville)
+        $stmt = $pdo->prepare("SELECT * FROM utilisateurs WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        if ($user && password_verify($password, $user['password'])) {
-            
-            $_SESSION['id_user']  = $user['id'];
-            $_SESSION['nom']      = $user['nom'];
-            $_SESSION['prenom']   = $user['prenom'];
-            $_SESSION['role']     = $user['role']; 
+        // Si l'utilisateur existe, on vérifie son mot de passe
+        if ($user && password_verify($password, $user['mot_de_passe'])) {
+            // Initialisation parfaite des variables de sessions requises
+            $_SESSION['id_user'] = $user['id_user'];
+            $_SESSION['nom'] = $user['nom'];
+            $_SESSION['role'] = $user['role'];
+            $_SESSION['ville'] = $user['ville']; // Crucial pour le filtre automatique
 
-            if ($_SESSION['role'] === 'admin') {
-                header("Location: admin_dashboard.php");
-                exit();
-            } elseif ($_SESSION['role'] === 'coiffeur') {
-                header("Location: tableau_coiffeur.php"); 
-                exit();
-            } else {
-                header("Location: index.php"); 
-                exit();
-            }
-
+            // Redirection immédiate vers l'accueil unique
+            echo "<script>window.location.href='index.php';</script>";
+            exit();
         } else {
-            $error = "Adresse e-mail ou mot de passe incorrect.";
+            $error = "Identifiants incorrects. Veuillez réessayer.";
         }
-    } catch (PDOException $e) {
-        $error = "Erreur de base de données : " . $e->getMessage();
+    } else {
+        $error = "Veuillez remplir tous les champs.";
     }
 }
-
-// 2. ENFUITE L'INCLUSION DU HEADER ET DU VISUEL HTML
-include 'header.php'; 
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 80vh;">
-    <div class="container mt-5">
+<section class="py-5 d-flex align-items-center" style="background-color: #000; min-height: 85vh;">
+    <div class="container">
         <div class="row justify-content-center">
-            <div class="col-md-5">
-                <div class="card p-4 shadow-lg" style="background-color: #111; border: 1px solid #D4AF37; border-radius: 20px;">
-                    <h2 class="text-center text-warning mb-4">CONNEXION</h2>
-                    
-                    <?php if($error): ?>
-                        <div class="alert alert-danger py-2 small"><?php echo $error; ?></div>
-                    <?php endif; ?>
+            <div class="col-md-5 col-lg-4">
+                
+                <?php if (!empty($error)): ?>
+                    <div class="alert alert-danger text-center small py-2 mb-3" style="border-radius: 8px;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> <?php echo $error; ?>
+                    </div>
+                <?php endif; ?>
 
-                    <form method="POST" action="">
+                <div class="card p-4 shadow-lg border-0" style="background-color: #111; border-radius: 16px; border: 1px solid #222 !important;">
+                    <div class="text-center mb-4">
+                        <h3 class="text-warning fw-bold mb-1" style="letter-spacing: 1px;">CONNEXION</h3>
+                        <p class="text-secondary small">Accédez à votre espace Coiffe Chez Toi</p>
+                    </div>
+
+                    <form method="POST">
                         <div class="mb-3">
-                            <label class="text-white small mb-1">Email</label>
-                            <input type="email" name="email" class="form-control" placeholder="Ex: votreemail@cft.bj" required>
+                            <label class="text-white small mb-1">Adresse Email</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-envelope"></i></span>
+                                <input type="email" name="email" class="form-control bg-dark text-white border-secondary" placeholder="exemple@mail.com" required>
+                            </div>
                         </div>
 
                         <div class="mb-4">
                             <label class="text-white small mb-1">Mot de passe</label>
                             <div class="input-group">
-                                <input type="password" name="password" id="password" class="form-control" placeholder="Votre mot de passe" style="border-top-right-radius: 0; border-bottom-right-radius: 0;" required>
-                                <button class="btn btn-outline-warning" type="button" id="togglePassword" style="border-top-right-radius: 8px; border-bottom-right-radius: 8px; background-color: #fff; border: 1px solid #ccc; color: #333;">
-                                    <i class="bi bi-eye" id="eyeIcon"></i>
-                                </button>
+                                <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-lock"></i></span>
+                                <input type="password" name="password" class="form-control bg-dark text-white border-secondary" placeholder="••••••••" required>
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-gold w-100 py-2 fw-bold">
+                        <button type="submit" name="connexion" class="btn btn-gold w-100 py-2 fw-bold mb-3" style="border-radius: 8px;">
                             SE CONNECTER
                         </button>
                     </form>
-                    
-                    <p class="text-center mt-4 text-secondary small">
-                        Pas encore de compte ? <a href="inscription.php" class="text-warning">Inscrivez-vous ici</a>
-                    </p>
+
+                    <div class="text-center mt-2">
+                        <p class="text-secondary small mb-0">Vous n'avez pas de compte ?</p>
+                        <a href="inscription.php" class="text-warning small text-decoration-none fw-bold">Créer un compte maintenant</a>
+                    </div>
                 </div>
+
             </div>
         </div>
     </div>
 </section>
 
 <style>
-    .form-control { background-color: #fff !important; border-radius: 8px; }
-    .btn-gold { background-color: #D4AF37; color: #000; border: none; transition: 0.3s; }
-    .btn-gold:hover { background-color: #f1c40f; transform: scale(1.02); }
+    .form-control:focus {
+        background-color: #1a1a1a !important;
+        border-color: var(--gold) !important;
+        color: #fff !important;
+        box-shadow: none;
+    }
+    .input-group-text {
+        border-radius: 8px 0 0 8px;
+    }
+    .form-control {
+        border-radius: 0 8px 8px 0;
+    }
+    .btn-gold {
+        background-color: var(--gold);
+        color: black;
+        transition: 0.3s;
+    }
+    .btn-gold:hover {
+        background-color: #c99b2c;
+    }
 </style>
-
-<script>
-    const togglePassword = document.querySelector('#togglePassword');
-    const passwordInput = document.querySelector('#password');
-    const eyeIcon = document.querySelector('#eyeIcon');
-
-    togglePassword.addEventListener('click', function () {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        eyeIcon.classList.toggle('bi-eye');
-        eyeIcon.classList.toggle('bi-eye-slash');
-    });
-</script>
 
 <?php include 'footer.php'; ?>

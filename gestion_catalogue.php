@@ -5,7 +5,6 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Sécurité : Seul un coiffeur connecté peut accéder à cette page
-// CORRIGÉ : Utilisation de id_user au lieu de user_id + redirection JavaScript
 if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
     echo "<script>window.location.href='connexion.php';</script>";
     exit();
@@ -15,7 +14,7 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
 include 'header.php';
 require 'config.php';
 
-$coiffeur_id = $_SESSION['id_user']; // CORRIGÉ : id_user
+$coiffeur_id = $_SESSION['id_user']; 
 $message = "";
 
 // Ajout d'une prestation
@@ -23,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_prestation']))
     $nom_style = htmlspecialchars($_POST['nom_style']);
     $prix = floatval($_POST['prix']);
     $description = htmlspecialchars($_POST['description']);
+    $duree = intval($_POST['duree']); // AJOUT : Récupération de la durée choisie
 
     $photo_style_path = NULL;
     if (isset($_FILES['photo_style']) && $_FILES['photo_style']['error'] == 0) {
@@ -39,8 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_prestation']))
         }
     }
 
-    $stmt = $pdo->prepare("INSERT INTO prestations (id_coiffeur, nom_style, prix, photo_style, description) VALUES (?, ?, ?, ?, ?)");
-    if ($stmt->execute([$coiffeur_id, $nom_style, $prix, $photo_style_path, $description])) {
+    // AJOUT : Insertion du champ 'duree' dans la requête SQL
+    $stmt = $pdo->prepare("INSERT INTO prestations (id_coiffeur, nom_style, prix, photo_style, description, duree) VALUES (?, ?, ?, ?, ?, ?)");
+    if ($stmt->execute([$coiffeur_id, $nom_style, $prix, $photo_style_path, $description, $duree])) {
         $message = "<div class='alert alert-success'>Prestation ajoutée avec succès !</div>";
     }
 }
@@ -85,12 +86,23 @@ $prestations = $stmt->fetchAll();
                             <input type="number" name="prix" class="form-control" placeholder="Ex: 5000" required>
                         </div>
                         <div class="mb-3">
+                            <label class="text-white small">Durée estimée</label>
+                            <select name="duree" class="form-select" required>
+                                <option value="30">30 minutes</option>
+                                <option value="60" selected>1 heure</option>
+                                <option value="90">1h 30min</option>
+                                <option value="120">2 heures</option>
+                                <option value="150">2h 30min</option>
+                                <option value="180">3 heures</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
                             <label class="text-white small">Image de la coiffure</label>
                             <input type="file" name="photo_style" class="form-control" accept="image/*" required>
                         </div>
                         <div class="mb-3">
                             <label class="text-white small">Description</label>
-                            <textarea name="description" class="form-control" rows="3" placeholder="Ex: Durée 3h, mèches fournies"></textarea>
+                            <textarea name="description" class="form-control" rows="3" placeholder="Ex: Mèches fournies, lavage inclus..."></textarea>
                         </div>
                         <button type="submit" name="ajouter_prestation" class="btn btn-gold w-100 py-2 fw-bold mt-2">
                             AJOUTER
@@ -117,9 +129,16 @@ $prestations = $stmt->fetchAll();
                                     <?php endif; ?>
 
                                     <div class="card-body">
-                                        <h5 class="text-warning"><?php echo htmlspecialchars($p['nom_style']); ?></h5>
-                                        <p class="text-success fw-bold"><?php echo number_format($p['prix'], 0, ',', ' '); ?> FCFA</p>
-                                        <p class="text-light small"><?php echo htmlspecialchars($p['description']); ?></p>
+                                        <h5 class="text-warning mb-2"><?php echo htmlspecialchars($p['nom_style']); ?></h5>
+                                        
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <span class="text-success fw-bold"><?php echo number_format($p['prix'], 0, ',', ' '); ?> FCFA</span>
+                                            <span class="badge bg-dark border border-warning text-warning">
+                                                <i class="bi bi-clock"></i> <?php echo isset($p['duree']) ? $p['duree'] : '60'; ?> min
+                                            </span>
+                                        </div>
+                                        
+                                        <p class="text-light small mb-0"><?php echo htmlspecialchars($p['description']); ?></p>
                                     </div>
 
                                     <div class="card-footer bg-dark border-top border-secondary d-flex justify-content-between">
@@ -138,7 +157,7 @@ $prestations = $stmt->fetchAll();
 </section>
 
 <style>
-    .form-control {
+    .form-control, .form-select {
         background-color: #fff;
         color: #000;
         border-radius: 8px;

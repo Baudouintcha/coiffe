@@ -1,23 +1,30 @@
 <?php
-include 'header.php';
-require 'config.php';
+// 1. TOUT EN HAUT : Sécurité et Session (Ligne 1, aucun espace avant)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Sécurité : réservé aux coiffeurs
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'coiffeur') {
-    header('Location: connexion.php');
+// Sécurité : Seul un coiffeur connecté peut accéder à son agenda
+// CORRIGÉ : Utilisation de id_user et redirection JavaScript pour éviter le bug d'affichage
+if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+    echo "<script>window.location.href='connexion.php';</script>";
     exit();
 }
 
-$id_coiffeur = $_SESSION['user_id'];
+// 2. Maintenant que la sécurité est validée, on inclut le visuel et la BDD
+include 'header.php';
+require 'config.php';
+
+$id_coiffeur = $_SESSION['id_user']; // CORRIGÉ : id_user partout
 $message = "";
 
-// Enregistrement des disponibilités
+// Enregistrement ou mise à jour des disponibilités
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['definir_horaires'])) {
     $jour_semaine = htmlspecialchars($_POST['jour_semaine']);
     $heure_debut = htmlspecialchars($_POST['heure_debut']);
     $heure_fin = htmlspecialchars($_POST['heure_fin']);
 
-    // Vérification si le jour existe déjà
+    // Vérification si le jour existe déjà pour ce coiffeur
     $check = $pdo->prepare("SELECT id_dispo FROM coiffeur_disponibilites WHERE id_coiffeur = ? AND jour_semaine = ?");
     $check->execute([$id_coiffeur, $jour_semaine]);
 
@@ -31,14 +38,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['definir_horaires'])) {
     $message = "<div class='alert alert-success'>Disponibilités mises à jour avec succès.</div>";
 }
 
-// Récupération des disponibilités
+// INTEGRATION : Traitement de la suppression d'une disponibilité au clic sur la poubelle
+if (isset($_GET['supprimer_dispo'])) {
+    $id_dispo = intval($_GET['supprimer_dispo']);
+    
+    // Sécurité : On vérifie que cette dispo appartient bien au coiffeur connecté avant de supprimer
+    $check_dispo = $pdo->prepare("SELECT * FROM coiffeur_disponibilites WHERE id_dispo = ? AND id_coiffeur = ?");
+    $check_dispo->execute([$id_dispo, $id_coiffeur]);
+    
+    if ($check_dispo->rowCount() > 0) {
+        $delete = $pdo->prepare("DELETE FROM coiffeur_disponibilites WHERE id_dispo = ?");
+        $delete->execute([$id_dispo]);
+        // Redirection JS propre pour nettoyer l'URL après suppression
+        echo "<script>window.location.href='agenda_coiffeurs.php';</script>";
+        exit();
+    }
+}
+
+// Récupération des disponibilités mises à jour
 $dispo_stmt = $pdo->prepare("SELECT * FROM coiffeur_disponibilites WHERE id_coiffeur = ? ORDER BY id_dispo ASC");
 $dispo_stmt->execute([$id_coiffeur]);
 $disponibilites = $dispo_stmt->fetchAll();
 
 // Récupération des rendez-vous des clients (à venir)
-$rdv_stmt = $pdo->prepare("SELECT * FROM rendezvous WHERE id_coiffeur = ? ORDER BY date_rdv ASC");
-// (Note : Si la table rendezvous est créée plus tard, cette requête fonctionne avec les clés appropriées)
+// CORRIGÉ : rendezvous changé en rendez_vous pour correspondre à tes tables précédentes
+$rdv_stmt = $pdo->prepare("SELECT * FROM rendez_vous WHERE coiffeur_id = ? ORDER BY date_rdv ASC");
 ?>
 
 <section class="py-5" style="background-color: #000; min-height: 90vh;">
@@ -99,11 +123,11 @@ $rdv_stmt = $pdo->prepare("SELECT * FROM rendezvous WHERE id_coiffeur = ? ORDER 
                             <?php else: ?>
                                 <?php foreach ($disponibilites as $d): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($d['jour_semaine']); ?></td>
+                                        <td><strong><?php echo htmlspecialchars($d['jour_semaine']); ?></strong></td>
                                         <td><?php echo htmlspecialchars($d['heure_debut']); ?></td>
                                         <td><?php echo htmlspecialchars($d['heure_fin']); ?></td>
                                         <td>
-                                            <a href="agenda_coiffeur.php?supprimer_dispo=<?php echo $d['id_dispo']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Supprimer cette disponibilité ?')">
+                                            <a href="agenda_coiffeurs.php?supprimer_dispo=<?php echo $d['id_dispo']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Supprimer cette disponibilité ?')">
                                                 <i class="bi bi-trash"></i>
                                             </a>
                                         </td>

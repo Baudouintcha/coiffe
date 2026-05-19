@@ -1,133 +1,132 @@
 <?php
+// 1. Sécurité et Session
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Seul un client connecté peut réserver
+if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
+    echo "<script>window.location.href='connexion.php';</script>";
+    exit();
+}
+
 include 'header.php';
 require 'config.php';
 
-// Sécurité : réservé aux clients connectés
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'client') {
-    header('Location: connexion.php');
-    exit();
-}
-
-$id_client = $_SESSION['user_id'];
+$id_client = $_SESSION['id_user'];
 $message = "";
 
-// Récupération des informations du client connecté pour les pré-remplir
-$stmt_client = $pdo->prepare("SELECT nom, prenom, ville, quartier FROM users WHERE id = ?");
-$stmt_client->execute([$id_client]);
-$client = $stmt_client->fetch();
+// Récupération des paramètres de l'URL (Ex: reserver.php?prestation=5&coiffeur=2)
+$id_prestation = isset($_GET['prestation']) ? intval($_GET['prestation']) : 0;
+$id_coiffeur = isset($_GET['coiffeur']) ? intval($_GET['coiffeur']) : 0;
 
-// Récupération du coiffeur et de la prestation sélectionnés via l'URL (ex: reserver.php?coiffeur_id=X&presta_id=Y)
-$id_coiffeur = isset($_GET['coiffeur_id']) ? intval($_GET['coiffeur_id']) : null;
-$id_prestation = isset($_GET['presta_id']) ? intval($_GET['presta_id']) : null;
+// 1. On récupère les infos de la coiffure demandée
+$presta_stmt = $pdo->prepare("SELECT * FROM prestations WHERE id_prestation = ?");
+$presta_stmt->execute([$id_prestation]);
+$prestation = $presta_stmt->fetch();
 
-// S'il manque un paramètre, on redirige vers le catalogue pour choisir un style
-if (!$id_coiffeur || !$id_prestation) {
-    header('Location: catalogue.php');
+// 2. IMPORTANT : On récupère le temps configuré par le coiffeur pour cette prestation
+// Si le champ 'duree' est dans ta table 'prestations', il prend la valeur décidée par le coiffeur
+$duree_coiffeur = (isset($prestation['duree']) && $prestation['duree'] > 0) ? intval($prestation['duree']) : 60; // 60 min par défaut si vide
+
+if (!$prestation) {
+    echo "<div class='container mt-5 alert alert-danger'>Prestation introuvable.</div>";
+    include 'footer.php';
     exit();
 }
 
-// Récupération des détails du coiffeur et de la prestation
-$stmt_info = $pdo->prepare("SELECT u.nom, u.prenom, u.telephone, p.nom_style, p.prix 
-                            FROM users u 
-                            JOIN prestations p ON p.id_coiffeur = u.id 
-                            WHERE u.id = ? AND p.id_prestation = ?");
-$stmt_info->execute([$id_coiffeur, $id_prestation]);
-$infos = $stmt_info->fetch();
-
-if (!$infos) {
-    header('Location: catalogue.php');
-    exit();
-}
-
-// Traitement de la réservation
+// Traitement du formulaire de réservation
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirmer_rdv'])) {
     $date_rdv = htmlspecialchars($_POST['date_rdv']);
-    $heure_rdv = htmlspecialchars($_POST['heure_rdv']);
-    $lieu_rdv = htmlspecialchars($_POST['lieu']);
+    $heure_debut = htmlspecialchars($_POST['heure_debut']);
+    $heure_fin = htmlspecialchars($_POST['heure_fin']); // Ce champ aura été calculé par le JavaScript
 
-    // 1. Vérification si le jour est disponible dans l'agenda du coiffeur
-    $jour_semaine = date('l', strtotime($date_rdv)); // En anglais selon la base, on peut adapter
-
-    // Pour simplifier la correspondance des jours en français/anglais
-    $jours = ['Sunday' => 'Dimanche', 'Monday' => 'Lundi', 'Tuesday' => 'Mardi', 'Wednesday' => 'Mercredi', 'Thursday' => 'Jeudi', 'Friday' => 'Vendredi', 'Saturday' => 'Samedi'];
-    $jour_fr = $jours[date('l', strtotime($date_rdv))];
-
-    $stmt_dispo = $pdo->prepare("SELECT * FROM coiffeur_disponibilites WHERE id_coiffeur = ? AND jour_semaine = ?");
-    $stmt_dispo->execute([$id_coiffeur, $jour_fr]);
-    $dispo = $stmt_dispo->fetch();
-
-    if (!$dispo) {
-        $message = "<div class='alert alert-danger'><strong>Erreur :</strong> Ce jour-là, le coiffeur ne travaille pas.</div>";
+    // Insertion du rendez-vous en base de données
+    $insert = $pdo->prepare("INSERT INTO rendez_vous (id_client, coiffeur_id, id_prestation, date_rdv, heure_debut, heure_fin, statut) VALUES (?, ?, ?, ?, ?, ?, 'en_attente')");
+    
+    if ($insert->execute([$id_client, $id_coiffeur, $id_prestation, $date_rdv, $heure_debut, $heure_fin])) {
+        $message = "<div class='alert alert-success text-center'> Demande de rendez-vous envoyée au coiffeur !</div>";
     } else {
-        $heure_debut = strtotime($dispo['heure_debut']);
-        $heure_fin = strtotime($dispo['heure_fin']);
-        $heure_choisie = strtotime($heure_rdv);
-
-        // 2. Vérification des heures de travail
-        if ($heure_choisie < $heure_debut || ($heure_choisie + 7200) > $heure_fin) { // Ajout de 2h (durée de la prestation)
-            $message = "<div class='alert alert-danger'><strong>Alerte :</strong> Le coiffeur ne sera pas disponible à cette heure (créneau requis : 2 heures).</div>";
-        } else {
-            // 3. Vérification si le créneau est déjà pris
-            $stmt_rdv = $pdo->prepare("SELECT id_rdv FROM rendezvous WHERE id_coiffeur = ? AND date_rdv = ? AND heure_rdv = ?");
-            $stmt_rdv->execute([$id_coiffeur, $date_rdv, $heure_rdv]);
-
-            if ($stmt_rdv->rowCount() > 0) {
-                $message = "<div class='alert alert-warning'><strong>Alerte :</strong> Ce créneau est déjà occupé par une autre réservation !</div>";
-            } else {
-                // 4. Enregistrement
-                $stmt_insert = $pdo->prepare("INSERT INTO rendezvous (id_client, id_coiffeur, id_prestation, date_rdv, heure_rdv, lieu, statut) VALUES (?, ?, ?, ?, ?, ?, 'en_attente')");
-                if ($stmt_insert->execute([$id_client, $id_coiffeur, $id_prestation, $date_rdv, $heure_rdv, $lieu_rdv])) {
-                    $message = "<div class='alert alert-success'>Votre rendez-vous a été enregistré avec succès. Le coiffeur recevra la notification !</div>";
-                }
-            }
-        }
+        $message = "<div class='alert alert-danger text-center'>Une erreur est survenue, veuillez réessayer.</div>";
     }
 }
 ?>
 
 <section class="py-5" style="background-color: #000; min-height: 90vh;">
-    <div class="container mt-4" style="max-width: 600px;">
-        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">FINALISER VOTRE RÉSERVATION</h2>
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                
+                <?php echo $message; ?>
 
-        <?php echo $message; ?>
-
-        <div class="card p-4 shadow-lg" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
-            <h5 class="text-warning mb-4">Résumé de votre choix</h5>
-            <p class="text-white mb-1"><strong>Coiffeur :</strong> <?php echo htmlspecialchars(strtoupper($infos['nom'] . ' ' . $infos['prenom'])); ?></p>
-            <p class="text-white mb-1"><strong>Style :</strong> <?php echo htmlspecialchars($infos['nom_style']); ?></p>
-            <p class="text-success fw-bold fs-5 mb-4"><strong>Tarif :</strong> <?php echo number_format($infos['prix'], 0, ',', ' '); ?> FCFA</p>
-
-            <hr class="border-warning my-3">
-
-            <form method="POST">
-                <div class="mb-3">
-                    <label class="text-white small mb-1">Vos informations</label>
-                    <input type="text" class="form-control" value="<?php echo htmlspecialchars($client['nom'] . ' ' . $client['prenom']); ?>" readonly>
-                </div>
-
-                <div class="mb-3">
-                    <label class="text-white small mb-1">Lieu de résidence (lieu de la prestation)</label>
-                    <input type="text" name="lieu" class="form-control" value="<?php echo htmlspecialchars($client['ville'] . ', ' . $client['quartier']); ?>" required>
-                </div>
-
-                <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="text-white small mb-1">Jour du rendez-vous</label>
-                        <input type="date" name="date_rdv" class="form-control" min="<?php echo date('Y-m-d'); ?>" required>
+                <div class="card p-4 shadow-lg" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
+                    <h3 class="text-warning text-center mb-4" style="letter-spacing: 1px;">RÉSERVER MA SÉANCE</h3>
+                    
+                    <div class="p-3 mb-4 rounded bg-dark border border-secondary">
+                        <h5 class="text-white mb-1 text-center"><?php echo htmlspecialchars($prestation['nom_style']); ?></h5>
+                        <p class="text-success fw-bold mb-0 text-center"><?php echo number_format($prestation['prix'], 0, ',', ' '); ?> FCFA</p>
+                        <hr class="border-secondary my-2">
+                        <p class="text-secondary small text-center mb-0">
+                            <i class="bi bi-hourglass-split text-warning"></i> Temps défini par le coiffeur : <strong><?php echo $duree_coiffeur; ?> minutes</strong>
+                        </p>
                     </div>
-                    <div class="col-md-6">
-                        <label class="text-white small mb-1">Heure de début</label>
-                        <input type="time" name="heure_rdv" class="form-control" required>
-                    </div>
-                </div>
 
-                <button type="submit" name="confirmer_rdv" class="btn btn-gold w-100 py-2 fw-bold mt-3">
-                    VALIDER LA RÉSERVATION
-                </button>
-            </form>
+                    <form method="POST">
+                        <input type="hidden" id="temps_coiffeur" value="<?php echo $duree_coiffeur; ?>">
+
+                        <div class="mb-3">
+                            <label class="text-white small mb-1">Date du rendez-vous</label>
+                            <input type="date" name="date_rdv" class="form-control" min="<?php echo date('Y-m-d'); ?>" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="text-white small mb-1">Heure de début</label>
+                                <input type="time" id="heure_debut" name="heure_debut" class="form-control" required>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="text-white small mb-1">Heure de fin </label>
+                                <input type="time" id="heure_fin" name="heure_fin" class="form-control bg-dark border-secondary text-warning fw-bold" readonly required>
+                            </div>
+                        </div>
+
+                        <button type="submit" name="confirmer_rdv" class="btn btn-gold w-100 py-2 fw-bold mt-3">
+                            CONFIRMER LA RÉSERVATION
+                        </button>
+                    </form>
+
+                </div>
+            </div>
         </div>
     </div>
 </section>
+
+<script>
+document.getElementById('heure_debut').addEventListener('change', function() {
+    let heureSelectionnee = this.value; // Récupère par ex: "10:30"
+    let tempsNecessaire = parseInt(document.getElementById('temps_coiffeur').value); // Récupère le temps du coiffeur (ex: 90)
+    
+    if (heureSelectionnee && !isNaN(tempsNecessaire)) {
+        // On sépare les heures et les minutes choisies
+        let [heures, minutes] = heureSelectionnee.split(':').map(Number);
+        
+        // Calcul mathématique des nouvelles minutes
+        let totalMinutes = minutes + tempsNecessaire;
+        let nouvellesHeures = heures + Math.floor(totalMinutes / 60);
+        let nouvellesMinutes = totalMinutes % 60;
+        
+        // Gestion du cas où le calcul dépasse 24h (sécurité de base)
+        nouvellesHeures = nouvellesHeures % 24;
+        
+        // Formatage pour l'affichage (ex: transformer "9" en "09")
+        let formatHeure = String(nouvellesHeures).padStart(2, '0');
+        let formatMinute = String(nouvellesMinutes).padStart(2, '0');
+        
+        // On implémente directement le résultat dans l'input d'heure de fin
+        document.getElementById('heure_fin').value = `${formatHeure}:${formatMinute}`;
+    }
+});
+</script>
 
 <style>
     .form-control {
@@ -135,14 +134,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirmer_rdv'])) {
         color: #000;
         border-radius: 8px;
     }
-
     .btn-gold {
         background-color: var(--gold);
         color: black;
         border: none;
         border-radius: 8px;
     }
-
     .btn-gold:hover {
         background-color: #c99b2c;
     }

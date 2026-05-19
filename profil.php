@@ -1,225 +1,138 @@
 <?php
-// 1. TOUT EN HAUT : Sécurité et Session
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Si l'utilisateur n'est pas connecté, redirection immédiate en JS
+require 'config.php';
+include 'header.php';
+
+// SÉCURITÉ : Si l'utilisateur n'est pas connecté, on le renvoie à la page de connexion
 if (!isset($_SESSION['id_user'])) {
-    echo "<script>window.location.href='connexion.php';</script>";
+    header("Location: connexion.php");
     exit();
 }
 
-// Inclusion du header (la sidebar s'adaptera automatiquement grâce à nos modifs d'avant)
-include 'header.php';
-require 'config.php';
+$user_id = $_SESSION['id_user'];
 
-// Récupération des informations fraîches de l'utilisateur depuis la BDD
-$id_user = $_SESSION['id_user'];
-$stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-$stmt->execute([$id_user]);
+// Récupération des informations de l'utilisateur connecté (Client ou Coiffeur)
+$stmt = $pdo->prepare("SELECT * FROM utilisateurs WHERE id_user = ?");
+$stmt->execute([$user_id]);
 $user = $stmt->fetch();
 
-// Si l'utilisateur n'existe pas en BDD (sécurité)
-if (!$user) {
-    echo "<script>window.location.href='deconnexion.php';</script>";
+// Si l'utilisateur est un admin, il n'a rien à faire ici, son dashboard est sur l'index
+if ($user['role'] === 'admin') {
+    header("Location: index.php");
     exit();
 }
 
-// Initialisation de variables de stats pour le tableau de bord selon le rôle
-$stats_rdv = 0;
-$solde_portefeuille = 0;
-
-if ($user['role'] === 'client') {
-    // Compter ses rendez-vous passés ou en attente
-    $stmt_stats = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE client_id = ?");
-    $stmt_stats->execute([$id_user]);
-    $stats_rdv = $stmt_stats->fetchColumn();
-} elseif ($user['role'] === 'coiffeur') {
-    // Compter ses rendez-vous à gérer
-    $stmt_stats = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE coiffeur_id = ?");
-    $stmt_stats->execute([$id_user]);
-    $stats_rdv = $stmt_stats->fetchColumn();
+// LOGIQUE DE TRAITEMENT : SUPPRESSION DU COMPTE
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression'])) {
+    $raison = htmlspecialchars(trim($_POST['raison_depart']));
     
-    // Simulation ou récupération du portefeuille si le champ existe (sinon valeur par défaut)
-    $solde_portefeuille = $user['portefeuille'] ?? 0; 
+    if (!empty($raison)) {
+        // 1. On sauvegarde la raison du départ pour l'admin avant de supprimer le compte
+        $log = $pdo->prepare("INSERT INTO suppressions_comptes (nom_utilisateur, email_utilisateur, role_utilisateur, raison) VALUES (?, ?, ?, ?)");
+        $log->execute([$user['nom'], $user['email'], $user['role'], $raison]);
+        
+        // 2. Suppression définitive de l'utilisateur de la BDD
+        $del = $pdo->prepare("DELETE FROM utilisateurs WHERE id_user = ?");
+        $del->execute([$user_id]);
+        
+        // 3. On détruit la session (déconnexion forcée puisque le compte n'existe plus)
+        session_destroy();
+        
+        // 4. Alerte et redirection vers l'accueil invité
+        echo "<script>
+                alert('Votre demande a bien été prise en compte. Votre compte et vos données ont été définitivement supprimés.');
+                window.location.href='index.php';
+              </script>";
+        exit();
+    }
 }
 ?>
 
-<div class="container py-5" style="min-height: 90vh;">
-    <div class="row mb-5">
-        <div class="col-12 text-center text-md-start">
-            <h2 class="text-warning border-bottom border-warning pb-3 d-inline-block" style="letter-spacing: 2px;">
-                ESPACE PROFIL &bull; <?php echo strtoupper($user['role']); ?>
-            </h2>
-            <p class="text-secondary mt-2">Bienvenue sur votre tableau de bord personnel, <?php echo htmlspecialchars($user['prenom']); ?>.</p>
-        </div>
-    </div>
-
-    <div class="row g-4">
-        <div class="col-lg-5 col-md-12">
-            <div class="id-card-container">
-                <div class="id-card">
-                    <div class="id-card-header d-flex justify-content-between align-items-center">
-                        <span class="fw-bold tracking-wider text-dark small">COIFFE CHEZ TOI</span>
-                        <span class="badge bg-dark text-warning border border-warning px-2 py-1 uppercase small">
-                            <?php echo htmlspecialchars($user['role']); ?>
+<section class="py-5" style="background-color: #000; min-height: 90vh; color: #fff;">
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-7 col-lg-6">
+                
+                <div class="card p-4 mb-4" style="background-color: #111; border: 1px solid #222; border-radius: 16px;">
+                    <div class="text-center mb-4">
+                        <img src="<?php echo !empty($user['photo_profil']) ? htmlspecialchars($user['photo_profil']) : 'uploads/default.png'; ?>" 
+                             class="rounded-circle border border-warning mb-3 shadow" 
+                             style="width: 110px; height: 110px; object-fit: cover;" alt="Avatar">
+                        
+                        <h3 class="text-warning fw-bold mb-1"><?php echo htmlspecialchars(strtoupper($user['nom'])); ?></h3>
+                        <span class="badge bg-black border border-secondary text-secondary px-3 py-1 text-uppercase mb-2">
+                            Espace <?php echo $user['role']; ?>
                         </span>
                     </div>
-                    
-                    <div class="id-card-body row mt-4 align-items-center">
-                        <div class="col-4 text-center">
-                            <div class="avatar-box border border-dark rounded d-flex align-items-center justify-content-center bg-light text-dark">
-                                <i class="bi bi-person-vcard fs-1 text-secondary"></i>
-                            </div>
+
+                    <div class="bg-black p-3 rounded border border-secondary mb-3">
+                        <div class="d-flex justify-content-between border-bottom border-dark pb-2 mb-2 small">
+                            <span class="text-secondary">Adresse Email :</span>
+                            <span class="text-white fw-bold"><?php echo htmlspecialchars($user['email']); ?></span>
                         </div>
-                        <div class="col-8 id-fields">
-                            <div class="mb-2">
-                                <small class="text-muted d-block text-uppercase">Nom & Prénom</small>
-                                <span class="fw-bold text-dark fs-5"><?php echo htmlspecialchars(strtoupper($user['nom']) . ' ' . $user['prenom']); ?></span>
-                            </div>
-                            <div class="mb-2">
-                                <small class="text-muted d-block text-uppercase">Identifiant unique</small>
-                                <span class="font-monospace text-dark">#CCT-00<?php echo htmlspecialchars($user['id']); ?></span>
-                            </div>
-                            <div>
-                                <small class="text-muted d-block text-uppercase">Téléphone</small>
-                                <span class="fw-bold text-dark"><?php echo htmlspecialchars($user['telephone']); ?></span>
-                            </div>
+                        <div class="d-flex justify-content-between border-bottom border-dark pb-2 mb-2 small">
+                            <span class="text-secondary">Ville / Localité :</span>
+                            <span class="text-white fw-bold"><?php echo htmlspecialchars($user['ville'] ?? 'Non renseignée'); ?></span>
                         </div>
+                        <?php if ($user['role'] === 'coiffeur'): ?>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-secondary">Statut Abonnement :</span>
+                                <span class="fw-bold <?php echo $user['abonnement_actif'] ? 'text-success' : 'text-danger'; ?>">
+                                    <?php echo $user['abonnement_actif'] ? 'Actif (Payé)' : 'Inactif'; ?>
+                                </span>
+                            </div>
+                        <?php endif; ?>
                     </div>
-                    
-                    <div class="id-card-footer mt-4 pt-3 border-top border-secondary-subtle d-flex justify-content-between align-items-center">
-                        <div>
-                            <small class="text-muted d-block">Statut du compte</small>
-                            <span class="text-success fw-bold"><i class="bi bi-patch-check-fill"></i> Actif</span>
-                        </div>
-                        <img src="images/logo.png" alt="Logo" style="height: 30px; opacity: 0.7; filter: grayscale(100%);" onerror="this.style.display='none'">
+
+                    <div class="mt-2">
+                        <a href="deconnexion.php" class="btn btn-outline-secondary w-100 fw-bold py-2" style="border-radius: 8px;">
+                            <i class="bi bi-box-arrow-left me-2"></i> SE DÉCONNECTER
+                        </a>
                     </div>
                 </div>
+
+                <div class="card p-4" style="background-color: #111; border: 1px solid #dc3545; border-radius: 16px;">
+                    <h5 class="text-danger fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i> Zone de Danger</h5>
+                    <p class="text-secondary small mb-3">
+                        Si vous décidez de supprimer votre compte, cette action sera instantanée et irréversible. Toutes vos données (prestations, rendez-vous, historique) seront effacées de nos serveurs.
+                    </p>
+
+                    <button class="btn btn-sm btn-outline-danger w-100 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#formulaireSuppression">
+                        <i class="bi bi-trash3 me-1"></i> Supprimer mon compte définitivement
+                    </button>
+
+                    <div class="collapse mt-3" id="formulaireSuppression">
+                        <form method="POST" class="p-3 rounded bg-black border border-secondary">
+                            <div class="mb-3">
+                                <label class="text-warning small fw-bold mb-2">Veuillez indiquer la raison de votre décision (Obligatoire pour l'administration) :</label>
+                                <textarea name="raison_depart" class="form-control bg-dark text-white border-secondary small" rows="3" placeholder="Ex: Je n'utilise plus l'application, je change de secteur, problème d'abonnement..." required></textarea>
+                            </div>
+                            
+                            <div class="p-2 bg-dark rounded small text-secondary mb-3 border border-secondary">
+                                <i class="bi bi-info-circle text-warning me-1"></i> En cliquant sur le bouton ci-dessous, votre compte sera immédiatement détruit et vous serez redirigé.
+                            </div>
+
+                            <button type="submit" name="confirmer_suppression" class="btn btn-danger btn-sm w-100 fw-bold" onclick="return confirm('Êtes-vous sûr à 100% de vouloir détruire votre compte maintenant ?');">
+                                CONFIRMER L'EFFACEMENT IMMÉDIAT
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
             </div>
-            
-            <div class="d-grid mt-4">
-                <a href="deconnexion.php" class="btn btn-outline-danger fw-bold py-2">
-                    <i class="bi bi-box-arrow-left"></i> Se déconnecter de la session
-                </a>
-            </div>
-        </div>
-
-        <div class="col-lg-7 col-md-12">
-            
-            <?php if ($user['role'] === 'client'): ?>
-                <div class="row g-3">
-                    <div class="col-md-6 col-12">
-                        <div class="card bg-card-custom border border-secondary text-white p-4 h-100">
-                            <h5 class="text-warning"><i class="bi bi-calendar3"></i> Mes Rendez-vous</h5>
-                            <p class="fs-3 fw-bold my-2"><?php echo $stats_rdv; ?></p>
-                            <p class="text-secondary small">Total des réservations enregistrées sur votre compte.</p>
-                            <a href="mes_rendezvous.php" class="btn btn-warning btn-sm mt-auto fw-bold text-dark">Voir l'historique</a>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-6 col-12">
-                        <div class="card bg-card-custom border border-secondary text-white p-4 h-100">
-                            <h5 class="text-warning"><i class="bi bi-scissors"></i> Prendre RDV</h5>
-                            <p class="text-secondary small mt-3">Envie d'une nouvelle coupe fraîche à domicile ? Parcourez le catalogue complet.</p>
-                            <a href="catalogue.php" class="btn btn-outline-warning btn-sm mt-auto fw-bold">Ouvrir le catalogue</a>
-                        </div>
-                    </div>
-                </div>
-
-            <?php elseif ($user['role'] === 'coiffeur'): ?>
-                <div class="row g-3 mb-4">
-                    <div class="col-sm-6 col-12">
-                        <div class="card bg-card-custom border border-secondary text-white p-4">
-                            <h6 class="text-secondary text-uppercase small">Rendez-vous à gérer</h6>
-                            <div class="d-flex justify-content-between align-items-center mt-2">
-                                <span class="fs-2 fw-bold text-warning"><?php echo $stats_rdv; ?></span>
-                                <i class="bi bi-calendar-check fs-2 text-secondary"></i>
-                            </div>
-                            <a href="valider_rendezvous.php" class="btn btn-link text-warning text-decoration-none p-0 mt-3 small text-start">
-                                Ouvrir mon agenda <i class="bi bi-arrow-right"></i>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <div class="col-sm-6 col-12">
-                        <div class="card bg-card-custom border border-secondary text-white p-4">
-                            <h6 class="text-secondary text-uppercase small">Mon Portefeuille (Gains)</h6>
-                            <div class="d-flex justify-content-between align-items-center mt-2">
-                                <span class="fs-2 fw-bold text-success"><?php echo number_format($solde_portefeuille, 0, ',', ' '); ?> <small class="fs-6">FCFA</small></span>
-                                <i class="bi bi-wallet2 fs-2 text-secondary"></i>
-                            </div>
-                            <a href="portefeuille.php" class="btn btn-link text-success text-decoration-none p-0 mt-3 small text-start">
-                                Retirer mes fonds <i class="bi bi-arrow-right"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card bg-card-custom border border-warning text-white p-4">
-                    <h5 class="text-warning mb-3"><i class="bi bi-award"></i> Certification & Diplôme Professionnel</h5>
-                    <p class="text-secondary small">Voici le document justificatif enregistré lors de votre inscription pour valider vos compétences de coiffeur sur la plateforme.</p>
-                    
-                    <div class="text-center mt-3 bg-dark p-3 border border-secondary rounded overflow-hidden">
-                        <img src="<?php echo !empty($user['diplome']) ? htmlspecialchars($user['diplome']) : 'images/diplome_default.jpg'; ?>" 
-                             alt="Diplôme de Coiffure Professionnel" 
-                             class="img-fluid rounded diplome-preview"
-                             style="max-height: 220px; object-fit: contain; width: 100%;">
-                    </div>
-                    <small class="text-center text-muted mt-2 d-block">
-                        <i class="bi bi-info-circle"></i> Dimensions certifiées conformes par l'administration CCT.
-                    </small>
-                </div>
-            <?php endif; ?>
-
         </div>
     </div>
-</div>
+</section>
 
 <style>
-    /* Style de la boîte Dashboard de droite */
-    .bg-card-custom {
+    .form-control:focus {
         background-color: #1a1a1a !important;
-        border-radius: 12px;
-        transition: transform 0.3s ease;
-    }
-    .bg-card-custom:hover {
-        transform: translateY(-3px);
-    }
-
-    /* --- EFFET CARTE D'IDENTITÉ GRAPHIQUE --- */
-    .id-card-container {
-        perspective: 1000px;
-    }
-    .id-card {
-        background: linear-gradient(135deg, #e5c060 0%, #ffffff 60%, #f4f4f4 100%);
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 15px 35px rgba(212, 175, 55, 0.15), 0 5px 15px rgba(0, 0, 0, 0.5);
-        color: #000;
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        position: relative;
-    }
-    .avatar-box {
-        width: 85px;
-        height: 100px;
-        border-style: dashed !important;
-        border-color: #6c757d !important;
-    }
-    .id-fields small {
-        font-size: 0.65rem;
-        letter-spacing: 1px;
-        color: #555 !important;
-    }
-
-    /* Effet Zoom sur le diplôme */
-    .diplome-preview {
-        transition: transform 0.4s ease;
-        cursor: pointer;
-    }
-    .diplome-preview:hover {
-        transform: scale(1.03);
+        border-color: var(--gold) !important;
+        box-shadow: none;
+        color: #fff;
     }
 </style>
 

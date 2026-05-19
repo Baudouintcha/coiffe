@@ -120,7 +120,9 @@
 
         <a href="index.php"><i class="bi bi-house-door"></i> Accueil</a>
 
-        <a href="annuaire_coiffeurs.php" class="text-warning fw-bold"><i class="bi bi-search"></i> Trouver un coiffeur</a>
+        <?php if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'coiffeur'): ?>
+            <a href="annuaire_coiffeurs.php" class="text-warning fw-bold"><i class="bi bi-search"></i> Trouver un coiffeur</a>
+        <?php endif; ?>
 
         <a href="catalogue.php"><i class="bi bi-images"></i> Catalogue des styles</a>
 
@@ -135,9 +137,10 @@
 
             <?php if ($_SESSION['role'] == 'coiffeur'): ?>
                 <a href="valider_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes rendez-vous</a>
-                <a href="catalogue.php"><i class="bi bi-camera"></i> Gérer mes coiffures</a>
-                <a href="agenda_coiffeur.php"><i class="bi bi-people"></i> Mes clients</a>
+                <a href="gestion_catalogue.php"><i class="bi bi-scissors"></i> Gérer mes coiffures</a>
+                <a href="agenda_coiffeurs.php"><i class="bi bi-people"></i> Mes clients</a>
                 <a href="portefeuille.php"><i class="bi bi-wallet2"></i> Mes gains</a>
+                <a href="profil.php"><i class="bi bi-person-badge"></i> Mon Profil Pro</a>
             <?php endif; ?>
 
             <a href="deconnexion.php" class="text-danger fw-bold border border-danger rounded text-center m-3 py-2"><i class="bi bi-power"></i> Déconnexion</a>
@@ -180,11 +183,13 @@
                     </a>
                 </div>
 
-                <div class="d-none d-md-flex align-items-center me-3">
-                    <a href="annuaire_coiffeurs.php" class="btn btn-warning btn-sm fw-bold px-3 py-2 text-dark">
-                        <i class="bi bi-search"></i> Trouver un coiffeur
-                    </a>
-                </div>
+                <?php if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'coiffeur'): ?>
+                    <div class="d-none d-md-flex align-items-center me-3">
+                        <a href="annuaire_coiffeurs.php" class="btn btn-warning btn-sm fw-bold px-3 py-2 text-dark">
+                            <i class="bi bi-search"></i> Trouver un coiffeur
+                        </a>
+                    </div>
+                <?php endif; ?>
 
                 <button class="navbar-toggler border-warning shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarHeader">
                     <span class="navbar-toggler-icon"></span>
