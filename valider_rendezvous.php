@@ -1,146 +1,247 @@
 <?php
-include 'header.php';
-require 'config.php';
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 
-// Sécurité : réservé aux coiffeurs
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'coiffeur') {
-    header('Location: connexion.php');
+// SÉCURITÉ : Seul un coiffeur connecté peut gérer cette page
+if ($role_utilisateur !== 'coiffeur') {
+    header("Location: index.php");
     exit();
 }
 
-$id_coiffeur = $_SESSION['user_id'];
-$message = "";
+$coiffeur_id = $_SESSION['id_user'];
+$message_action = "";
 
-// Traitement du changement de statut du rendez-vous
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['changer_statut'])) {
-    $id_rdv = intval($_POST['id_rdv']);
-    $nouveau_statut = htmlspecialchars($_POST['statut']);
+// =================================================================
+// 1. LE ROBOT AUTOMATIQUE : TRAITEMENT DES EXPIRATIONS (TIMEOUT)
+// =================================================================
+// On récupère tous les RDV "en attente" pour vérifier s'ils ont expiré
+$stmt_verif_expiration = $pdo->prepare("
+    SELECT r.*, p.prix, p.id_coiffeur, u.ville 
+    FROM rendezvous r
+    JOIN prestations p ON r.id_prestation = p.id_prestation
+    JOIN users u ON p.id_coiffeur = u.id
+    WHERE r.statut = 'en_attente'
+");
+$stmt_verif_expiration->execute();
+$rdvs_en_attente = $stmt_verif_expiration->fetchAll();
 
-    // On s'assure que le coiffeur est bien concerné par ce RDV
-    $stmt_check = $pdo->prepare("SELECT id_rdv FROM rendezvous WHERE id_rdv = ? AND id_coiffeur = ?");
-    $stmt_check->execute([$id_rdv, $id_coiffeur]);
+foreach ($rdvs_en_attente as $rdv) {
+    $date_demande = strtotime($rdv['date_demande']);
+    $date_rdv = $rdv['date_rdv'];
+    $heure_actuelle = time();
+    
+    // Détermination du délai limite : jour même = 15 min (900s), lendemain ou plus = 1h (3600s)
+    $delai_limite = ($date_rdv === date('Y-m-d')) ? 900 : 3600;
 
-    if ($stmt_check->rowCount() > 0) {
-        $stmt_update = $pdo->prepare("UPDATE rendezvous SET statut = ? WHERE id_rdv = ?");
-        if ($stmt_update->execute([$nouveau_statut, $id_rdv])) {
-            $message = "<div class='alert alert-success'>Statut du rendez-vous mis à jour avec succès.</div>";
-        } else {
-            $message = "<div class='alert alert-danger'>Une erreur est survenue.</div>";
+    // Si le temps est écoulé !
+    if (($heure_actuelle - $date_demande) > $delai_limite) {
+        $pdo->beginTransaction();
+        try {
+            // A. On passe le rendez-vous en statut 'expire'
+            $up_rdv = $pdo->prepare("UPDATE rendezvous SET statut = 'expire' WHERE id_rendezvous = ?");
+            $up_rdv->execute([$rdv['id_rendezvous']]);
+
+            // B. REMBOURSEMENT DU CLIENT (On dégèle son argent)
+            if ($rdv['paiement_statut'] === 'gele') {
+                // On remet l'argent dans son solde et on le retire de l'argent gelé
+                $up_wallet = $pdo->prepare("UPDATE portefeuilles SET solde = solde + ?, argent_gele = argent_gele - ? WHERE user_id = ?");
+                $up_wallet->execute([$rdv['prix'], $rdv['prix'], $rdv['id_client']]);
+
+                // On écrit la ligne dans l'historique sécurisé
+                $ins_transac = $pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif) VALUES (?, 'deblocage_rdv', ?, ?)");
+                $ins_transac->execute([$rdv['id_client'], $rdv['prix'], "Remboursement automatique : Le coiffeur n'a pas répondu à temps (RDV #" . $rdv['id_rendezvous'] . ")"]);
+            }
+            $pdo->commit();
+        } catch (Exception $e) {
+            $pdo->rollBack();
         }
     }
 }
 
-// Récupération de tous les rendez-vous liés à ce coiffeur
-$stmt_rdv = $pdo->prepare("SELECT r.*, p.nom_style, p.prix, u.nom AS client_nom, u.prenom AS client_prenom, u.telephone AS client_telephone 
-                           FROM rendezvous r 
-                           JOIN prestations p ON r.id_prestation = p.id_prestation 
-                           JOIN users u ON r.id_client = u.id 
-                           WHERE r.id_coiffeur = ? 
-                           ORDER BY r.date_rdv DESC, r.heure_rdv DESC");
-$stmt_rdv->execute([$id_coiffeur]);
-$rendezvous_liste = $stmt_rdv->fetchAll();
+// =================================================================
+// 2. TRAITEMENT DES CLICS MANUELS (ACCEPTER / REFUSER)
+// =================================================================
+if (isset($_GET['action']) && isset($_GET['id_rdv'])) {
+    $action = htmlspecialchars($_GET['action']);
+    $id_rdv = intval($_GET['id_rdv']);
+
+    // Vérification que ce RDV appartient bien à ce coiffeur
+    $verif = $pdo->prepare("SELECT r.*, p.prix FROM rendezvous r JOIN prestations p ON r.id_prestation = p.id_prestation WHERE r.id_rendezvous = ? AND p.id_coiffeur = ?");
+    $verif->execute([$id_rdv, $coiffeur_id]);
+    $rdv_valid = $verif->fetch();
+
+    if ($rdv_valid && $rdv_valid['statut'] === 'en_attente') {
+        $pdo->beginTransaction();
+        try {
+            if ($action === 'accepter') {
+                // A. Le RDV est validé
+                $stmt = $pdo->prepare("UPDATE rendezvous SET statut = 'confirme', paiement_statut = 'paye' WHERE id_rendezvous = ?");
+                $stmt->execute([$id_rdv]);
+
+                // B. L'argent gelé du client est détruit
+                $up_client = $pdo->prepare("UPDATE portefeuilles SET argent_gele = argent_gele - ? WHERE user_id = ?");
+                $up_client->execute([$rdv_valid['prix'], $rdv_valid['id_client']]);
+
+                // C. Le portefeuille du coiffeur reçoit l'argent
+                // Calcul de la commission de l'admin (Ex: 10%)
+                $commission = $rdv_valid['prix'] * 0.10;
+                $gain_coiffeur = $rdv_valid['prix'] - $commission;
+
+                // Création/Mise à jour du portefeuille du coiffeur
+                $up_coiffeur = $pdo->prepare("INSERT INTO portefeuilles (user_id, solde) VALUES (?, ?) ON DUPLICATE KEY UPDATE solde = solde + ?");
+                $up_coiffeur->execute([$coiffeur_id, $gain_coiffeur, $gain_coiffeur]);
+
+                // Historique pour le coiffeur
+                $ins_t = $pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif) VALUES (?, 'gain_prestation', ?, ?)");
+                $ins_t->execute([$coiffeur_id, $gain_coiffeur, "Gain prestation RDV #" . $id_rdv]);
+
+                $message_action = "<div class='alert alert-success text-center fw-bold mb-4'><i class='bi bi-check-circle-fill'></i> Rendez-vous confirmé ! L'argent a été transféré dans votre portefeuille.</div>";
+
+            } elseif ($action === 'refuser') {
+                // A. On annule le RDV
+                $stmt = $pdo->prepare("UPDATE rendezvous SET statut = 'annule' WHERE id_rendezvous = ?");
+                $stmt->execute([$id_rdv]);
+
+                // B. On rend immédiatement l'argent sur le solde du client
+                if ($rdv_valid['paiement_statut'] === 'gele') {
+                    $up_wallet = $pdo->prepare("UPDATE portefeuilles SET solde = solde + ?, argent_gele = argent_gele - ? WHERE user_id = ?");
+                    $up_wallet->execute([$rdv_valid['prix'], $rdv_valid['prix'], $rdv_valid['id_client']]);
+
+                    $ins_transac = $pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif) VALUES (?, 'deblocage_rdv', ?, ?)");
+                    $ins_transac->execute([$rdv_valid['id_client'], $rdv_valid['prix'], "Rendez-vous refusé par le coiffeur (RDV #" . $id_rdv . ")"]);
+                }
+
+                $message_action = "<div class='alert alert-danger text-center fw-bold mb-4'><i class='bi bi-exclamation-triangle-fill'></i> Vous avez refusé le rendez-vous. Le client a été remboursé.</div>";
+            }
+            $pdo->commit();
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $message_action = "<div class='alert alert-warning text-center fw-bold mb-4'>Une erreur est survenue lors du traitement.</div>";
+        }
+    }
+}
+
+// =================================================================
+// 3. RÉCUPÉRATION DES RENDEZ-VOUS DU COIFFEUR POUR AFFICHAGE
+// =================================================================
+$query = "SELECT r.*, u.nom AS nom_client, u.telephone, u.ville AS ville_client, p.nom_style, p.prix 
+          FROM rendezvous r
+          JOIN users u ON r.id_client = u.id
+          JOIN prestations p ON r.id_prestation = p.id_prestation
+          WHERE p.id_coiffeur = ? 
+          ORDER BY r.date_rdv DESC, r.heure_rdv DESC";
+$stmt = $pdo->prepare($query);
+$stmt->execute([$coiffeur_id]);
+$mes_rendezvous = $stmt->fetchAll();
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh;">
-    <div class="container mt-4">
-        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">GESTION DES RENDEZ-VOUS</h2>
+<div class="container py-5" style="min-height: 80vh;">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="text-warning fw-bold"><i class="bi bi-shield-shaded me-2"></i> TABLEAU DES DEMANDES ENTRANTES</h2>
+            <p class="text-secondary small">Respectez vos chronos (15min pour le jour même, 1h pour le lendemain) pour éviter l'annulation automatique.</p>
+        </div>
+    </div>
 
-        <?php echo $message; ?>
+    <?php echo $message_action; ?>
 
+    <div class="card border-secondary p-4" style="background-color: var(--card-bg); border-radius: 12px;">
         <div class="table-responsive">
-            <table class="table table-dark table-bordered border-warning align-middle">
+            <table class="table table-dark table-hover align-middle text-center mb-0">
                 <thead>
-                    <tr class="text-warning">
-                        <th>Date & Heure</th>
+                    <tr class="text-secondary small border-bottom border-secondary">
                         <th>Client</th>
-                        <th>Prestation</th>
-                        <th>Montant</th>
-                        <th>Lieu</th>
-                        <th>Contact</th>
-                        <th>Statut actuel</th>
-                        <th>Action</th>
+                        <th>Style & Tarif</th>
+                        <th>Créneau Demandé</th>
+                        <th>Statut Interne</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (empty($rendezvous_liste)): ?>
+                    <?php if (empty($mes_rendezvous)): ?>
                         <tr>
-                            <td colspan="8" class="text-center text-secondary py-5">
-                                <i class="bi bi-calendar-x fs-2"></i><br>
-                                Aucune demande de rendez-vous pour le moment.
-                            </td>
+                            <td colspan="5" class="text-muted py-5">Aucune activité enregistrée.</td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($rendezvous_liste as $rdv): ?>
-                            <tr>
+                        <?php foreach ($mes_rendezvous as $rdv): ?>
+                            <tr class="border-bottom border-dark">
                                 <td>
-                                    <strong><?php echo htmlspecialchars(date('d/m/Y', strtotime($rdv['date_rdv']))); ?></strong><br>
-                                    <small class="text-secondary"><?php echo htmlspecialchars(substr($rdv['heure_rdv'], 0, 5)); ?></small>
+                                    <strong class="text-white d-block"><?php echo htmlspecialchars(strtoupper($rdv['nom_client'])); ?></strong>
+                                    <small class="text-secondary"><i class="bi bi-geo-alt"></i> <?php echo htmlspecialchars($rdv['ville_client']); ?></small>
                                 </td>
-                                <td><?php echo htmlspecialchars(strtoupper($rdv['client_nom'] . ' ' . $rdv['client_prenom'])); ?></td>
-                                <td><?php echo htmlspecialchars($rdv['nom_style']); ?></td>
-                                <td class="text-success fw-bold"><?php echo number_format($rdv['prix'], 0, ',', ' '); ?> FCFA</td>
-                                <td><?php echo htmlspecialchars($rdv['lieu']); ?></td>
-                                <td>
-                                    <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $rdv['client_telephone']); ?>" target="_blank" class="btn btn-success btn-sm">
-                                        <i class="bi bi-whatsapp"></i> Contacter
-                                    </a>
+                                <td class="text-warning">
+                                    <span class="d-block text-white font-monospace"><?php echo htmlspecialchars($rdv['nom_style']); ?></span>
+                                    <strong><?php echo number_format($rdv['prix'], 0, ',', ' '); ?> F</strong>
                                 </td>
                                 <td>
-                                    <?php if ($rdv['statut'] == 'en_attente'): ?>
-                                        <span class="badge bg-warning text-dark">En attente</span>
-                                    <?php elseif ($rdv['statut'] == 'confirme'): ?>
-                                        <span class="badge bg-primary">Confirmé</span>
-                                    <?php elseif ($rdv['statut'] == 'termine'): ?>
-                                        <span class="badge bg-success">Terminé</span>
+                                    <span class="badge bg-black border border-secondary text-white"><?php echo date('d/m/Y', strtotime($rdv['date_rdv'])); ?></span>
+                                    <span class="badge bg-warning text-black fw-bold"><?php echo $rdv['heure_rdv']; ?></span>
+                                </td>
+                                <td>
+                                    <?php if ($rdv['statut'] === 'confirme'): ?>
+                                        <span class="badge bg-success-subtle text-success border border-success px-3">Encaissé</span>
+                                    <?php elseif ($rdv['statut'] === 'expire'): ?>
+                                        <span class="badge bg-secondary-subtle text-muted border border-secondary px-3">Expiré (Chrono dépassé)</span>
+                                    <?php elseif ($rdv['statut'] === 'annule'): ?>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger px-3">Annulé</span>
                                     <?php else: ?>
-                                        <span class="badge bg-secondary"><?php echo htmlspecialchars($rdv['statut']); ?></span>
+                                        <span class="badge bg-warning-subtle text-warning border border-warning px-3 animate-pulse">En attente</span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <form method="POST" class="d-flex gap-2">
-                                        <input type="hidden" name="id_rdv" value="<?php echo $rdv['id_rdv']; ?>">
-                                        <select name="statut" class="form-select form-select-sm" style="width: auto;">
-                                            <option value="confirme" <?php echo ($rdv['statut'] == 'confirme') ? 'selected' : ''; ?>>Confirmer</option>
-                                            <option value="termine" <?php echo ($rdv['statut'] == 'termine') ? 'selected' : ''; ?>>Terminé</option>
-                                            <option value="annule" <?php echo ($rdv['statut'] == 'annule') ? 'selected' : ''; ?>>Annuler</option>
-                                        </select>
-                                        <button type="submit" name="changer_statut" class="btn btn-warning btn-sm text-dark fw-bold">
-                                            Mettre à jour
-                                        </button>
-                                    </form>
+                                    <?php if ($rdv['statut'] === 'en_attente'): ?>
+                                        <div class="d-flex gap-2 justify-content-center">
+                                            <a href="valider_rendezvous.php?action=accepter&id_rdv=<?php echo $rdv['id_rendezvous']; ?>" class="btn btn-sm btn-success fw-bold px-3">Accepter</a>
+                                            <a href="valider_rendezvous.php?action=refuser&id_rdv=<?php echo $rdv['id_rendezvous']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Refuser et rembourser le client ?');">Refuser</a>
+                                        </div>
+                                    <?php else: ?>
+                                        <?php if ($rdv['statut'] === 'expire' || $rdv['statut'] === 'annule'): ?>
+                                            <button class="btn btn-sm btn-outline-warning small" type="button" data-bs-toggle="collapse" data-bs-target="#secours_<?php echo $rdv['id_rendezvous']; ?>">
+                                                <i class="bi bi-people-fill"></i> Voir alternatives
+                                            </button>
+                                        <?php else: ?>
+                                            <span class="text-muted small">Terminé</span>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
+                                
+                            <?php if ($rdv['statut'] === 'expire' || $rdv['statut'] === 'annule'): 
+                                // On cherche 3 coiffeurs différents de la même ville qui sont actifs (liaison table users via id)
+                                $stmt_secours = $pdo->prepare("SELECT id, nom, photo_profil FROM users WHERE role = 'coiffeur' AND ville = ? AND id != ? LIMIT 3");
+                                $stmt_secours->execute([$rdv['ville_client'], $coiffeur_id]);
+                                $coiffeurs_dispos = $stmt_secours->fetchAll();
+                            ?>
+                                <tr class="collapse bg-black" id="secours_<?php echo $rdv['id_rendezvous']; ?>">
+                                    <td colspan="5" class="p-3 text-start">
+                                        <h6 class="text-warning small fw-bold mb-2"><i class="bi bi-info-circle"></i> COIFFEURS DISPONIBLES DANS LA ZONE POUR LE CLIENT :</h6>
+                                        <div class="d-flex gap-4">
+                                            <?php if(empty($coiffeurs_dispos)): ?>
+                                                <span class="text-muted small">Aucun autre coiffeur disponible dans cette localité.</span>
+                                            <?php else: ?>
+                                                <?php foreach($coiffeurs_dispos as $c): ?>
+                                                    <div class="d-flex align-items-center gap-2 border border-secondary p-2 rounded bg-dark">
+                                                        <img src="<?php echo $c['photo_profil'] ?? 'uploads/default.png'; ?>" class="rounded-circle" style="width:30px; height:30px; object-fit:cover;">
+                                                        <span class="small fw-bold text-white"><?php echo htmlspecialchars($c['nom']); ?></span>
+                                                        <span class="badge bg-success small">Disponible</span>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
-
-        <div class="text-center mt-5">
-            <a href="agenda.php" class="btn btn-gold px-5 py-2 fw-bold">
-                <i class="bi bi-calendar3"></i> Voir mon agenda
-            </a>
-        </div>
     </div>
-</section>
+</div>
 
 <style>
-    .form-select {
-        background-color: #333;
-        color: #fff;
-        border: 1px solid var(--gold);
-    }
-
-    .btn-gold {
-        background-color: var(--gold);
-        color: black;
-        border: none;
-        border-radius: 8px;
-    }
-
-    .btn-gold:hover {
-        background-color: #c99b2c;
-    }
+    .animate-pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 </style>
 
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/layout/footer.php'; ?>

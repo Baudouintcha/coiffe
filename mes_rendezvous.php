@@ -11,8 +11,8 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
 }
 
 // Maintenant que la sécurité est passée, on inclut le visuel et la configuration
-include 'header.php';
-require 'config.php';
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 
 // Utilisation de la clé de session harmonisée
 $id_client = $_SESSION['id_user'];
@@ -108,4 +108,4 @@ $rendezvous = $stmt->fetchAll();
     }
 </style>
 
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/layout/footer.php'; ?>

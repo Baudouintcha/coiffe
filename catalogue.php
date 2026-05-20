@@ -1,6 +1,6 @@
 <?php
-include 'header.php';
-require 'config.php';
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 
 // Récupération de toutes les prestations de la base de données
 $stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone, u.ville, u.quartier 
@@ -69,4 +69,4 @@ $prestations = $stmt->fetchAll();
     }
 </style>
 
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/layout/footer.php'; ?>

@@ -3,8 +3,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require 'config.php';
-include 'header.php';
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 
 // SÉCURITÉ : Si l'utilisateur n'est pas connecté, on le renvoie à la page de connexion
 if (!isset($_SESSION['id_user'])) {
@@ -136,4 +136,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
     }
 </style>
 
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/layout/footer.php'; ?>

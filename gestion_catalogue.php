@@ -11,8 +11,8 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
 }
 
 // 2. Maintenant que la sécurité est OK, on inclut le visuel et la BDD
-include 'header.php';
-require 'config.php';
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 
 $coiffeur_id = $_SESSION['id_user']; 
 $message = "";
@@ -175,4 +175,4 @@ $prestations = $stmt->fetchAll();
     }
 </style>
 
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/layout/footer.php'; ?>

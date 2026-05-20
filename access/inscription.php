@@ -3,7 +3,8 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-require 'config.php';
+require_once __DIR__ . '/security/config.php';
+
 
 $message = "";
 

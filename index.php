@@ -3,16 +3,15 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require 'config.php';
-include 'header.php';
-
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 // =================================================================
 // INTERFACE #1 : L'ADMINISTRATEUR
 // =================================================================
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
     // Calculs de l'activité globale
-    $nb_clients = $pdo->query("SELECT COUNT(*) FROM utilisateurs WHERE role = 'client'")->fetchColumn();
-    $nb_coiffeurs = $pdo->query("SELECT COUNT(*) FROM utilisateurs WHERE role = 'coiffeur'")->fetchColumn();
+    $nb_clients = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'client'")->fetchColumn();
+    $nb_coiffeurs = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'coiffeur'")->fetchColumn();
     
     // Calculs comptables (Entrées / Sorties)
     $total_entrees = $pdo->query("SELECT SUM(montant) FROM transactions_plateforme WHERE type_mouvement = 'entree'")->fetchColumn() ?? 0;
@@ -20,8 +19,8 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
     $solde_net = $total_entrees - $total_sorties;
 
     // Récupération des entités pour affichage
-    $utilisateurs = $pdo->query("SELECT * FROM utilisateurs ORDER BY id_user DESC")->fetchAll();
-    $commentaires = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN utilisateurs u ON c.id_client = u.id_user ORDER BY c.date_creation DESC")->fetchAll();
+    $users = $pdo->query("SELECT * FROM users ORDER BY id_user DESC")->fetchAll();
+    $commentaires = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN users u ON c.id_client = u.id_user ORDER BY c.date_creation DESC")->fetchAll();
     $motifs_suppression = $pdo->query("SELECT * FROM suppressions_comptes ORDER BY date_demande DESC")->fetchAll();
 ?>
     <section class="py-5" style="background-color: #000; min-height: 100vh;">
@@ -65,7 +64,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
             </div>
 
             <div class="card bg-dark border-secondary p-4 mb-5">
-                <h4 class="text-white mb-4"><i class="bi bi-people me-2"></i> Comptes Utilisateurs (Total : <?php echo ($nb_clients + $nb_coiffeurs); ?>)</h4>
+                <h4 class="text-white mb-4"><i class="bi bi-people me-2"></i> Comptes users (Total : <?php echo ($nb_clients + $nb_coiffeurs); ?>)</h4>
                 <div class="table-responsive">
                     <table class="table table-dark table-hover align-middle text-center">
                         <thead>
@@ -74,7 +73,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($utilisateurs as $u): ?>
+                            <?php foreach ($users as $u): ?>
                                 <tr>
                                     <td><img src="<?php echo htmlspecialchars($u['photo_profil']); ?>" class="rounded-circle" style="width:35px; height:35px; object-fit:cover;"></td>
                                     <td class="fw-bold text-white"><?php echo htmlspecialchars($u['nom']); ?></td>
@@ -173,7 +172,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur') {
     $coiffeur_id = $_SESSION['id_user'];
     
     // Récupération des informations fraîches du coiffeur depuis la base de données
-    $chk = $pdo->prepare("SELECT * FROM utilisateurs WHERE id_user = ?");
+    $chk = $pdo->prepare("SELECT * FROM users WHERE id_user = ?");
     $chk->execute([$coiffeur_id]);
     $db_coiffeur = $chk->fetch();
 
@@ -192,7 +191,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur') {
                         <p class="text-secondary mb-4">Pour publier votre catalogue de coiffures et recevoir des réservations de clients de votre ville, veuillez vous acquitter de votre abonnement mensuel.</p>
                         <div class="bg-black p-3 rounded mb-4 border border-secondary">
                             <span class="text-muted d-block small">TARIF UNIQUE MENSUEL</span>
-                            <span class="fs-2 fw-bold text-success">5 000 FCFA / mois</span>
+                            <span class="fs-2 fw-bold text-success">1500 FCFA / mois</span>
                         </div>
                         
                         <script src="https://cdn.kkiapay.me/k.js"></script>
@@ -256,7 +255,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur') {
 // =================================================================
 // INTERFACE #3 : L'INTERFACE PUBLIQUE ET CLIENTS
 // =================================================================
-$query_coms = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN utilisateurs u ON c.id_client = u.id_user ORDER BY c.date_creation DESC LIMIT 6");
+$query_coms = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN users u ON c.id_client = u.id_user ORDER BY c.date_creation DESC LIMIT 6");
 $all_comments = $query_coms->fetchAll();
 ?>
 <section class="py-5 text-center bg-black border-bottom border-secondary" style="min-height: 55vh; display: flex; align-items: center;">
@@ -287,4 +286,4 @@ $all_comments = $query_coms->fetchAll();
         </div>
     </div>
 </section>
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/layout/footer.php'; ?>

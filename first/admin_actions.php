@@ -3,8 +3,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require 'config.php';
-include 'header.php';
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 
 // =================================================================
 // INTERFACE #1 : L'ADMINISTRATEUR
@@ -287,4 +287,4 @@ $all_comments = $query_coms->fetchAll();
         </div>
     </div>
 </section>
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/layout/footer.php'; ?>

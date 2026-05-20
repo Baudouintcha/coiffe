@@ -10,8 +10,8 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
     exit();
 }
 
-include 'header.php';
-require 'config.php';
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 
 $id_client = $_SESSION['id_user'];
 $message = "";
@@ -145,4 +145,4 @@ document.getElementById('heure_debut').addEventListener('change', function() {
     }
 </style>
 
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/layout/footer.php'; ?>

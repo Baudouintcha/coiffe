@@ -12,8 +12,8 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
 }
 
 // 2. Maintenant que la sécurité est validée, on inclut le visuel et la BDD
-include 'header.php';
-require 'config.php';
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 
 $id_coiffeur = $_SESSION['id_user']; // CORRIGÉ : id_user partout
 $message = "";
@@ -170,4 +170,4 @@ $rdv_stmt = $pdo->prepare("SELECT * FROM rendez_vous WHERE coiffeur_id = ? ORDER
     }
 </style>
 
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/layout/footer.php'; ?>

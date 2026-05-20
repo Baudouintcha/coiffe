@@ -3,9 +3,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require 'config.php';
-include 'header.php';
-
+require_once __DIR__ . '/security/config.php';
+include __DIR__ . '/layout/header.php';
 $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
