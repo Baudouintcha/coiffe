@@ -57,7 +57,7 @@ if (isset($_SESSION['role'])) {
 // Extraction géolocalisée (Client) ou globale (Invité) vers l'annuaire unique
 if ($role_actuel === 'client') {
     $ville_client = $_SESSION['ville'] ?? '';
-    $stmt = $pdo->prepare("SELECT id_user, nom, photo_profil, quartier FROM users WHERE role = 'coiffeur' AND abonnement_status = 1 AND ville = ? ORDER BY RAND() LIMIT 6");
+    $stmt = $pdo->prepare("SELECT id, nom, photo_profil, quartier FROM users WHERE role = 'coiffeur' AND abonnement_status = 1 AND ville = ? ORDER BY RAND() LIMIT 6");
     $stmt->execute([$ville_client]);
     $coiffeurs_matching = $stmt->fetchAll();
 } elseif ($role_actuel === 'invite') {
