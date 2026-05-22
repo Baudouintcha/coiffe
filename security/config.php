@@ -18,3 +18,10 @@ try {
     // Si la connexion échoue (mauvais mot de passe ou nom de BDD), on arrête tout et on affiche l'erreur
     die("Erreur de connexion à la base de données : " . $e->getMessage());
 }
+// Tout en bas de security/config.php
+if (!defined('BASE_URL')) {
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
+    $domaine = $_SERVER['HTTP_HOST'];
+    $url_calculee = ($domaine === 'localhost') ? $protocol . $domaine . '/coiffons/' : $protocol . $domaine . '/';
+    define('BASE_URL', $url_calculee);
+}

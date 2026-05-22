@@ -168,3 +168,86 @@ CREATE TABLE IF NOT EXISTS transactions_site (
 
 
 ///// clé api google gemini AIzaSyDMsHNIu_0QGlT7i7t1L4_zJb9qCMnNkLg
+
+-- =========================================================================
+-- 1. ADAPTATION DE LA TABLE USERS
+-- =========================================================================
+-- On supprime l'ancien champ texte 'quartier' s'il existe toujours
+ALTER TABLE `users` DROP COLUMN IF EXISTS `quartier`;
+
+-- On ajoute le champ 'id_quartier' qui va stocker l'identifiant numérique du quartier
+ALTER TABLE `users` ADD COLUMN `id_quartier` INT NULL AFTER `ville`;
+
+
+-- =========================================================================
+-- 2. NETTOYAGE ET RECONSTRUCTION DE LA TABLE VILLES
+-- =========================================================================
+DROP TABLE IF EXISTS `villes`;
+CREATE TABLE `villes` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `nom_ville` VARCHAR(100) NOT NULL UNIQUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insertion des principales villes/communes du Bénin
+INSERT INTO `villes` (`id`, `nom_ville`) VALUES
+(1, 'Cotonou'),
+(2, 'Abomey-Calavi'),
+(3, 'Porto-Novo'),
+(4, 'Parakou'),
+(5, 'Ouidah');
+
+
+-- =========================================================================
+-- 3. CRÉATION DE LA TABLE QUARTIERS (LIÉE AUX VILLES)
+-- =========================================================================
+DROP TABLE IF EXISTS `quartiers`;
+CREATE TABLE `quartiers` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `nom_quartier` VARCHAR(100) NOT NULL,
+    `id_ville` INT NOT NULL,
+    FOREIGN KEY (`id_ville`) REFERENCES `villes`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- =========================================================================
+-- 4. INSERTION DES QUARTIERS DE TEST (PROPRES AU BÉNIN)
+-- =========================================================================
+INSERT INTO `quartiers` (`nom_quartier`, `id_ville`) VALUES
+-- Quartiers de Cotonou (id_ville = 1)
+('Gbégamey', 1),
+('Fidjrossè', 1),
+('Cadjehoun', 1),
+('Akpakpa', 1),
+('Zogbo', 1),
+('Kouhounou', 1),
+
+-- Quartiers d'Abomey-Calavi (id_ville = 2)
+('Tankpè', 2),
+('Akassato', 2),
+('Calavi Kpota', 2),
+('Bidossessi', 2),
+('Zogbadjè', 2),
+('Godomey', 2),
+
+-- Quartiers de Porto-Novo (id_ville = 3)
+('Ouando', 3),
+('Catchi', 3),
+('Avakpa', 3),
+('Tokpota', 3),
+
+-- Quartiers de Parakou (id_ville = 4)
+('Zongo', 4),
+('Ladji Farani', 4),
+('Banikanni', 4),
+
+-- Quartiers de Ouidah (id_ville = 5)
+('Ahouandjigo', 5),
+('Fonsramè', 5);
+
+
+-- =========================================================================
+-- 5. AJOUT DE LA CLÉ ÉTRANGÈRE SUR LA TABLE USERS
+-- =========================================================================
+-- Cela force l'application à n'accepter que des quartiers qui existent vraiment dans notre liste
+ALTER TABLE `users` ADD CONSTRAINT `fk_users_quartier` 
+FOREIGN KEY (`id_quartier`) REFERENCES `quartiers`(`id`) ON DELETE SET NULL;
