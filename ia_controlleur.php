@@ -39,25 +39,16 @@ $contexte_systeme .= "Tu t'adresses actuellement à un utilisateur connecté. Vo
 // =================================================================
 
 if ($role_actuel === 'admin') {
-    // 1. COMPORTEMENT POUR L'ADMINISTRATEUR
     $nomIA = "Victor";
     $contexte_systeme .= "Tu parles à l'ADMINISTRATEUR du site. Ton nom est $nomIA. Ton rôle est d'être son conseiller stratégique.\n";
-    
-    // On extrait rapidement quelques statistiques pour l'Admin
     $nb_users = $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $nb_coiffeurs_actifs = $pdo->query("SELECT COUNT(*) FROM users WHERE role='coiffeur' AND abonnement_status=1")->fetchColumn();
-    
-    $contexte_systeme .= "Voici les données en temps réel de la plateforme pour l'aider : \n";
-    $contexte_systeme .= "- Nombre total d'utilisateurs inscrits : $nb_users\n";
-    $contexte_systeme .= "- Nombre de coiffeurs avec abonnement actif : $nb_coiffeurs_actifs\n";
-    $contexte_systeme .= "Parle-lui avec le respect dû à son rang (vouvoiement, ton professionnel). Aide-le à analyser ces chiffres s'il te demande l'état du site.\n";
+    $contexte_systeme .= "Voici les données en temps réel de la plateforme pour l'aider : \n- Nombre total d'utilisateurs inscrits : $nb_users\n- Nombre de coiffeurs avec abonnement actif : $nb_coiffeurs_actifs\n";
 
 } elseif ($role_actuel === 'coiffeur') {
-    // 2. COMPORTEMENT POUR LE COIFFEUR
     $nomIA = "Victor";
     $contexte_systeme .= "Tu parles à un COIFFEUR partenaire. Ton nom est $nomIA. Tu es son assistant de gestion de salon.\n";
     
-    // Vérification de son abonnement et de ses rendez-vous
     $stmt = $pdo->prepare("SELECT abonnement_status FROM users WHERE id = ?");
     $stmt->execute([$id_user]);
     $abo = $stmt->fetchColumn();
@@ -66,57 +57,39 @@ if ($role_actuel === 'admin') {
     $stmt->execute([$id_user]);
     $rdv_attente = $stmt->fetchColumn();
 
-    $contexte_systeme .= "Données du coiffeur en temps réel :\n";
-    $contexte_systeme .= "- Statut de son abonnement mensuel (1500 FCFA) : " . ($abo ? "ACTIF / PAYÉ" : "INACTIF / NON PAYÉ") . "\n";
-    $contexte_systeme .= "- Nombre de réservations de clients en attente de sa validation : $rdv_attente\n";
-    
-    if (!$abo) {
-        $contexte_systeme .= "ATTENTION CRITIQUE : Son abonnement est expiré. Rappelle-lui amicalement dès le début qu'il doit régulariser son abonnement de 1500 FCFA sur son tableau de bord via Kkiapay pour rester visible dans l'annuaire du Bénin.\n";
-    }
-    if ($rdv_attente > 0) {
-        $contexte_systeme .= "Notification : Dis-le lui qu'il a $rdv_attente demande(s) de rendez-vous en attente de validation dans son espace coiffeur.\n";
-    }
+    $contexte_systeme .= "Données du coiffeur en temps réel :\n- Statut de son abonnement mensuel : " . ($abo ? "ACTIF" : "INACTIF") . "\n- Réservations en attente : $rdv_attente\n";
 
 } elseif ($role_actuel === 'client') {
-    // 3. COMPORTEMENT POUR LE CLIENT
     $nomIA = "Vanessa";
-    $contexte_systeme .= "Tu parles à un CLIENT de la plateforme. Ton nom est $nomIA. Tu es sa conseillère beauté et style.\n";
-    $contexte_systeme .= "Le client est situé dans la ville de : $ville_user.\n";
+    $contexte_systeme .= "Tu parles à un CLIENT de la plateforme. Ton nom est $nomIA. Tu es sa conseillère beauté et style. Localisation : $ville_user.\n";
     
-    // Récupération de son dernier rendez-vous historique
     $stmt = $pdo->prepare("SELECT r.date_rdv, u.nom as coiffeur FROM rendezvous r JOIN users u ON r.id_coiffeur = u.id WHERE r.id_client = ? ORDER BY r.date_rdv DESC LIMIT 1");
     $stmt->execute([$id_user]);
     $dernier_rdv = $stmt->fetch();
     
     if ($dernier_rdv) {
-        $contexte_systeme .= "- Historique client : Son dernier rendez-vous s'est déroulé le " . $dernier_rdv['date_rdv'] . " avec le coiffeur " . $dernier_rdv['coiffeur'] . ".\n";
-        $contexte_systeme .= "- Consigne : S'il s'agit du tout premier message, fais-y allusion subtilement pour lui demander si sa coupe a besoin d'être rafraîchie ou s'il veut changer de look ! 😉\n";
+        $contexte_systeme .= "- Historique client : Dernier rdv le " . $dernier_rdv['date_rdv'] . " avec " . $dernier_rdv['coiffeur'] . ".\n";
     }
 
-    // Extraction des coiffeurs disponibles dans sa zone pour faire du matching direct
     $stmt = $pdo->prepare("SELECT id, nom, quartier FROM users WHERE role = 'coiffeur' AND abonnement_status = 1 AND ville = ?");
     $stmt->execute([$ville_user]);
     $coiffeurs_locaux = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    $contexte_systeme .= "Voici les professionnels disponibles dans sa ville ($ville_user) : " . json_encode($coiffeurs_locaux) . ".\n";
-    $contexte_systeme .= "S'il te demande une coiffure ou t'envoie une photo, recommande-lui explicitement l'un de ces professionnels de sa zone géographique et explique-lui comment cliquer sur 'Prendre RDV'.\n";
+    $contexte_systeme .= "Professionnels disponibles dans sa ville : " . json_encode($coiffeurs_locaux) . ".\n";
 
 } else {
-    // 4. COMPORTEMENT POUR LE VISITEUR ANONYME / NON CONNECTÉ
     $nomIA = "Vanessa";
-    $contexte_systeme .= "L'utilisateur est un simple VISITEUR (Invité). Il n'est pas connecté.\n";
-    $contexte_systeme .= "Ton but est d'être ultra-accueillante, de répondre à ses questions sur la coiffure, mais de lui rappeler de manière très séduisante que pour voir les meilleurs barbiers et coiffeurs du Bénin près de chez lui et réserver un créneau à domicile, il doit créer un compte gratuitement en cliquant sur 'Créer un compte' dans la barre latérale.\n";
+    $contexte_systeme .= "L'utilisateur est un simple VISITEUR (Invité). Invite-le poliment à s'inscrire ou se connecter pour réserver près de chez lui au Bénin.\n";
 }
 
 // =================================================================
-// ENVOI DE LA REQUÊTE À L'API GOOGLE GEMINI (MODÈLE GEMINI 2.5 FLASH)
+// ENVOI DE LA REQUÊTE À L'API GOOGLE GEMINI (MODÈLE STABLE)
 // =================================================================
-$api_key = 'AIzaSyDMsHNIu_0QGlT7i7t1L4_zJb9qCMnNkLg'; // <-- Remplace impérativement par ta clé Google AI Studio !
+$api_key = 'AIzaSyAHxqVv-NSDE4JYVjl_6ztYtCSVqFTtaPA'; // <-- Remets ta clé API ici !
+
+// Utilisation du modèle stable officiel accessible via l'URL v1 standard
+$url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=" . $api_key;
 
 if ($image_data) {
-    // Mode Vision (Analyse de la photo)
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . $api_key;
-    
     $mime_type = "image/jpeg";
     if (preg_match('/^data:image\/(\w+);base64,/', $image_data, $type)) {
         $mime_type = "image/" . strtolower($type[1]);
@@ -126,37 +99,40 @@ if ($image_data) {
     $payload = [
         "contents" => [[
             "parts" => [
-                ["text" => $contexte_systeme . "\nAnalyse visuellement cette photo de coiffure. Identifie le style précis (Braid, Dégradé, Locks, Twist, etc.), dis si c'est réalisable, regarde dans les données fournies si un coiffeur de sa zone est dispo et conseille-le."],
+                ["text" => $contexte_systeme . "\nAnalyse cette photo de coiffure."],
                 ["inlineData" => ["mimeType" => $mime_type, "data" => $image_data]]
             ]
         ]]
     ];
 } else {
-    // Mode Discussion Texte Classique
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . $api_key;
-    
     $payload = [
         "contents" => [[
             "role" => "user",
             "parts" => [
-                ["text" => $contexte_systeme . "\nVoici le message de l'utilisateur : " . $message_utilisateur]
+                ["text" => $contexte_systeme . "\nMessage de l'utilisateur : " . $message_utilisateur]
             ]
         ]]
     ];
 }
 
-$ch = curl_init($url);
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_POST => true,
-    CURLOPT_POSTFIELDS => json_encode($payload),
-    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-    CURLOPT_SSL_VERIFYPEER => false,
-    CURLOPT_SSL_VERIFYHOST => false
-]);
+// =================================================================
+// EXÉCUTION DE LA REQUÊTE (ALTERNATIVE ROBUSTE POUR XAMPP)
+// =================================================================
+$options = [
+    'http' => [
+        'header'  => "Content-Type: application/json\r\n",
+        'method'  => 'POST',
+        'content' => json_encode($payload),
+        'ignore_errors' => true // Permet de voir le vrai message si Google renvoie un code erreur
+    ],
+    'ssl' => [
+        'verify_peer' => false,
+        'verify_peer_name' => false
+    ]
+];
 
-$response = curl_exec($ch);
-curl_close($ch);
+$context  = stream_context_create($options);
+$response = file_get_contents($url, false, $context);
 
 $resultat = json_decode($response, true);
 $reponse_ia = $resultat['candidates'][0]['content']['parts'][0]['text'] ?? null;
@@ -168,9 +144,10 @@ if ($reponse_ia) {
         'reply' => $reponse_ia
     ]);
 } else {
+    // Si ça échoue encore, on affiche la réponse brute de Google pour comprendre le blocage exact
     echo json_encode([
         'status' => 'success', 
-        'reply' => 'Oups ! J\'ai rencontré une anomalie lors de la liaison avec le système Google Gemini : ' . json_encode($resultat)
+        'reply' => 'Diagnostic technique : ' . substr(strip_tags($response), 0, 300)
     ]);
 }
 exit();
