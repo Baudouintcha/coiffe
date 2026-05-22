@@ -142,6 +142,7 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
         <?php else: ?>
             
             <?php if ($role_utilisateur == 'client'): ?>
+                <a href="/coiffons/client/creer_rendezvous.php" class="text-warning fw-bold"><i class="bi bi-calendar-event"></i> Planifier un RDV</a>
                 <a href="/coiffons/client/mes_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes RDV</a>
                 <a href="/coiffons/profil.php"><i class="bi bi-person-circle"></i> Mon Profil</a>
             <?php endif; ?>
@@ -198,15 +199,21 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
                     </a>
                 </div>
 
-                <?php if ($role_utilisateur !== 'coiffeur' && $role_utilisateur !== 'admin'): ?>
-                    <div class="d-none d-md-flex align-items-center me-3">
+                <div class="d-none d-md-flex align-items-center me-3 gap-2">
+                    <?php if ($role_utilisateur !== 'coiffeur' && $role_utilisateur !== 'admin'): ?>
                         <a href="/coiffons/filter/annuaire_coiffeurs.php" class="btn btn-warning btn-sm fw-bold px-3 py-2 text-dark">
                             <i class="bi bi-search"></i> Trouver un coiffeur
                         </a>
-                    </div>
-                <?php endif; ?>
+                    <?php endif; ?>
 
-                <button class="navbar-toggler border-warning shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarHeader">
+                    <?php if ($role_utilisateur == 'client'): ?>
+                        <a href="/coiffons/client/creer_rendezvous.php" class="btn btn-outline-warning btn-sm fw-bold px-3 py-2">
+                            <i class="bi bi-calendar-event"></i> Planifier un RDV
+                        </a>
+                    <?php endif; ?>
+                </div>
+
+                <button class="navbar-toggler border-warning shadow-none" type="button" onclick="toggleAboutUs()">
                     <span class="navbar-toggler-icon"></span>
                 </button>
             </div>
@@ -224,6 +231,16 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
         function closeNav() {
             document.getElementById("mySidebar").style.width = "0";
             document.getElementById("mainOverlay").style.display = "none";
+        }
+
+        // Fonction unique et souveraine pour le panneau About Us
+        function toggleAboutUs() {
+            var collapseElement = document.getElementById("navbarHeader");
+            if (collapseElement.classList.contains("show")) {
+                collapseElement.classList.remove("show");
+            } else {
+                collapseElement.classList.add("show");
+            }
         }
     </script>
 

@@ -6,7 +6,7 @@ require_once __DIR__ . '/../security/config.php';
 include __DIR__ . '/../layout/header.php';
 
 // Récupération de toutes les prestations de la base de données
-$stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone, u.ville, u.quartier 
+$stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone, u.ville, u.id_quartier 
                      FROM prestations p 
                      JOIN users u ON p.id_coiffeur = u.id 
                      ORDER BY p.id_prestation DESC");

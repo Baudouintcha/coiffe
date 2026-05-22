@@ -6,29 +6,45 @@ require_once __DIR__ . '/../security/config.php';
 include __DIR__ . '/../layout/header.php';
 
 // Gestion des filtres de recherche
-$ville_filtre = isset($_GET['ville']) ? trim($_GET['ville']) : '';
-$quartier_filtre = isset($_GET['quartier']) ? trim($_GET['quartier']) : '';
+$ville_filtre = isset($_GET['ville']) ? intval($_GET['ville']) : 0;
+$quartier_filtre = isset($_GET['id_quartier']) ? intval($_GET['id_quartier']) : 0;
+$prix_filtre = isset($_GET['prix_max']) ? trim($_GET['prix_max']) : '';
 
-// Construction de la requête SQL
-$sql = "SELECT * FROM users WHERE role = 'coiffeur' ";
+// Construction de la requête SQL avec Jointures
+$sql = "SELECT u.*, v.nom_ville, q.nom_quartier 
+        FROM users u
+        LEFT JOIN villes v ON u.ville = v.id
+        LEFT JOIN quartiers q ON u.id_quartier = q.id
+        WHERE u.role = 'coiffeur' AND u.valide = 1";
 
 $params = [];
-if (!empty($ville_filtre)) {
-    $sql .= " AND ville = ? ";
+
+if ($ville_filtre > 0) {
+    $sql .= " AND u.ville = ? ";
     $params[] = $ville_filtre;
 }
-if (!empty($quartier_filtre)) {
-    $sql .= " AND quartier LIKE ? ";
-    $params[] = '%' . $quartier_filtre . '%';
+
+if ($quartier_filtre > 0) {
+    $sql .= " AND u.id_quartier = ? ";
+    $params[] = $quartier_filtre;
 }
 
-$sql .= " ORDER BY created_at DESC";
+// Application des marges de prix réelles des coiffeurs de zone
+if ($prix_filtre === 'eco') {
+    $sql .= " AND u.tarif_base <= 1500 ";
+} elseif ($prix_filtre === 'moyen') {
+    $sql .= " AND u.tarif_base > 1500 AND u.tarif_base <= 3000 ";
+} elseif ($prix_filtre === 'premium') {
+    $sql .= " AND u.tarif_base > 3000 ";
+}
+
+$sql .= " ORDER BY u.created_at DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $coiffeurs = $stmt->fetchAll();
 
-// Récupération de la liste des villes pour la liste déroulante du filtre
-$villes_stmt = $pdo->query("SELECT DISTINCT ville FROM users WHERE role = 'coiffeur' ORDER BY ville ASC");
+// Récupération de TOUTES les villes enregistrées dans la DB
+$villes_stmt = $pdo->query("SELECT id, nom_ville FROM villes ORDER BY nom_ville ASC");
 $villes = $villes_stmt->fetchAll();
 ?>
 
@@ -37,28 +53,51 @@ $villes = $villes_stmt->fetchAll();
         <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">NOS COIFFEURS CERTIFIÉS</h2>
 
         <div class="row justify-content-center mb-5">
-            <div class="col-md-8">
+            <div class="col-md-12">
                 <form method="GET" class="p-4 shadow rounded" style="background-color: #111; border: 1px solid var(--gold);">
                     <div class="row g-3">
-                        <div class="col-md-5">
+                        
+                        <div class="col-md-4">
                             <label class="text-white small mb-1">Filtrer par ville</label>
-                            <select name="ville" class="form-select">
+                            <select name="ville" id="villeSelectAnnuaire" class="form-select">
                                 <option value="">Toutes les villes</option>
                                 <?php foreach ($villes as $v): ?>
-                                    <?php if (!empty($v['ville'])): ?>
-                                        <option value="<?php echo htmlspecialchars($v['ville']); ?>" <?php echo ($ville_filtre == $v['ville']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($v['ville']); ?>
-                                        </option>
-                                    <?php endif; ?>
+                                    <option value="<?php echo $v['id']; ?>" <?php echo ($ville_filtre == $v['id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($v['nom_ville']); ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-5">
-                            <label class="text-white small mb-1">Rechercher un quartier</label>
-                            <input type="text" name="quartier" class="form-control" placeholder="Ex: Gbégamey" value="<?php echo htmlspecialchars($quartier_filtre); ?>">
+                        
+                        <div class="col-md-4">
+                            <label class="text-white small mb-1">Filtrer par quartier</label>
+                            <select name="id_quartier" id="quartierSelectAnnuaire" class="form-select" <?php echo ($ville_filtre > 0) ? '' : 'disabled'; ?>>
+                                <option value="">Tous les quartiers</option>
+                                <?php 
+                                if ($ville_filtre > 0) {
+                                    $q_stmt = $pdo->prepare("SELECT id, nom_quartier FROM quartiers WHERE id_ville = ? ORDER BY nom_quartier ASC");
+                                    $q_stmt->execute([$ville_filtre]);
+                                    while ($q = $q_stmt->fetch()) {
+                                        $selected = ($quartier_filtre == $q['id']) ? 'selected' : '';
+                                        echo "<option value='".$q['id']."' $selected>".htmlspecialchars($q['nom_quartier'])."</option>";
+                                    }
+                                }
+                                ?>
+                            </select>
                         </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-gold w-100 fw-bold">Filtrer</button>
+
+                        <div class="col-md-3">
+                            <label class="text-white small mb-1">Budget maximum</label>
+                            <select name="prix_max" class="form-select">
+                                <option value="">Tous les tarifs</option>
+                                <option value="eco" <?php echo ($prix_filtre === 'eco') ? 'selected' : ''; ?>>Moins de 1 500 FCFA</option>
+                                <option value="moyen" <?php echo ($prix_filtre === 'moyen') ? 'selected' : ''; ?>>1 500 - 3 000 FCFA</option>
+                                <option value="premium" <?php echo ($prix_filtre === 'premium') ? 'selected' : ''; ?>>Plus de 3 000 FCFA</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="submit" class="btn btn-gold w-100 fw-bold py-2"><i class="bi bi-search"></i></button>
                         </div>
                     </div>
                 </form>
@@ -67,7 +106,7 @@ $villes = $villes_stmt->fetchAll();
 
         <div class="row g-4">
             <?php if (empty($coiffeurs)): ?>
-                <p class="text-secondary text-center py-5">Aucun coiffeur ne correspond à cette recherche.</p>
+                <p class="text-secondary text-center py-5">Aucun coiffeur certifié ne correspond à cette recherche.</p>
             <?php else: ?>
                 <?php foreach ($coiffeurs as $c): ?>
                     <div class="col-md-4">
@@ -75,11 +114,11 @@ $villes = $villes_stmt->fetchAll();
 
                             <div class="card-body text-center p-4">
                                 <div class="mb-3">
-                                    <?php if (!empty($c['photo_profil']) && file_exists($c['photo_profil'])): ?>
-                                        <img src="<?php echo $c['photo_profil']; ?>"
-                                            alt="Photo de profil"
-                                            class="rounded-circle border border-warning"
-                                            style="width: 110px; height: 110px; object-fit: cover;">
+                                    <?php if (!empty($c['photo_profil']) && file_exists('../access/' . $c['photo_profil'])): ?>
+                                        <img src="<?php echo '../access/' . $c['photo_profil']; ?>"
+                                             alt="Photo de profil"
+                                             class="rounded-circle border border-warning"
+                                             style="width: 110px; height: 110px; object-fit: cover;">
                                     <?php else: ?>
                                         <i class="bi bi-person-circle text-warning" style="font-size: 5rem;"></i>
                                     <?php endif; ?>
@@ -89,28 +128,36 @@ $villes = $villes_stmt->fetchAll();
                                     <?php echo htmlspecialchars(strtoupper($c['nom'] . ' ' . $c['prenom'])); ?>
                                 </h4>
 
-                                <p class="text-secondary small mb-3">
+                                <p class="text-secondary small mb-2">
                                     <i class="bi bi-geo-alt-fill text-warning"></i>
-                                    <?php echo htmlspecialchars($c['ville'] . ' - ' . $c['quartier']); ?>
+                                    <?php 
+                                    $nom_ville_affiche = !empty($c['nom_ville']) ? $c['nom_ville'] : 'Bénin';
+                                    $nom_quartier_affiche = (!empty($c['nom_quartier']) && $c['id_quartier'] != 0) ? $c['nom_quartier'] : 'Centre-ville / Autre';
+                                    echo htmlspecialchars($nom_ville_affiche . ' - ' . $nom_quartier_affiche); 
+                                    ?>
+                                </p>
+
+                                <p class="text-white small mb-3 fw-bold">
+                                    <span class="text-warning">Tarif :</span> à partir de <?php echo number_format($c['tarif_base'], 0, ',', ' '); ?> FCFA
                                 </p>
 
                                 <a href="https://wa.me/<?php echo preg_replace('/[^0-9+]/', '', $c['telephone']); ?>"
-                                    target="_blank"
-                                    class="btn btn-outline-success btn-sm w-100 mb-3 py-2 fw-bold">
+                                   target="_blank"
+                                   class="btn btn-outline-success btn-sm w-100 mb-3 py-2 fw-bold">
                                     <i class="bi bi-whatsapp"></i> <?php echo htmlspecialchars($c['telephone']); ?>
                                 </a>
                             </div>
 
                             <div class="card-footer text-center bg-dark border-top border-warning">
                                 <p class="text-white small fw-bold mb-2">Diplôme / Certification :</p>
-                                <?php if (!empty($c['diplome']) && file_exists($c['diplome'])): ?>
-                                    <a href="<?php echo $c['diplome']; ?>" target="_blank">
-                                        <img src="<?php echo $c['diplome']; ?>"
-                                            alt="Diplôme"
-                                            class="img-fluid rounded shadow-sm"
-                                            style="height: 140px; width: 100%; object-fit: cover; border: 1px solid var(--gold);">
+                                <?php if (!empty($c['diplome']) && file_exists('../access/' . $c['diplome'])): ?>
+                                    <a href="<?php echo '../access/' . $c['diplome']; ?>" target="_blank">
+                                        <img src="<?php echo '../access/' . $c['diplome']; ?>"
+                                             alt="Diplôme"
+                                             class="img-fluid rounded shadow-sm"
+                                             style="height: 140px; width: 100%; object-fit: cover; border: 1px solid var(--gold);">
                                     </a>
-                                    <a href="<?php echo $c['diplome']; ?>" target="_blank" class="btn btn-gold btn-sm w-100 mt-2 fw-bold">
+                                    <a href="<?php echo '../access/' . $c['diplome']; ?>" target="_blank" class="btn btn-gold btn-sm w-100 mt-2 fw-bold">
                                         <i class="bi bi-eye"></i> Voir en grand
                                     </a>
                                 <?php else: ?>
@@ -128,17 +175,62 @@ $villes = $villes_stmt->fetchAll();
     </div>
 </section>
 
+<script>
+    document.getElementById('villeSelectAnnuaire').addEventListener('change', function() {
+        var idVille = this.value;
+        var quartierSelect = document.getElementById('quartierSelectAnnuaire');
+        
+        if (!idVille) {
+            quartierSelect.innerHTML = '<option value="">Tous les quartiers</option>';
+            quartierSelect.disabled = true;
+            return;
+        }
+
+        // Utilisation d'un chemin relatif sortant vers le dossier access pour trouver le fichier get_quartiers.php
+        fetch('../access/get_quartiers.php?id_ville=' + idVille)
+            .then(response => {
+                if (!response.ok) throw new Error("Fichier introuvable");
+                return response.json();
+            })
+            .then(data => {
+                quartierSelect.innerHTML = '<option value="">Tous les quartiers</option>';
+                quartierSelect.disabled = false;
+
+                data.forEach(quartier => {
+                    var option = document.createElement('option');
+                    option.value = quartier.id;
+                    option.textContent = quartier.nom_quartier;
+                    quartierSelect.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Erreur AJAX Annuaire:', error);
+                // Secours au cas où le chemin d'accès varie sur ton architecture locale
+                fetch('get_quartiers.php?id_ville=' + idVille)
+                    .then(res => res.json())
+                    .then(data => {
+                        quartierSelect.innerHTML = '<option value="">Tous les quartiers</option>';
+                        quartierSelect.disabled = false;
+                        data.forEach(quartier => {
+                            var option = document.createElement('option');
+                            option.value = quartier.id;
+                            option.textContent = quartier.nom_quartier;
+                            quartierSelect.appendChild(option);
+                        });
+                    }).catch(err => console.log("Échec total du chargement"));
+            });
+    });
+</script>
+
 <style>
     .btn-gold {
         background-color: var(--gold);
         color: black;
         border: none;
     }
-
     .btn-gold:hover {
         background-color: #c99b2c;
     }
-
     .form-control,
     .form-select {
         background-color: #fff;
