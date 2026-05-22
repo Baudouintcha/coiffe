@@ -164,3 +164,7 @@ CREATE TABLE IF NOT EXISTS transactions_site (
     date_transaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_coiffeur) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+///// clé api google gemini AIzaSyDMsHNIu_0QGlT7i7t1L4_zJb9qCMnNkLg

@@ -128,32 +128,37 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
             <hr class="border-warning">
         </div>
 
-        <a href="index.php"><i class="bi bi-house-door"></i> Accueil</a>
+        <a href="/coiffons/index.php"><i class="bi bi-house-door"></i> Accueil</a>
 
-        <?php if ($role_utilisateur !== 'coiffeur'): ?>
-            <a href="annuaire_coiffeurs.php" class="text-warning fw-bold"><i class="bi bi-search"></i> Trouver un coiffeur</a>
+        <?php if ($role_utilisateur !== 'coiffeur' && $role_utilisateur !== 'admin'): ?>
+            <a href="/coiffons/filter/annuaire_coiffeurs.php" class="text-warning fw-bold"><i class="bi bi-search"></i> Trouver un coiffeur</a>
         <?php endif; ?>
 
-        <a href="catalogue.php"><i class="bi bi-images"></i> Catalogue des styles</a>
+        <a href="/coiffons/client/catalogue.php"><i class="bi bi-images"></i> Catalogue des styles</a>
 
         <?php if (!$est_connecte): ?>
-            <a href="inscription.php"><i class="bi bi-person-plus"></i> Créer un compte</a>
-            <a href="connexion.php"><i class="bi bi-box-arrow-in-right"></i> Se connecter</a>
+            <a href="/coiffons/access/inscription.php"><i class="bi bi-person-plus"></i> Créer un compte</a>
+            <a href="/coiffons/access/connexion.php"><i class="bi bi-box-arrow-in-right"></i> Se connecter</a>
         <?php else: ?>
+            
             <?php if ($role_utilisateur == 'client'): ?>
-                <a href="mes_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes RDV</a>
-                <a href="profil.php"><i class="bi bi-person-circle"></i> Mon Profil</a>
+                <a href="/coiffons/client/mes_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes RDV</a>
+                <a href="/coiffons/profil.php"><i class="bi bi-person-circle"></i> Mon Profil</a>
             <?php endif; ?>
 
             <?php if ($role_utilisateur == 'coiffeur'): ?>
-                <a href="valider_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes rendez-vous</a>
-                <a href="gestion_catalogue.php"><i class="bi bi-scissors"></i> Gérer mes coiffures</a>
-                <a href="agenda_coiffeurs.php"><i class="bi bi-people"></i> Mes clients</a>
-                <a href="portefeuille.php"><i class="bi bi-wallet2"></i> Mes gains</a>
-                <a href="profil.php"><i class="bi bi-person-badge"></i> Mon Profil</a>
+                <a href="/coiffons/coiffeurs/valider_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes rendez-vous</a>
+                <a href="/coiffons/coiffeurs/gestion_catalogue.php"><i class="bi bi-scissors"></i> Gérer mes coiffures</a>
+                <a href="/coiffons/coiffeurs/agenda_coiffeurs.php"><i class="bi bi-people"></i> Mes clients</a>
+                <a href="/coiffons/coiffeurs/portefeuille.php"><i class="bi bi-wallet2"></i> Mes gains</a>
+                <a href="/coiffons/profil.php"><i class="bi bi-person-badge"></i> Mon Profil</a>
             <?php endif; ?>
 
-            <a href="deconnexion.php" class="text-danger fw-bold border border-danger rounded text-center m-3 py-2"><i class="bi bi-power"></i> Déconnexion</a>
+            <?php if ($role_utilisateur == 'admin'): ?>
+                <a href="/coiffons/index.php"><i class="bi bi-shield-lock"></i> Tableau de bord Admin</a>
+            <?php endif; ?>
+
+            <a href="/coiffons/deconnexion.php" class="text-danger fw-bold border border-danger rounded text-center m-3 py-2"><i class="bi bi-power"></i> Déconnexion</a>
         <?php endif; ?>
 
         <a href="https://wa.me/2290100000000" target="_blank" class="mt-2 small text-secondary text-decoration-none">
@@ -187,15 +192,15 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
         <div class="navbar navbar-dark bg-dark shadow-sm">
             <div class="container d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
-                    <img src="images/logo.png" alt="Logo" class="nav-logo" onclick="openNav()">
-                    <a href="index.php" class="navbar-brand d-flex align-items-center">
+                    <img src="/coiffons/images/logo.png" alt="Logo" class="nav-logo" onclick="openNav()">
+                    <a href="/coiffons/index.php" class="navbar-brand d-flex align-items-center">
                         <strong>Coiffe_Chez_Toi</strong>
                     </a>
                 </div>
 
-                <?php if ($role_utilisateur !== 'coiffeur'): ?>
+                <?php if ($role_utilisateur !== 'coiffeur' && $role_utilisateur !== 'admin'): ?>
                     <div class="d-none d-md-flex align-items-center me-3">
-                        <a href="annuaire_coiffeurs.php" class="btn btn-warning btn-sm fw-bold px-3 py-2 text-dark">
+                        <a href="/coiffons/filter/annuaire_coiffeurs.php" class="btn btn-warning btn-sm fw-bold px-3 py-2 text-dark">
                             <i class="bi bi-search"></i> Trouver un coiffeur
                         </a>
                     </div>
@@ -223,5 +228,5 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <main>

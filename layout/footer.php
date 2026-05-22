@@ -1,10 +1,17 @@
 <?php 
 // Détermination de l'avatar et du nom selon le sexe stocké en session
-$nomIA = "Vanessa"; 
-$avatarIcon = "👩‍💼"; // Avatar féminin par défaut
-if (isset($_SESSION['sexe']) && $_SESSION['sexe'] == 'femme') { 
-    $nomIA = "Daniel"; 
-    $avatarIcon = "👨‍💼"; // Avatar masculin si l'utilisateur est une femme
+// Icône par défaut configurée en robot moderne et sobre 🤖
+$nomIA = "Vic"; 
+$avatarIcon = "🤖"; 
+
+if (isset($_SESSION['sexe'])) {
+    if ($_SESSION['sexe'] == 'femme') { 
+        $nomIA = "Daniel"; 
+        $avatarIcon = "👨‍💼"; // Avatar masculin si l'utilisateur est une femme
+    } else {
+        $nomIA = "Vanessa"; 
+        $avatarIcon = "👩‍💼"; // Avatar féminin si l'utilisateur est un homme
+    }
 }
 ?>
 
@@ -46,7 +53,7 @@ if (isset($_SESSION['sexe']) && $_SESSION['sexe'] == 'femme') {
 </footer>
 
 <div id="ai-bubble" onclick="toggleChat()" style="position:fixed; bottom:30px; right:30px; width:75px; height:75px; background: #1a1a1a; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow: 0 0 20px rgba(212,175,55,0.6); z-index:9998; border: 2px solid #D4AF37; transition: 0.4s;">
-    <span style="font-size: 40px; filter: drop-shadow(0 0 5px rgba(212,175,55,0.5));">
+    <span style="font-size: 35px; filter: drop-shadow(0 0 5px rgba(212,175,55,0.5));">
         <?php echo $avatarIcon; ?>
     </span>
 </div>
@@ -74,7 +81,7 @@ if (isset($_SESSION['sexe']) && $_SESSION['sexe'] == 'femme') {
 
     <div class="p-3 border-top border-secondary bg-dark" style="border-radius: 0 0 20px 20px;">
         <div class="input-group mb-2 shadow-sm">
-            <input type="text" id="user-input" class="form-control bg-black text-white border-secondary shadow-none" placeholder="Posez une question...">
+            <input type="text" id="user-input" class="form-control bg-black text-white border-secondary shadow-none" placeholder="Posez une question..." onkeypress="if(event.key === 'Enter') sendMessage()">
             <button class="btn btn-warning fw-bold" id="btn-vocal" title="Parler">🎤</button>
         </div>
         <div class="d-flex gap-2">
@@ -91,6 +98,10 @@ if (isset($_SESSION['sexe']) && $_SESSION['sexe'] == 'femme') {
     #ai-bubble:hover { transform: scale(1.1) rotate(5deg); box-shadow: 0 0 30px rgba(212,175,55,0.8); }
     #chat-content::-webkit-scrollbar { width: 4px; }
     #chat-content::-webkit-scrollbar-thumb { background: #D4AF37; border-radius: 10px; }
+    .typing-indicator span { content: ''; animation: blink 1.4s infinite both; font-weight: bold; display: inline-block; font-size: 1.4rem; line-height: 0.5; }
+    .typing-indicator span:nth-child(2) { animation-delay: .2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0% { opacity: .2; } 20% { opacity: 1; } 100% { opacity: .2; } }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -100,12 +111,15 @@ function toggleChat() {
     win.style.display = (win.style.display === 'none') ? 'block' : 'none';
 }
 
-// LOGIQUE VOCALE
+// =================================================================
+// LOGIQUE DE RECONNAISSANCE VOCALE (SPEECH TO TEXT)
+// =================================================================
 const btnVocal = document.getElementById('btn-vocal');
 const userInput = document.getElementById('user-input');
 
-if ('webkitSpeechRecognition' in window) {
-    const recognition = new webkitSpeechRecognition();
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
     recognition.lang = 'fr-FR';
     
     btnVocal.onclick = () => {
@@ -118,27 +132,104 @@ if ('webkitSpeechRecognition' in window) {
         btnVocal.style.background = "#D4AF37";
         sendMessage();
     };
+
+    recognition.onerror = () => {
+        btnVocal.style.background = "#D4AF37";
+    };
 }
 
+// =================================================================
+// MODULE VOCAL DE L'IA (TEXT TO SPEECH)
+// =================================================================
 function parler(texte) {
-    const msg = new SpeechSynthesisUtterance();
-    msg.text = texte;
-    msg.lang = 'fr-FR';
-    window.speechSynthesis.speak(msg);
+    if ('speechSynthesis' in window) {
+        // Nettoyage sobre du format Markdown pour éviter que l'IA lise les astérisques
+        let textePropre = texte.replace(/[*#_]/g, '');
+        
+        const msg = new SpeechSynthesisUtterance();
+        msg.text = textePropre;
+        msg.lang = 'fr-FR';
+        
+        const voixDisponibles = window.speechSynthesis.getVoices();
+        // Attribution de voix élégantes selon le genre détecté
+        let voixChoisie = voixDisponibles.find(v => v.name.includes('Google français') || v.name.includes('Julie') || v.name.includes('Hortense'));
+        if (voixChoisie) {
+            msg.voice = voixChoisie;
+        }
+        
+        window.speechSynthesis.speak(msg);
+    }
 }
 
-function sendMessage() {
+// =================================================================
+// ENVOI ET TRAITEMENT DES MESSAGES VIA L'IA GEMINI PRO
+// =================================================================
+async function sendMessage(imageBase64 = null) {
     const text = userInput.value;
-    if(!text.trim()) return;
-    const content = document.getElementById('chat-content');
-    content.innerHTML += `<div class="text-end mb-3"><div class="d-inline-block p-2 px-3 rounded-4 bg-warning text-dark small fw-bold" style="border-top-right-radius:0;">${text}</div></div>`;
-    userInput.value = "";
+    if(!text.trim() && !imageBase64) return;
     
-    setTimeout(() => {
-        const rep = "C'est noté ! Je recherche les meilleures options pour vous.";
-        content.innerHTML += `<div class="mb-3 text-start"><div class="p-2 px-3 rounded-4 bg-dark border border-warning text-white small" style="border-top-left-radius:0;">${rep}</div></div>`;
-        parler(rep);
-        content.scrollTop = content.scrollHeight;
-    }, 800);
+    const content = document.getElementById('chat-content');
+    
+    // Affichage du message utilisateur s'il y a du texte
+    if(text.trim()) {
+        content.innerHTML += `<div class="text-end mb-3"><div class="d-inline-block p-2 px-3 rounded-4 bg-warning text-dark small fw-bold" style="border-top-right-radius:0;">${text}</div></div>`;
+        userInput.value = "";
+    } else if (imageBase64) {
+        content.innerHTML += `<div class="text-end mb-3"><div class="d-inline-block p-2 px-3 rounded-4 bg-warning text-dark small fw-bold" style="border-top-right-radius:0;">📷 Image envoyée pour analyse...</div></div>`;
+    }
+    
+    // Affichage de l'indicateur de réflexion sobre ("...")
+    const tempId = "typing-" + Date.now();
+    content.innerHTML += `<div class="mb-3 text-start" id="${tempId}"><div class="p-2 px-3 rounded-4 bg-dark border border-secondary text-secondary small typing-indicator" style="border-top-left-radius:0;">Reflexion<span>.</span><span>.</span><span>.</span></div></div>`;
+    content.scrollTop = content.scrollHeight;
+
+    try {
+        // Requête AJAX Fetch vers le contrôleur IA centralise
+        const response = await fetch('/coiffons/ia_controlleur.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: text,
+                image: imageBase64
+            })
+        });
+
+        const data = await response.json();
+        
+        // Suppression de l'indicateur d'attente
+        document.getElementById(tempId)?.remove();
+
+        if (data.status === 'success') {
+            const rep = data.reply;
+            content.innerHTML += `<div class="mb-3 text-start"><div class="p-2 px-3 rounded-4 bg-dark border border-warning text-white small" style="border-top-left-radius:0;">${rep}</div></div>`;
+            parler(rep);
+        } else {
+            content.innerHTML += `<div class="mb-3 text-start"><div class="p-2 px-3 rounded-4 bg-dark border border-danger text-danger small" style="border-top-left-radius:0;">Une erreur est survenue lors de la connexion à l'assistant.</div></div>`;
+        }
+    } catch (error) {
+        document.getElementById(tempId)?.remove();
+        content.innerHTML += `<div class="mb-3 text-start"><div class="p-2 px-3 rounded-4 bg-dark border border-danger text-danger small" style="border-top-left-radius:0;">Impossible de joindre le serveur IA.</div></div>`;
+        console.error("Erreur Fetch IA :", error);
+    }
+    
+    content.scrollTop = content.scrollHeight;
 }
+
+// =================================================================
+// LOGIQUE DE TRAITEMENT DES PHOTOS DE CONCOURS ET MATCHING STYLE
+// =================================================================
+document.getElementById('ai-photo')?.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const base64String = event.target.result;
+            // On lance l'envoi de l'image directement à Gemini Pro Vision
+            sendMessage(base64String);
+        };
+        reader.readAsDataURL(file);
+    }
+});
 </script>

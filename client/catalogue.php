@@ -1,6 +1,9 @@
 <?php
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 
 // Récupération de toutes les prestations de la base de données
 $stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone, u.ville, u.quartier 
@@ -46,7 +49,7 @@ $prestations = $stmt->fetchAll();
                             </div>
 
                             <div class="card-footer bg-dark border-top border-warning text-center">
-                                <a href="reserver.php?coiffeur_id=<?php echo $p['id_coiffeur']; ?>&presta_id=<?php echo $p['id_prestation']; ?>"
+                                <a href="coiffons/client/reserver.php?coiffeur_id=<?php echo $p['id_coiffeur']; ?>&presta_id=<?php echo $p['id_prestation']; ?>"
                                     class="btn btn-warning btn-sm w-100 py-2 fw-bold text-dark">
                                     <i class="bi bi-calendar-check"></i> Réserver cette coiffure
                                 </a>
@@ -69,4 +72,4 @@ $prestations = $stmt->fetchAll();
     }
 </style>
 
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>

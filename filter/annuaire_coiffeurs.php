@@ -1,6 +1,9 @@
 <?php
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 
 // Gestion des filtres de recherche
 $ville_filtre = isset($_GET['ville']) ? trim($_GET['ville']) : '';
@@ -143,4 +146,4 @@ $villes = $villes_stmt->fetchAll();
     }
 </style>
 
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>

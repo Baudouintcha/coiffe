@@ -1,6 +1,10 @@
 <?php
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 // Sécurité : réservé aux coiffeurs
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'coiffeur') {
     header('Location: connexion.php');
@@ -87,4 +91,4 @@ $coiffeur = $stmt->fetch();
     .btn-gold:hover { background-color: #c99b2c; }
 </style>
 
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>

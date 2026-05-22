@@ -3,8 +3,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 
 // =================================================================
 // INTERFACE #1 : L'ADMINISTRATEUR
@@ -92,7 +92,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                                     </td>
                                     <td>
                                         <?php if ($u['role'] !== 'admin'): ?>
-                                            <a href="admin_action.php?action=supprimer_user&id=<?php echo $u['id_user']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Exclure définitivement ce membre ?');"><i class="bi bi-trash"></i></a>
+                                            <a href="coiffons/first/admin_action.php?action=supprimer_user&id=<?php echo $u['id_user']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Exclure définitivement ce membre ?');"><i class="bi bi-trash"></i></a>
                                         <?php else: ?>
                                             <span class="text-muted small">Protégé</span>
                                         <?php endif; ?>
@@ -151,7 +151,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                                     <td class="text-light small"><?php echo htmlspecialchars($com['message']); ?></td>
                                     <td class="text-center text-warning"><?php echo str_repeat('⭐', $com['note']); ?></td>
                                     <td class="text-center">
-                                        <a href="admin_action.php?action=supprimer_commentaire&id=<?php echo $com['id_commentaire']; ?>" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i> Supprimer</a>
+                                        <a href="coiffons/first/admin_action.php?action=supprimer_commentaire&id=<?php echo $com['id_commentaire']; ?>" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i> Supprimer</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -192,12 +192,12 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur') {
                         <p class="text-secondary mb-4">Pour publier votre catalogue de coiffures et recevoir des réservations de clients de votre ville, veuillez vous acquitter de votre abonnement mensuel.</p>
                         <div class="bg-black p-3 rounded mb-4 border border-secondary">
                             <span class="text-muted d-block small">TARIF UNIQUE MENSUEL</span>
-                            <span class="fs-2 fw-bold text-success">5 000 FCFA / mois</span>
+                            <span class="fs-2 fw-bold text-success">1 500 FCFA / mois</span>
                         </div>
                         
                         <script src="https://cdn.kkiapay.me/k.js"></script>
                         <kkiapay-widget 
-                            amount="5000" 
+                            amount="1500" 
                             key="VOTRE_CLE_PUBLIQUE_KKIAPAY_ICI" 
                             position="center" 
                             sandbox="true" 
@@ -213,19 +213,19 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur') {
                         <p class="text-success mb-0 small"><i class="bi bi-check-circle-fill"></i> Votre abonnement est actif (Expire le : <?php echo $db_coiffeur['date_expiration_abo']; ?>)</p>
                     </div>
                     <div class="col-md-4 text-md-end mt-3 mt-md-0">
-                        <a href="gestion_catalogue.php" class="btn btn-warning fw-bold px-4"><i class="bi bi-plus-circle-fill me-2"></i> AJOUTER UN STYLE</a>
+                        <a href="coiffons/coiffeurs/gestion_catalogue.php" class="btn btn-warning fw-bold px-4"><i class="bi bi-plus-circle-fill me-2"></i> AJOUTER UN STYLE</a>
                     </div>
                 </div>
                 
                 <div class="row g-4 mb-4">
                     <div class="col-md-6">
-                        <a href="agenda_coiffeurs.php" class="card bg-dark text-white p-3 text-decoration-none border-secondary">
+                        <a href="coiffons/coiffeurs/agenda_coiffeurs.php" class="card bg-dark text-white p-3 text-decoration-none border-secondary">
                             <h5 class="text-warning"><i class="bi bi-calendar3 me-2"></i> Configurer mon agenda</h5>
                             <span class="text-secondary small">Définissez vos horaires d'intervention chez les clients.</span>
                         </a>
                     </div>
                     <div class="col-md-6">
-                        <a href="valider_rendezvous.php" class="card bg-dark text-white p-3 text-decoration-none border-secondary">
+                        <a href="coiffons/coiffeurs/valider_rendezvous.php" class="card bg-dark text-white p-3 text-decoration-none border-secondary">
                             <h5 class="text-success"><i class="bi bi-check2-circle me-2"></i> Gérer mes Rendez-vous</h5>
                             <span class="text-secondary small">Consultez et validez les demandes clients.</span>
                         </a>
@@ -267,7 +267,7 @@ $all_comments = $query_coms->fetchAll();
             <a href="catalogue_ville.php" class="btn btn-warning btn-lg px-5 py-3 fw-bold shadow-lg">TROUVER UN COIFFEUR DANS MA VILLE</a>
         <?php else: ?>
             <p class="text-light fs-5 mb-5 mx-auto" style="max-width: 650px;">Découvrez les meilleurs talents de la coiffure à domicile près de chez vous.</p>
-            <a href="connexion.php" class="btn btn-outline-warning btn-lg px-5 py-3 fw-bold">SE CONNECTER POUR RÉSERVER</a>
+            <a href="coiffons/access/connexion.php" class="btn btn-outline-warning btn-lg px-5 py-3 fw-bold">SE CONNECTER POUR RÉSERVER</a>
         <?php endif; ?>
     </div>
 </section>
@@ -287,4 +287,4 @@ $all_comments = $query_coms->fetchAll();
         </div>
     </div>
 </section>
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>

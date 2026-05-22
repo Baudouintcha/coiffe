@@ -11,8 +11,8 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
 }
 
 // 2. Maintenant que la sécurité est OK, on inclut le visuel et la BDD
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 
 $coiffeur_id = $_SESSION['id_user']; 
 $message = "";
@@ -142,7 +142,7 @@ $prestations = $stmt->fetchAll();
                                     </div>
 
                                     <div class="card-footer bg-dark border-top border-secondary d-flex justify-content-between">
-                                        <a href="gestion_catalogue.php?supprimer=<?php echo $p['id_prestation']; ?>" class="btn btn-outline-danger btn-sm w-100" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce style ?');">
+                                        <a href="coiffons/coiffeurs/gestion_catalogue.php?supprimer=<?php echo $p['id_prestation']; ?>" class="btn btn-outline-danger btn-sm w-100" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce style ?');">
                                             <i class="bi bi-trash"></i> Supprimer
                                         </a>
                                     </div>
@@ -175,4 +175,4 @@ $prestations = $stmt->fetchAll();
     }
 </style>
 
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>

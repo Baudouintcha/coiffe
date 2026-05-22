@@ -3,8 +3,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
 
                     <div class="text-center mt-2">
                         <p class="text-secondary small mb-0">Vous n'avez pas de compte ?</p>
-                        <a href="inscription.php" class="text-warning small text-decoration-none fw-bold">Créer un compte maintenant</a>
+                        <a href="/coiffons/access/inscription.php" class="text-warning small text-decoration-none fw-bold">Créer un compte maintenant</a>
                     </div>
                 </div>
 
@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
 
 <style>
     .form-control:focus {
-        background-color: #1a1a1a !important;
+        background-color: #e9cbcb !important;
         border-color: var(--gold) !important;
         color: #fff !important;
         box-shadow: none;
@@ -110,4 +110,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
     }
 </style>
 
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>

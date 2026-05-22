@@ -3,7 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-require_once __DIR__ . '/security/config.php';
+require_once __DIR__ . '/../security/config.php';
 
 
 $message = "";
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // 2. INCLUSION DU HEADER (Maintenant qu'aucune redirection PHP par header() ne peut être bloquée)
-include 'header.php';
+include __DIR__ . '/../layout/header.php';
 ?>
 
 <section class="py-5" style="background-color: #000; min-height: 90vh;">
@@ -201,7 +201,7 @@ include 'header.php';
                     </form>
 
                     <p class="text-center mt-4 text-secondary small">
-                        Déjà inscrit ? <a href="connexion.php" class="text-warning">Connectez-vous</a>
+                        Déjà inscrit ? <a href="coiffons/access/connexion.php" class="text-warning">Connectez-vous</a>
                     </p>
                 </div>
             </div>
@@ -261,4 +261,4 @@ include 'header.php';
     }
 </style>
 
-<?php include 'footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>

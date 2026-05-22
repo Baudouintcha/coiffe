@@ -1,6 +1,9 @@
 <?php
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 
 // SÉCURITÉ : Seul un coiffeur connecté peut gérer son agenda
 if ($role_utilisateur !== 'coiffeur') {
@@ -144,4 +147,4 @@ function toggleHeures(jour) {
     }
 </style>
 
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>

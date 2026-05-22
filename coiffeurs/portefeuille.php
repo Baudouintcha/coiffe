@@ -1,6 +1,9 @@
 <?php
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 
 // Sécurité : réservé aux coiffeurs
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'coiffeur') {
@@ -136,4 +139,4 @@ $historique_gains = $rdv_stmt->fetchAll();
     }
 </style>
 
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>

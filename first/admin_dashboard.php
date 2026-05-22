@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // 1. SÉCURITÉ STRICTE : Seul l'admin entre ici
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
@@ -105,7 +107,7 @@ $retraits_attente = $bdd->query("SELECT t.*, u.nom, u.prenom, u.telephone FROM t
                                     <td><?php echo htmlspecialchars($ab['nom'] . ' ' . $ab['prenom']); ?></td>
                                     <td><?php echo htmlspecialchars($ab['telephone']); ?></td>
                                     <td>
-                                        <a href="admin_actions.php?action=valider_abonnement&id=<?php echo $ab['id_abonnement']; ?>" class="btn btn-success btn-sm fw-bold">
+                                        <a href="coiffons/first/admin_actions.php?action=valider_abonnement&id=<?php echo $ab['id_abonnement']; ?>" class="btn btn-success btn-sm fw-bold">
                                             <i class="bi bi-check-circle"></i> Confirmer la réception des 1500F
                                         </a>
                                     </td>
@@ -139,7 +141,7 @@ $retraits_attente = $bdd->query("SELECT t.*, u.nom, u.prenom, u.telephone FROM t
                                     <td><?php echo htmlspecialchars($ret['telephone']); ?></td>
                                     <td class="text-gold fw-bold"><?php echo number_format(abs($ret['montant_net']), 0, ',', ' '); ?> FCFA</td>
                                     <td>
-                                        <a href="admin_actions.php?action=valider_retrait&id=<?php echo $ret['id_transaction']; ?>" class="btn btn-warning btn-sm fw-bold text-dark">
+                                        <a href="coiffons/first/admin_actions.php?action=valider_retrait&id=<?php echo $ret['id_transaction']; ?>" class="btn btn-warning btn-sm fw-bold text-dark">
                                             <i class="bi bi-send-check"></i> J'ai fait le transfert (Valider)
                                         </a>
                                     </td>

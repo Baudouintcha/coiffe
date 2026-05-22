@@ -11,8 +11,8 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
 }
 
 // Maintenant que la sécurité est passée, on inclut le visuel et la configuration
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 
 // Utilisation de la clé de session harmonisée
 $id_client = $_SESSION['id_user'];
@@ -88,7 +88,7 @@ $rendezvous = $stmt->fetchAll();
         </div>
 
         <div class="text-center mt-5">
-            <a href="catalogue.php" class="btn btn-gold px-5 py-2 fw-bold">
+            <a href="coiffons/client/catalogue.php" class="btn btn-gold px-5 py-2 fw-bold">
                 <i class="bi bi-scissors"></i> Retour au catalogue
             </a>
         </div>
@@ -108,4 +108,4 @@ $rendezvous = $stmt->fetchAll();
     }
 </style>
 
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>
