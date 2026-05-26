@@ -88,18 +88,18 @@ if (isset($_SESSION['role'])) {
         $nb_clients = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'client'")->fetchColumn();
         $nb_coiffeurs = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'coiffeur'")->fetchColumn();
         
-        $total_entrees = $pdo->query("SELECT SUM(montant) FROM transactions_plateforme WHERE type_mouvement = 'entree'")->fetchColumn() ?? 0;
-        $total_sorties = $pdo->query("SELECT SUM(montant) FROM transactions_plateforme WHERE type_mouvement = 'sortie'")->fetchColumn() ?? 0;
+        $total_entrees = $pdo->query("SELECT SUM(montant_commission) FROM transactions_site WHERE type_transaction = 'entree'")->fetchColumn() ?? 0;
+        $total_sorties = $pdo->query("SELECT SUM(montant_abonnement) FROM transactions_site WHERE type_transaction = 'sortie'")->fetchColumn() ?? 0;
         $solde_net = $total_entrees - $total_sorties;
 
-        $users = $pdo->query("SELECT * FROM users ORDER BY id_user DESC")->fetchAll();
-        $commentaires = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN users u ON c.id_client = u.id_user ORDER BY c.date_creation DESC")->fetchAll();
+        $users = $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
+        $commentaires = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN users u ON c.id_client = u.id ORDER BY c.date_creation DESC")->fetchAll();
         $motifs_suppression = $pdo->query("SELECT * FROM suppressions_comptes ORDER BY date_demande DESC")->fetchAll();
         
     } elseif ($_SESSION['role'] === 'coiffeur') {
         $coiffeur_id = $_SESSION['id_user'];
         
-        $chk = $pdo->prepare("SELECT * FROM users WHERE id_user = ?");
+        $chk = $pdo->prepare("SELECT * FROM users WHERE id = ?");
         $chk->execute([$coiffeur_id]);
         $db_coiffeur = $chk->fetch();
 
@@ -138,7 +138,7 @@ if ($role_actuel === 'client') {
 
 } elseif ($role_actuel === 'invite') {
     try {
-        $catalog_demo = $pdo->query("SELECT p.*, u.nom as nom_coiffeur, u.ville, u.quartier FROM prestations p JOIN users u ON p.id_coiffeur = u.id_user WHERE u.abonnement_status = 1 ORDER BY RAND() LIMIT 6")->fetchAll();
+        $catalog_demo = $pdo->query("SELECT p.*, u.nom as nom_coiffeur, u.ville, u.id_quartier FROM prestations p JOIN users u ON p.id_coiffeur = u.id_user WHERE u.abonnement_status = 1 ORDER BY RAND() LIMIT 6")->fetchAll();
     } catch (Exception $e) {
         $catalog_demo = [];
     }
@@ -327,7 +327,7 @@ try {
                 <div class="row mb-5 align-items-center">
                     <div class="col-md-8">
                         <h1 class="text-warning fw-bold">SALON DE : <?php echo strtoupper(htmlspecialchars($db_coiffeur['nom'])); ?></h1>
-                        <p class="text-success mb-0 small"><i class="bi bi-check-circle-fill"></i> Votre abonnement est actif (Expire le : <?php echo $db_coiffeur['date_expiration_abo']; ?>)</p>
+                        <p class="text-success mb-0 small"><i class="bi bi-check-circle-fill"></i> Votre abonnement est actif (Expire le : <?php echo $_SESSION['date_expiration_abo'] ?? 'Aucune';?>)</p>
                     </div>
                     <div class="col-md-4 text-md-end mt-3 mt-md-0">
                         <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="btn btn-warning fw-bold px-4"><i class="bi bi-plus-circle-fill me-2"></i> AJOUTER UN STYLE</a>
@@ -336,7 +336,7 @@ try {
                 
                 <div class="row g-4 mb-4">
                     <div class="col-md-6">
-                        <a href="/coiffons/coiffeurs/agenda_coiffeur.php" class="card bg-dark text-white p-3 text-decoration-none border-secondary h-100">
+                        <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="card bg-dark text-white p-3 text-decoration-none border-secondary h-100">
                             <h5 class="text-warning"><i class="bi bi-calendar3 me-2"></i> Configurer mon agenda</h5>
                             <span class="text-secondary small">Définissez vos horaires d'intervention chez les clients.</span>
                         </a>
@@ -373,12 +373,12 @@ try {
 <?php elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'client'): ?>
     <section class="py-5 text-center bg-black border-bottom border-secondary">
         <div class="container py-3">
-            <h1 class="text-warning fw-bold display-4 mb-3">COIFFONS — VOTRE SALON DE LUXE À DOMICILE</h1>
+            <h1 class="text-warning fw-bold display-4 mb-3">COIFFE_CHEZ_TOI — VOTRE SALON DE LUXE À DOMICILE</h1>
             <p class="text-light fs-5 mb-4 mx-auto" style="max-width: 750px;">
                 Découvrez, réservez et planifiez vos prestations avec les meilleurs coiffeurs professionnels de votre région. Un système de portefeuille sécurisé, des coiffeurs certifiés et un service sur-mesure directement chez vous.
             </p>
             <p class="text-secondary fs-6 mb-4">Ravi de vous revoir, <strong><?php echo htmlspecialchars($_SESSION['nom']); ?></strong> ! Prêt à réserver une coiffure à <?php echo htmlspecialchars($_SESSION['ville']); ?> ?</p>
-            <a href="/coiffons/filter/annuaire_coiffeur.php" class="btn btn-warning btn-lg px-5 py-3 fw-bold shadow-lg">EXPLORER L'ANNUAIRE DES COIFFEURS</a>
+            <a href="/coiffons/filter/annuaire_coiffeurs.php" class="btn btn-warning btn-lg px-5 py-3 fw-bold shadow-lg">EXPLORER L'ANNUAIRE DES COIFFEURS</a>
         </div>
     </section>
 

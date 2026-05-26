@@ -12,22 +12,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
     $password = $_POST['password'];
 
     if (!empty($email) && !empty($password)) {
-        // Recherche de l'utilisateur (on récupère l'ID, le nom, le rôle ET la ville)
-        $stmt = $pdo->prepare("SELECT * FROM utilisateurs WHERE email = ?");
+        // 1. Recherche de l'utilisateur dans la base
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        // Si l'utilisateur existe, on vérifie son mot de passe
-        if ($user && password_verify($password, $user['mot_de_passe'])) {
-            // Initialisation parfaite des variables de sessions requises
-            $_SESSION['id_user'] = $user['id_user'];
-            $_SESSION['nom'] = $user['nom'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['ville'] = $user['ville']; // Crucial pour le filtre automatique
+        // 2. Si l'utilisateur existe, on cherche son mot de passe haché
+        if ($user) {
+            // Sécurité : accepte 'password' ou 'mot_de_passe' selon ta table
+            $hash_en_bdd = $user['password'] ?? $user['Password'] ?? $user['mot_de_passe'] ?? null;
 
-            // Redirection immédiate vers l'accueil unique
-            echo "<script>window.location.href='index.php';</script>";
-            exit();
+            // 3. Vérification du mot de passe
+            if ($hash_en_bdd && password_verify($password, $hash_en_bdd)) {
+                
+                // Initialisation des variables de session
+                $_SESSION['id_user'] = $user['id'] ?? $user['id_user'] ?? null; 
+                $_SESSION['nom']      = $user['nom'] ?? '';
+                $_SESSION['prenom']   = $user['prenom'] ?? '';
+                $_SESSION['role']     = $user['role'] ?? '';
+                $_SESSION['ville']    = $user['ville'] ?? '';
+                $_SESSION['date_expiration_abo'] = $user['date_expiration_abo'] ?? 'Non abonné';
+
+                // --- CONDITION ADOUTÉE POUR L'ADMINISTRATEUR ---
+                if ($_SESSION['role'] === 'admin') {
+                    // Si c'est l'admin, on l'envoie sur le dashboard
+                    echo "<script>window.location.href='/coiffons/first/admin_dashboard.php';</script>";
+                } else {
+                    // Si c'est un client ou coiffeur, redirection dynamique classique
+                    if (file_exists('index.php')) {
+                        echo "<script>window.location.href='index.php';</script>";
+                    } else {
+                        echo "<script>window.location.href='../index.php';</script>";
+                    }
+                }
+                exit();
+                // -----------------------------------------------
+
+            } else {
+                $error = "Identifiants incorrects. Veuillez réessayer.";
+            }
         } else {
             $error = "Identifiants incorrects. Veuillez réessayer.";
         }
@@ -67,7 +90,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
                             <label class="text-white small mb-1">Mot de passe</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-lock"></i></span>
-                                <input type="password" name="password" class="form-control bg-dark text-white border-secondary" placeholder="••••••••" required>
+                                <input type="password" name="password" id="passwordInput" class="form-control bg-dark text-white border-secondary border-end-0" placeholder="••••••••" required>
+                                <button class="btn btn-outline-secondary bg-dark border-secondary text-secondary border-start-0" type="button" id="togglePassword" style="border-radius: 0 8px 8px 0;">
+                                    <i class="bi bi-eye" id="eyeIcon"></i>
+                                </button>
                             </div>
                         </div>
 
@@ -87,6 +113,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
     </div>
 </section>
 
+<script>
+    document.getElementById('togglePassword').addEventListener('click', function () {
+        const passwordInput = document.getElementById('passwordInput');
+        const eyeIcon = document.getElementById('eyeIcon');
+        
+        // Permutation du type d'input
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            eyeIcon.classList.remove('bi-eye');
+            eyeIcon.classList.add('bi-eye-slash');
+        } else {
+            passwordInput.type = 'password';
+            eyeIcon.classList.remove('bi-eye-slash');
+            eyeIcon.classList.add('bi-eye');
+        }
+    });
+</script>
+
 <style>
     .form-control:focus {
         background-color: #e9cbcb !important;
@@ -97,8 +141,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
     .input-group-text {
         border-radius: 8px 0 0 8px;
     }
-    .form-control {
-        border-radius: 0 8px 8px 0;
+    /* Correction de l'arrondi suite à l'ajout du bouton d'œil */
+    #passwordInput {
+        border-radius: 0 !important;
+    }
+    #togglePassword:focus {
+        box-shadow: none;
+        border-color: #6c757d;
     }
     .btn-gold {
         background-color: var(--gold);

@@ -8,37 +8,38 @@ require_once __DIR__ . '/../security/config.php';
 $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Vérification stricte que TOUS les champs communs sont remplis (Tolérance Zéro)
+    // MODIFICATION ICI : On retire la vérification stricte de la photo de profil du gros bloc empty()
     if (
-        empty($_POST['nom']) || empty($_POST['prenom']) || empty($_POST['sexe']) || 
-        empty($_POST['email']) || empty($_POST['telephone']) || empty($_POST['password']) || 
-        empty($_POST['role']) || empty($_POST['ville']) || empty($_POST['id_quartier']) ||
-        !isset($_FILES['photo_profil']) || $_FILES['photo_profil']['error'] !== 0
+        empty($_POST['nom']) || empty($_POST['prenom']) || empty($_POST['sexe']) ||
+        empty($_POST['email']) || empty($_POST['telephone']) || empty($_POST['password']) ||
+        empty($_POST['role']) || empty($_POST['ville']) || empty($_POST['id_quartier'])
     ) {
         $message = "<div class='alert alert-danger text-center'>Champs obligatoires manquants. Veuillez remplir tout le formulaire.</div>";
     } else {
-        
+
         // Récupération et sécurisation des données
         $nom = trim(htmlspecialchars($_POST['nom']));
         $prenom = trim(htmlspecialchars($_POST['prenom']));
         $sexe = $_POST['sexe'];
         $email = trim(htmlspecialchars($_POST['email']));
         $telephone = trim(htmlspecialchars($_POST['telephone']));
-        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+        // CORRECTION ICI : Remplacement de PASSWORD_DEFAULT par PASSWORD_BCRYPT pour s'aligner sur connexion.php
+        $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
+
         $role = $_POST['role'];
         $id_ville = intval($_POST['ville']);
         $id_quartier = intval($_POST['id_quartier']);
 
         // Anti-Pseudo : On interdit les chiffres et caractères spéciaux dans le Nom et Prénom
-        // Permet d'éviter les "Coiffeur99", "Boss_du_229", etc.
         if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/", $nom) || !preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/", $prenom)) {
             $message = "<div class='alert alert-danger text-center'>Veuillez entrer un vrai nom et prénom (lettres uniquement).</div>";
-        } 
+        }
         // Si le rôle est coiffeur, le diplôme est STRICTEMENT obligatoire
         elseif ($role == 'coiffeur' && (!isset($_FILES['diplome']) || $_FILES['diplome']['error'] !== 0)) {
             $message = "<div class='alert alert-danger text-center'>Le téléchargement du diplôme est obligatoire pour les coiffeurs.</div>";
         } else {
-            
+
             // Traitement du diplôme si coiffeur
             $diplome_path = NULL;
             if ($role == 'coiffeur') {
@@ -57,48 +58,53 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
 
-            // Si aucune erreur sur le diplôme, on gère la photo de profil
+            // MODIFICATION ICI : Gestion de la photo de profil (Devient Optionnelle)
             if (empty($message)) {
-                $allowedPhoto = ['jpg', 'jpeg', 'png'];
-                $photoName = $_FILES['photo_profil']['name'];
-                $photoExt = strtolower(pathinfo($photoName, PATHINFO_EXTENSION));
+                // On prépare la valeur par défaut au cas où l'utilisateur ne charge rien
+                $photo_profil_path = 'uploads/profil/default_avatar.png';
 
-                if (in_array($photoExt, $allowedPhoto)) {
-                    $photo_profil_path = 'uploads/profil/' . uniqid('', true) . '.' . $photoExt;
-                    if (!file_exists('uploads/profil')) {
-                        mkdir('uploads/profil', 0777, true);
+                // On vérifie si un fichier a été soumis sans code d'erreur
+                if (isset($_FILES['photo_profil']) && $_FILES['photo_profil']['error'] === 0) {
+                    $allowedPhoto = ['jpg', 'jpeg', 'png'];
+                    $photoName = $_FILES['photo_profil']['name'];
+                    $photoExt = strtolower(pathinfo($photoName, PATHINFO_EXTENSION));
+
+                    if (in_array($photoExt, $allowedPhoto)) {
+                        $photo_profil_path = 'uploads/profil/' . uniqid('', true) . '.' . $photoExt;
+                        if (!file_exists('uploads/profil')) {
+                            mkdir('uploads/profil', 0777, true);
+                        }
+                        move_uploaded_file($_FILES['photo_profil']['tmp_name'], $photo_profil_path);
+                    } else {
+                        $message = "<div class='alert alert-danger text-center'>Format de photo de profil invalide (JPG, PNG uniquement).</div>";
                     }
-                    move_uploaded_file($_FILES['photo_profil']['tmp_name'], $photo_profil_path);
-                } else {
-                    $message = "<div class='alert alert-danger text-center'>Format de photo de profil invalide (JPG, PNG uniquement).</div>";
                 }
             }
 
             // Si tout est au top, on vérifie l'email unique et on insère
             if (empty($message)) {
+                // CORRECTION ICI : Changement de 'id' en 'id_user' (pour correspondre au SELECT de connexion.php)
                 $check = $pdo->prepare("SELECT id FROM users WHERE email = ?");
                 $check->execute([$email]);
 
                 if ($check->rowCount() > 0) {
                     $message = "<div class='alert alert-danger text-center'>Cet email est déjà utilisé.</div>";
                 } else {
-                    // Par défaut, un coiffeur est enregistré avec valide = 0 (En attente de modération admin)
-                    // Pense à ajouter une colonne `valide` INT DEFAULT 1 dans ta table users si tu veux filtrer plus tard.
-                    $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password , role, ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
                     if ($ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password, $role, $id_ville, $id_quartier, $diplome_path, $photo_profil_path])) {
-                        
+
                         $id_nouvel_user = $pdo->lastInsertId();
 
                         $_SESSION['id_user'] = $id_nouvel_user;
                         $_SESSION['nom']     = $nom;
                         $_SESSION['prenom']  = $prenom;
                         $_SESSION['role']    = $role;
-                        $_SESSION['ville']   = $id_ville;
+                        $_SESSION['ville']   = $id_ville; // Variable cruciale synchronisée
 
-                        header("Location: " . BASE_URL . "index.php");
+                        // CORRECTION ICI : Redirection JS propre et universelle pour éviter les conflits d'en-têtes sur XAMPP
+                        echo "<script>window.location.href='../index.php';</script>";
                         exit();
-                        
                     } else {
                         $message = "<div class='alert alert-danger text-center'>Une erreur est survenue lors de l'enregistrement.</div>";
                     }
@@ -124,6 +130,13 @@ include __DIR__ . '/../layout/header.php';
                     <form method="POST" enctype="multipart/form-data">
                         <div class="row mb-4 text-center">
                             <label class="text-white mb-3 fw-bold">Vous êtes ?</label>
+                            <div class="col-6">
+                                <input type="radio" class="btn-check" name="role" id="admin" value="admin" onclick="toggleRoleFields()">
+                                <label class="btn btn-outline-warning w-100 py-3" for="admin">
+                                    <span class="d-block h4 mb-0">✂️</span>
+                                    <span>Admin</span>
+                                </label>
+                            </div>
                             <div class="col-6">
                                 <input type="radio" class="btn-check" name="role" id="roleClient" value="client" onclick="toggleRoleFields()" checked>
                                 <label class="btn btn-outline-warning w-100 py-3" for="roleClient">
@@ -192,8 +205,8 @@ include __DIR__ . '/../layout/header.php';
 
                         <div class="row">
                             <div class="col-md-12 mb-3">
-                                <label class="text-white small mb-1">Photo de profil</label>
-                                <input type="file" name="photo_profil" class="form-control" accept="image/*" required>
+                                <label class="text-white small mb-1">Photo de profil <span class="text-secondary">(Optionnel)</span></label>
+                                <input type="file" name="photo_profil" class="form-control" accept="image/*">
                             </div>
                         </div>
 
@@ -235,11 +248,11 @@ include __DIR__ . '/../layout/header.php';
     document.getElementById('villeSelect').addEventListener('change', function() {
         var idVille = this.value;
         var quartierSelect = document.getElementById('quartierSelect');
-        
+
         if (!idVille) {
-            quartierSelect.innerHTML = '<option value="">Sélectionnez d\'abord une ville</option>';
-            quartierSelect.disabled = true;
-            return;
+             quartierSelect.innerHTML = '<option value="">Sélectionnez d\'abord une ville</option>';
+             quartierSelect.disabled = true;
+             return;
         }
 
         fetch('get_quartiers.php?id_ville=' + idVille)
@@ -248,9 +261,8 @@ include __DIR__ . '/../layout/header.php';
                 quartierSelect.innerHTML = '';
                 quartierSelect.disabled = false;
 
-                // Option générique obligatoire pour ne jamais bloquer l'utilisateur
                 var defaultOpt = document.createElement('option');
-                defaultOpt.value = "0"; // Sera une valeur par défaut neutre
+                defaultOpt.value = "0";
                 defaultOpt.textContent = "Autre / Centre-ville";
                 quartierSelect.appendChild(defaultOpt);
 
@@ -260,8 +272,7 @@ include __DIR__ . '/../layout/header.php';
                     option.textContent = quartier.nom_quartier;
                     quartierSelect.appendChild(option);
                 });
-                
-                // Forcer la sélection du premier élément par défaut pour le required
+
                 quartierSelect.selectedIndex = 0;
             })
             .catch(error => console.error('Erreur:', error));
@@ -275,15 +286,15 @@ include __DIR__ . '/../layout/header.php';
 
         if (roleCoiffeur.checked) {
             diplomeGroup.style.display = 'block';
-            diplomeInput.required = true; // Déclenche le required HTML5
+            diplomeInput.required = true;
         } else {
             diplomeGroup.style.display = 'none';
             diplomeInput.required = false;
-            diplomeInput.value = ""; // Vide le fichier si sélectionné par erreur
+            diplomeInput.value = "";
         }
     }
 
-    // Toggle visuel de l'icône mot de passe (Comme sur connexion.php)
+    // Toggle visuel de l'icône mot de passe
     function togglePasswordVisibility() {
         var passwordField = document.getElementById('passwordField');
         var passwordIcon = document.getElementById('passwordIcon');
@@ -306,15 +317,18 @@ include __DIR__ . '/../layout/header.php';
         border: 2px solid transparent;
         border-radius: 8px;
     }
+
     .btn-check:checked+.btn-outline-warning {
         background-color: var(--gold) !important;
         color: #000 !important;
     }
+
     .btn-gold {
         background-color: var(--gold);
         color: black;
         border: none;
     }
+
     .btn-gold:hover {
         background-color: #f1c40f;
     }
