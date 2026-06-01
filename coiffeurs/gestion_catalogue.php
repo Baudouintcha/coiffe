@@ -148,7 +148,11 @@ if (isset($_GET['supprimer'])) {
         
         $del = $pdo->prepare("DELETE FROM prestations WHERE id_prestation = ?");
         $del->execute([$id_prestation]);
-        $message = "<div class='alert alert-warning text-center fw-bold'>🗑️ Prestation supprimée du catalogue.</div>";
+        
+        // Redirection vers la page d'origine (soit catalogue, soit index, soit lui-même)
+        $redirect = $_SERVER['HTTP_REFERER'] ?? 'gestion_catalogue.php';
+        echo "<script>alert('🗑️ Prestation supprimée du catalogue.'); window.location.href='$redirect';</script>";
+        exit();
     }
 }
 
@@ -327,7 +331,7 @@ $prestations = $stmt->fetchAll();
                                                 </div>
                                             </div>
                                             <div class="modal-footer border-secondary">
-                                                <button type="button" class="btn btn-secondary btn-sm" data-bs-toggle="modal">Annuler</button>
+                                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annuler</button>
                                                 <button type="submit" name="modifier_prestation" class="btn btn-gold btn-sm fw-bold">SAUVEGARDER LES MODIFICATIONS</button>
                                             </div>
                                         </form>
@@ -379,6 +383,19 @@ function ajouterOptionEdit(idPrestation) {
     `;
     wrapper.appendChild(div);
 }
+
+// --- AJOUT NOUVELLE ERGONOMIE : OUVERTURE AUTOMATIQUE DEPUIS L'EXTÉRIEUR ---
+document.addEventListener("DOMContentLoaded", function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('ouvrir_modifier')) {
+        const idPrestation = urlParams.get('ouvrir_modifier');
+        const modalElement = document.getElementById('modalModifier-' + idPrestation);
+        if (modalElement) {
+            const myModal = new bootstrap.Modal(modalElement);
+            myModal.show();
+        }
+    }
+});
 </script>
 
 <style>

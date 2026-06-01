@@ -12,33 +12,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
     $password = $_POST['password'];
 
     if (!empty($email) && !empty($password)) {
-        // 1. Recherche de l'utilisateur dans la base
+        // Recherche de l'utilisateur dans la base
         $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        // 2. Si l'utilisateur existe, on cherche son mot de passe haché
         if ($user) {
-            // Sécurité : accepte 'password' ou 'mot_de_passe' selon ta table
+            // Tolérance d'écriture pour la colonne du mot de passe
             $hash_en_bdd = $user['password'] ?? $user['Password'] ?? $user['mot_de_passe'] ?? null;
 
-            // 3. Vérification du mot de passe
             if ($hash_en_bdd && password_verify($password, $hash_en_bdd)) {
                 
-                // Initialisation des variables de session
-                $_SESSION['id_user'] = $user['id'] ?? $user['id_user'] ?? null; 
-                $_SESSION['nom']      = $user['nom'] ?? '';
-                $_SESSION['prenom']   = $user['prenom'] ?? '';
-                $_SESSION['role']     = $user['role'] ?? '';
-                $_SESSION['ville']    = $user['ville'] ?? '';
+                // RAPPEL : Clé primaire de la table 'users' est 'id'
+                $_SESSION['id_user'] = $user['id'];
+                $_SESSION['nom']     = $user['nom'] ?? '';
+                $_SESSION['prenom']  = $user['prenom'] ?? '';
+                $_SESSION['role']    = $user['role'] ?? 'client';
+                
+                // Gestion de la ville de l'utilisateur (ID numérique)
+                $id_ville = $user['ville'] ?? null;
+                $_SESSION['ville'] = $id_ville; 
+
+                // CONFIRMÉ : La clé primaire de la table villes est bien 'id'
+                if ($id_ville) {
+                    $get_ville_name = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");
+                    $get_ville_name->execute([$id_ville]);
+                    $ville_data = $get_ville_name->fetch();
+                    $_SESSION['nom_ville'] = $ville_data ? $ville_data['nom_ville'] : "votre ville";
+                } else {
+                    $_SESSION['nom_ville'] = "votre ville";
+                }
+
                 $_SESSION['date_expiration_abo'] = $user['date_expiration_abo'] ?? 'Non abonné';
 
-                // --- CONDITION ADOUTÉE POUR L'ADMINISTRATEUR ---
+                // Redirections adaptées par rôles
                 if ($_SESSION['role'] === 'admin') {
-                    // Si c'est l'admin, on l'envoie sur le dashboard
                     echo "<script>window.location.href='/coiffons/first/admin_dashboard.php';</script>";
                 } else {
-                    // Si c'est un client ou coiffeur, redirection dynamique classique
                     if (file_exists('index.php')) {
                         echo "<script>window.location.href='index.php';</script>";
                     } else {
@@ -46,7 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
                     }
                 }
                 exit();
-                // -----------------------------------------------
 
             } else {
                 $error = "Identifiants incorrects. Veuillez réessayer.";
@@ -60,54 +69,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
 }
 ?>
 
-<section class="py-5 d-flex align-items-center" style="background-color: #000; min-height: 85vh;">
+<!-- Interface HTML -->
+<section class="d-flex align-items-center justify-content-center text-white" style="background-color: #000; min-height: 100vh; padding: 40px 0;">
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-md-5 col-lg-4">
-                
-                <?php if (!empty($error)): ?>
-                    <div class="alert alert-danger text-center small py-2 mb-3" style="border-radius: 8px;">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i> <?php echo $error; ?>
-                    </div>
-                <?php endif; ?>
-
-                <div class="card p-4 shadow-lg border-0" style="background-color: #111; border-radius: 16px; border: 1px solid #222 !important;">
+            <div class="col-md-5">
+                <div class="card p-4 shadow-lg border-secondary" style="background-color: #111; border-radius: 12px;">
                     <div class="text-center mb-4">
-                        <h3 class="text-warning fw-bold mb-1" style="letter-spacing: 1px;">CONNEXION</h3>
-                        <p class="text-secondary small">Accédez à votre espace Coiffe Chez Toi</p>
+                        <h2 class="fw-bold text-warning" style="letter-spacing: 1px;">SE CONNECTER</h2>
+                        <p class="text-secondary small">Accédez à votre espace CoiffeChezToi</p>
                     </div>
 
-                    <form method="POST">
+                    <?php if (!empty($error)): ?>
+                        <div class="alert alert-danger text-center py-2 small" style="border-radius: 8px;">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?php echo $error; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <form action="" method="POST">
                         <div class="mb-3">
-                            <label class="text-white small mb-1">Adresse Email</label>
+                            <label class="form-label text-secondary small fw-bold">ADRESSE EMAIL</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-envelope"></i></span>
-                                <input type="email" name="email" class="form-control bg-dark text-white border-secondary" placeholder="exemple@mail.com" required>
+                                <span class="input-group-text bg-black border-secondary text-secondary"><i class="bi bi-envelope"></i></span>
+                                <input type="email" name="email" class="form-control bg-black text-white border-secondary text-center" placeholder="exemple@mail.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required>
                             </div>
                         </div>
 
                         <div class="mb-4">
-                            <label class="text-white small mb-1">Mot de passe</label>
+                            <label class="form-label text-secondary small fw-bold">MOT DE PASSE</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-lock"></i></span>
-                                <input type="password" name="password" id="passwordInput" class="form-control bg-dark text-white border-secondary border-end-0" placeholder="••••••••" required>
-                                <button class="btn btn-outline-secondary bg-dark border-secondary text-secondary border-start-0" type="button" id="togglePassword" style="border-radius: 0 8px 8px 0;">
-                                    <i class="bi bi-eye" id="eyeIcon"></i>
+                                <span class="input-group-text bg-black border-secondary text-secondary"><i class="bi bi-lock"></i></span>
+                                <input type="password" name="password" id="passwordField" class="form-control bg-black text-white border-secondary text-center" placeholder="••••••••" required>
+                                <button class="btn btn-outline-secondary border-secondary bg-black" type="button" id="togglePassword">
+                                    <i class="bi bi-eye text-secondary" id="eyeIcon"></i>
                                 </button>
                             </div>
                         </div>
 
-                        <button type="submit" name="connexion" class="btn btn-gold w-100 py-2 fw-bold mb-3" style="border-radius: 8px;">
+                        <button type="submit" name="connexion" class="btn btn-warning w-100 fw-bold py-2 mb-3 shadow-sm" style="border-radius: 8px; transition: 0.3s;">
                             SE CONNECTER
                         </button>
+
+                        <div class="text-center mt-3">
+                            <p class="text-secondary small mb-1">Pas encore de compte ?</p>
+                            <a href="inscription.php" class="text-warning text-decoration-none small fw-bold">Créer un compte maintenant</a>
+                        </div>
                     </form>
-
-                    <div class="text-center mt-2">
-                        <p class="text-secondary small mb-0">Vous n'avez pas de compte ?</p>
-                        <a href="/coiffons/access/inscription.php" class="text-warning small text-decoration-none fw-bold">Créer un compte maintenant</a>
-                    </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -115,48 +123,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
 
 <script>
     document.getElementById('togglePassword').addEventListener('click', function () {
-        const passwordInput = document.getElementById('passwordInput');
+        const passwordField = document.getElementById('passwordField');
         const eyeIcon = document.getElementById('eyeIcon');
-        
-        // Permutation du type d'input
-        if (passwordInput.type === 'password') {
-            passwordInput.type = 'text';
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
             eyeIcon.classList.remove('bi-eye');
             eyeIcon.classList.add('bi-eye-slash');
         } else {
-            passwordInput.type = 'password';
+            passwordField.type === 'password';
+            passwordField.type = 'password';
             eyeIcon.classList.remove('bi-eye-slash');
             eyeIcon.classList.add('bi-eye');
         }
     });
 </script>
-
-<style>
-    .form-control:focus {
-        background-color: #e9cbcb !important;
-        border-color: var(--gold) !important;
-        color: #fff !important;
-        box-shadow: none;
-    }
-    .input-group-text {
-        border-radius: 8px 0 0 8px;
-    }
-    /* Correction de l'arrondi suite à l'ajout du bouton d'œil */
-    #passwordInput {
-        border-radius: 0 !important;
-    }
-    #togglePassword:focus {
-        box-shadow: none;
-        border-color: #6c757d;
-    }
-    .btn-gold {
-        background-color: var(--gold);
-        color: black;
-        transition: 0.3s;
-    }
-    .btn-gold:hover {
-        background-color: #c99b2c;
-    }
-</style>
 
 <?php include __DIR__ . '/../layout/footer.php'; ?>

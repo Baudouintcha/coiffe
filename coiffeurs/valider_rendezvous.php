@@ -20,10 +20,10 @@ $message_action = "";
 // On récupère tous les RDV "en attente" pour vérifier s'ils ont expiré
 $stmt_verif_expiration = $pdo->prepare("
     SELECT r.*, p.prix, p.id_coiffeur, u.ville 
-    FROM rendezvous r
-    JOIN prestations p ON r.id_prestation = p.id_prestation
+    FROM rendez_vous r
+    JOIN prestations p ON r.id = p.id_prestation
     JOIN users u ON p.id_coiffeur = u.id
-    WHERE r.statut = 'en_attente'
+    WHERE r.statut_rdv = 'en_attente'
 ");
 $stmt_verif_expiration->execute();
 $rdvs_en_attente = $stmt_verif_expiration->fetchAll();
@@ -128,11 +128,11 @@ if (isset($_GET['action']) && isset($_GET['id_rdv'])) {
 // 3. RÉCUPÉRATION DES RENDEZ-VOUS DU COIFFEUR POUR AFFICHAGE
 // =================================================================
 $query = "SELECT r.*, u.nom AS nom_client, u.telephone, u.ville AS ville_client, p.nom_style, p.prix 
-          FROM rendezvous r
-          JOIN users u ON r.id_client = u.id
-          JOIN prestations p ON r.id_prestation = p.id_prestation
+          FROM rendez_vous r
+          JOIN users u ON r.client_id = u.id
+          JOIN prestations p ON r.coiffure_id = p.id_prestation
           WHERE p.id_coiffeur = ? 
-          ORDER BY r.date_rdv DESC, r.heure_rdv DESC";
+          ORDER BY r.date_rdv DESC, r.heure_debut DESC , r.heure_fin DESC ";
 $stmt = $pdo->prepare($query);
 $stmt->execute([$coiffeur_id]);
 $mes_rendezvous = $stmt->fetchAll();

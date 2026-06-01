@@ -96,11 +96,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                         $id_nouvel_user = $pdo->lastInsertId();
 
-                        $_SESSION['id_user'] = $id_nouvel_user;
-                        $_SESSION['nom']     = $nom;
-                        $_SESSION['prenom']  = $prenom;
-                        $_SESSION['role']    = $role;
-                        $_SESSION['ville']   = $id_ville; // Variable cruciale synchronisée
+                        // NOUVEAU BLOC SÉCURISÉ
+$_SESSION['id_user'] = $id_nouvel_user;
+$_SESSION['nom']     = $nom_clean;
+$_SESSION['prenom']  = $prenom_clean;
+$_SESSION['role']    = $role;
+$_SESSION['ville']   = $id_ville; // On garde l'ID pour les requêtes SQL
+
+// On va chercher le nom textuel de la ville pour l'affichage
+$get_ville_name = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");
+$get_ville_name->execute([$id_ville]);
+$ville_data = $get_ville_name->fetch();
+
+$_SESSION['nom_ville'] = $ville_data ? $ville_data['nom_ville'] : "votre ville";
 
                         // CORRECTION ICI : Redirection JS propre et universelle pour éviter les conflits d'en-têtes sur XAMPP
                         echo "<script>window.location.href='../index.php';</script>";

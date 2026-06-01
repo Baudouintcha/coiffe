@@ -1,150 +1,122 @@
 <?php
+// Fichier : coiffons/coiffeurs/agenda_coiffeurs.php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// Inclusions avec les bons chemins relatifs
 require_once __DIR__ . '/../security/config.php';
 include __DIR__ . '/../layout/header.php';
 
-// SÉCURITÉ : Seul un coiffeur connecté peut gérer son agenda
-if ($role_utilisateur !== 'coiffeur') {
-    header("Location: index.php");
+$coiffeur_id = $_SESSION['id_user'] ?? null;
+$role_actuel = $_SESSION['role'] ?? 'invite';
+
+// Protection de la page
+if (!$coiffeur_id || $role_actuel !== 'coiffeur') {
+    header('Location: /coiffons/access/connexion.php');
     exit();
 }
 
-$coiffeur_id = $_SESSION['id_user'];
-$message_action = "";
-
-// Les 7 jours de la semaine à gérer
-$jours_semaine = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-
-// =================================================================
-// 1. TRAITEMENT DU FORMULAIRE (SAUVEGARDE EN BDD)
-// =================================================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_agenda'])) {
-    $pdo->beginTransaction();
-    try {
-        foreach ($jours_semaine as $jour) {
-            // On vérifie si la case du jour est cochée (1) ou non (0)
-            $est_dispo = isset($_POST['dispo'][$jour]) ? 1 : 0;
-            $heure_debut = !empty($_POST['heure_debut'][$jour]) ? $_POST['heure_debut'][$jour] : '08:00';
-            $heure_fin = !empty($_POST['heure_fin'][$jour]) ? $_POST['heure_fin'][$jour] : '18:00';
-
-            // Le "ON DUPLICATE KEY UPDATE" permet de créer si ça n'existe pas, ou de modifier si ça existe déjà
-            $stmt = $pdo->prepare("
-                INSERT INTO disponibilites_coiffeur (user_id, jour_semaine, est_dispo, heure_debut, heure_fin)
-                VALUES (?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE est_dispo = ?, heure_debut = ?, heure_fin = ?
-            ");
-            $stmt->execute([
-                $coiffeur_id, $jour, $est_dispo, $heure_debut, $heure_fin,
-                $est_dispo, $heure_debut, $heure_fin
-            ]);
-        }
-        $pdo->commit();
-        $message_action = "<div class='alert alert-success text-center fw-bold mb-4'><i class='bi bi-check-circle-fill'></i> Votre agenda a été mis à jour avec succès !</div>";
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $message_action = "<div class='alert alert-danger text-center fw-bold mb-4'>Une erreur est survenue lors de l'enregistrement de l'agenda.</div>";
-    }
+// Récupération des horaires existants
+try {
+    $stmt = $pdo->prepare("SELECT * FROM agenda_coiffeurs WHERE id_coiffeur = ? ORDER BY FIELD(jour, 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche')");
+    $stmt->execute([$coiffeur_id]);
+    $horaires_existants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $horaires_existants = [];
 }
 
-// =================================================================
-// 2. RÉCUPÉRATION DES DONNÉES EXISTANTES POUR L'AFFICHAGE
-// =================================================================
-$stmt_get = $pdo->prepare("SELECT * FROM disponibilites_coiffeur WHERE user_id = ?");
-$stmt_get->execute([$coiffeur_id]);
-$config_existante = $stmt_get->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
-// Astuce PHP : $config_existante['Lundi'] contiendra directement les infos du lundi !
+$mode_edition = isset($_GET['action']) && $_GET['action'] === 'edit';
+$est_vide = empty($horaires_existants);
+
+$jours_semaine = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 ?>
 
-<div class="container py-5" style="min-height: 80vh;">
-    <div class="row mb-4">
-        <div class="col">
-            <h2 class="text-warning fw-bold"><i class="bi bi-calendar3-event me-2"></i> CONFIGURER MON AGENDA</h2>
-            <p class="text-secondary small">Cochez vos jours de disponibilité et définissez vos tranches horaires de travail de manière indépendante.</p>
+<section class="py-5 bg-pure-dark" style="min-height: 100vh; background-color: #0b0c10 !important;">
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-warning fw-bold"><i class="bi bi-calendar3"></i> CONFIGURATION DE MON AGENDA</h1>
+            <a href="/coiffons/index.php" class="btn btn-outline-secondary btn-sm fw-bold text-white"><i class="bi bi-arrow-left"></i> Tableau de bord</a>
         </div>
-    </div>
 
-    <?php echo $message_action; ?>
+        <?php if ($est_vide || $mode_edition): ?>
+            <div class="card bg-soft-dark text-white border-secondary p-4 shadow-lg" style="background-color: #1f2833 !important;">
+                <div class="mb-3">
+                    <span class="badge bg-warning text-dark fw-bold mb-2">Étape Directe</span>
+                    <h3 class="text-white fw-bold mb-1">Définissez vos jours et plages horaires</h3>
+                    <p class="text-muted small mb-0">Cochez simplement les jours où vous acceptez les rendez-vous clients à domicile, puis ajustez vos heures.</p>
+                </div>
 
-    <form method="POST" action="agenda_coiffeur.php">
-        <div class="card border-secondary p-4" style="background-color: var(--card-bg); border-radius: 12px;">
-            
-            <div class="d-flex flex-column gap-3">
-                <?php foreach ($jours_semaine as $jour): 
-                    // On récupère les valeurs en BDD si elles existent, sinon on met des valeurs par défaut
-                    $checked = (isset($config_existante[$jour]) && $config_existante[$jour]['est_dispo'] == 1) ? 'checked' : '';
-                    $h_debut = isset($config_existante[$jour]) ? substr($config_existante[$jour]['heure_debut'], 0, 5) : '08:00';
-                    $h_fin = isset($config_existante[$jour]) ? substr($config_existante[$jour]['heure_fin'], 0, 5) : '18:00';
-                ?>
-                    <div class="row align-items-center bg-dark p-3 rounded border border-secondary inner-row-dispo">
-                        
-                        <div class="col-md-3 col-12 mb-2 mb-md-0">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input syntax-checkbox-warning" type="checkbox" name="dispo[<?php echo $jour; ?>]" id="check_<?php echo $jour; ?>" value="1" <?php echo $checked; ?> onchange="toggleHeures('<?php echo $jour; ?>')">
-                                <label class="form-check-label fw-bold text-white text-uppercase ms-2" for="check_<?php echo $jour; ?>">
-                                    <?php echo $jour; ?>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4 col-6 input-group-time-box">
-                            <div class="input-group">
-                                <span class="input-group-text bg-black text-secondary border-secondary small">De</span>
-                                <input type="time" name="heure_debut[<?php echo $jour; ?>]" id="debut_<?php echo $jour; ?>" class="form-control bg-black text-white border-secondary text-center" value="<?php echo $h_debut; ?>" <?php echo empty($checked) ? 'disabled' : ''; ?>>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4 col-6 input-group-time-box">
-                            <div class="input-group">
-                                <span class="input-group-text bg-black text-secondary border-secondary small">À</span>
-                                <input type="time" name="heure_fin[<?php echo $jour; ?>]" id="fin_<?php echo $jour; ?>" class="form-control bg-black text-white border-secondary text-center" value="<?php echo $h_fin; ?>" <?php echo empty($checked) ? 'disabled' : ''; ?>>
-                            </div>
-                        </div>
-
+                <form action="sauvegarder_agenda.php" method="POST" class="mt-4">
+                    <div class="table-responsive rounded border border-secondary">
+                        <table class="table table-dark table-striped table-hover align-middle mb-0">
+                            <thead>
+                                <tr class="text-secondary small">
+                                    <th style="width: 80px;" class="text-center">Actif</th>
+                                    <th>Jour de la semaine</th>
+                                    <th>Heure d'ouverture (Début)</th>
+                                    <th>Heure de fermeture (Fin)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($jours_semaine as $jour): 
+                                    $cle_jour = array_search($jour, array_column($horaires_existants, 'jour'));
+                                    $dispo_jour = ($cle_jour !== false) ? $horaires_existants[$cle_jour] : null;
+                                ?>
+                                    <tr>
+                                        <td class="text-center">
+                                            <input type="checkbox" name="dispo[<?php echo $jour; ?>]" value="1" class="form-check-input bg-dark border-secondary fs-5" style="cursor: pointer;" <?php echo $dispo_jour ? 'checked' : ''; ?>>
+                                        </td>
+                                        <td class="text-white fw-bold fs-5"><?php echo $jour; ?></td>
+                                        <td>
+                                            <input type="time" name="heure_debut[<?php echo $jour; ?>]" class="form-control bg-dark text-white border-secondary py-2 font-monospace" value="<?php echo $dispo_jour['heure_debut'] ?? '08:00'; ?>">
+                                        </td>
+                                        <td>
+                                            <input type="time" name="heure_fin[<?php echo $jour; ?>]" class="form-control bg-dark text-white border-secondary py-2 font-monospace" value="<?php echo $dispo_jour['heure_fin'] ?? '19:00'; ?>">
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
-                <?php endforeach; ?>
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top border-secondary">
+                        <span class="text-muted small"><i class="bi bi-info-circle text-warning me-1"></i> Les clients ne pourront réserver que sur les créneaux cochés ici.</span>
+                        <button type="submit" class="btn btn-warning text-dark fw-bold px-5 py-3 shadow">ENREGISTRER MON AGENDA PROFESSIONNEL</button>
+                    </div>
+                </form>
             </div>
 
-            <div class="row mt-4">
-                <div class="col text-end">
-                    <button type="submit" name="enregistrer_agenda" class="btn btn-warning fw-bold px-5 py-2">
-                        <i class="bi bi-cloud-arrow-up-fill me-2"></i> Enregistrer mon agenda
-                    </button>
+        <?php else: ?>
+            <div class="card bg-soft-dark text-white border-secondary p-4 shadow-sm" style="background-color: #1f2833 !important;">
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+                    <div>
+                        <h4 class="text-white fw-bold mb-1">Votre planning hebdomadaire actuel</h4>
+                        <p class="text-muted small mb-0">Voici les horaires visibles par les clients sur la plateforme.</p>
+                    </div>
+                    <a href="/coiffons/coiffeurs/agenda_coiffeurs.php?action=edit" class="btn btn-warning text-dark fw-bold px-4"><i class="bi bi-pencil-square me-2"></i> MODIFIER LES HORAIRES</a>
+                </div>
+
+                <div class="row g-3">
+                    <?php foreach ($horaires_existants as $h): ?>
+                        <div class="col-md-4 col-sm-6">
+                            <div class="p-3 rounded border border-success text-center shadow-sm" style="background-color: #0b0c10;">
+                                <span class="badge bg-success uppercase px-3 py-2 mb-2 fw-bold"><?php echo htmlspecialchars($h['jour']); ?></span>
+                                <div class="text-white font-monospace fs-5 mt-1">
+                                    <?php echo date('H:i', strtotime($h['heure_debut'])); ?> à <?php echo date('H:i', strtotime($h['heure_fin'])); ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
+        <?php endif; ?>
 
-        </div>
-    </form>
-</div>
-
-<script>
-function toggleHeures(jour) {
-    var checkBox = document.getElementById("check_" + jour);
-    var inputDebut = document.getElementById("debut_" + jour);
-    var inputFin = document.getElementById("fin_" + jour);
-    
-    if (checkBox.checked == true) {
-        inputDebut.disabled = false;
-        inputFin.disabled = false;
-    } else {
-        inputDebut.disabled = true;
-        inputFin.disabled = true;
-    }
-}
-</script>
-
-<style>
-    .syntax-checkbox-warning:checked {
-        background-color: #ffc107 !important;
-        border-color: #ffc107 !important;
-    }
-    .inner-row-dispo {
-        transition: all 0.3s ease;
-    }
-    .inner-row-dispo:hover {
-        border-color: #ffc107 !important;
-    }
-</style>
+    </div>
+</section>
 
 <?php include __DIR__ . '/../layout/footer.php'; ?>

@@ -169,80 +169,7 @@ CREATE TABLE IF NOT EXISTS transactions_site (
 
 ///// clé api google gemini AIzaSyDMsHNIu_0QGlT7i7t1L4_zJb9qCMnNkLg
 
--- =========================================================================
--- 1. ADAPTATION DE LA TABLE USERS
--- =========================================================================
--- On supprime l'ancien champ texte 'quartier' s'il existe toujours
-ALTER TABLE `users` DROP COLUMN IF EXISTS `quartier`;
 
--- On ajoute le champ 'id_quartier' qui va stocker l'identifiant numérique du quartier
-ALTER TABLE `users` ADD COLUMN `id_quartier` INT NULL AFTER `ville`;
-
-
--- =========================================================================
--- 2. NETTOYAGE ET RECONSTRUCTION DE LA TABLE VILLES
--- =========================================================================
-DROP TABLE IF EXISTS `villes`;
-CREATE TABLE `villes` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `nom_ville` VARCHAR(100) NOT NULL UNIQUE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Insertion des principales villes/communes du Bénin
-INSERT INTO `villes` (`id`, `nom_ville`) VALUES
-(1, 'Cotonou'),
-(2, 'Abomey-Calavi'),
-(3, 'Porto-Novo'),
-(4, 'Parakou'),
-(5, 'Ouidah');
-
-
--- =========================================================================
--- 3. CRÉATION DE LA TABLE QUARTIERS (LIÉE AUX VILLES)
--- =========================================================================
-DROP TABLE IF EXISTS `quartiers`;
-CREATE TABLE `quartiers` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `nom_quartier` VARCHAR(100) NOT NULL,
-    `id_ville` INT NOT NULL,
-    FOREIGN KEY (`id_ville`) REFERENCES `villes`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
--- =========================================================================
--- 4. INSERTION DES QUARTIERS DE TEST (PROPRES AU BÉNIN)
--- =========================================================================
-INSERT INTO `quartiers` (`nom_quartier`, `id_ville`) VALUES
--- Quartiers de Cotonou (id_ville = 1)
-('Gbégamey', 1),
-('Fidjrossè', 1),
-('Cadjehoun', 1),
-('Akpakpa', 1),
-('Zogbo', 1),
-('Kouhounou', 1),
-
--- Quartiers d'Abomey-Calavi (id_ville = 2)
-('Tankpè', 2),
-('Akassato', 2),
-('Calavi Kpota', 2),
-('Bidossessi', 2),
-('Zogbadjè', 2),
-('Godomey', 2),
-
--- Quartiers de Porto-Novo (id_ville = 3)
-('Ouando', 3),
-('Catchi', 3),
-('Avakpa', 3),
-('Tokpota', 3),
-
--- Quartiers de Parakou (id_ville = 4)
-('Zongo', 4),
-('Ladji Farani', 4),
-('Banikanni', 4),
-
--- Quartiers de Ouidah (id_ville = 5)
-('Ahouandjigo', 5),
-('Fonsramè', 5);
 
 
 -- =========================================================================
@@ -251,3 +178,143 @@ INSERT INTO `quartiers` (`nom_quartier`, `id_ville`) VALUES
 -- Cela force l'application à n'accepter que des quartiers qui existent vraiment dans notre liste
 ALTER TABLE `users` ADD CONSTRAINT `fk_users_quartier` 
 FOREIGN KEY (`id_quartier`) REFERENCES `quartiers`(`id`) ON DELETE SET NULL;
+
+ALTER TABLE rendez_vous CHANGE heure_rdv heure_debut TIME NOT NULL;
+ALTER TABLE rendez_vous ADD heure_fin TIME NOT NULL AFTER heure_debut;
+
+-- Vider proprement les tables pour éviter les conflits avant l'insertion complète
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE quartiers;
+TRUNCATE TABLE villes;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ==========================================================
+-- 1. INSERTION DE TOUTES LES VILLES (COMMUNES) DU BÉNIN
+-- ==========================================================
+INSERT INTO villes (nom_ville) VALUES 
+-- Atlantique & Littoral
+('Cotonou'), ('Abomey-Calavi'), ('Allada'), ('Ouidah'), ('Kpomasse'), ('Toffo'), ('Tori-Bossito'), ('Zè'), ('Sô-Ava'),
+-- Ouémé & Plateau
+('Porto-Novo'), ('Adjarra'), ('Ajohoun'), ('Avrankou'), ('Bonou'), ('Dangbo'), ('Sèmè-Podji'), ('Akpro-Missérété'), ('Pobè'), ('Adja-Ouère'), ('Ifangni'), ('Kétou'), ('Sakété'),
+-- Zou & Collines
+('Abomey'), ('Bohicon'), ('Dassa-Zoumé'), ('Glazoué'), ('Savè'), ('Savalou'), ('Bantè'), ('Ouèssè'), ('Agbangnizoun'), ('Djidja'), ('Covè'), ('Zagnanado'), ('Za-Kpota'), ('Zogbodomey'), ('Ouinhi'),
+-- Mono & Couffo
+('Lokossa'), ('Athiémé'), ('Bopa'), ('Comè'), ('Grand-Popo'), ('Houéyogbé'), ('Aplahoué'), ('Djakotomey'), ('Dogbo'), ('Klouékanmè'), ('Lalo'), ('Toviklin'),
+-- Borgou & Alibori
+('Parakou'), ('Bembéréké'), ('N''Dali'), ('Nikki'), ('Pèrèrè'), ('Sinendé'), ('Tchaourou'), ('Kandi'), ('Banikoara'), ('Gogounou'), ('Karimama'), ('Malanville'), ('Segbana'),
+-- Atacora & Donga
+('Natitingou'), ('Boukoumbé'), ('Cobly'), ('Kérou'), ('Kouandé'), ('Matéri'), ('Pehunco'), ('Tanguiéta'), ('Toucountouna'), ('Djougou'), ('Bassila'), ('Copargo'), ('Ouaké');
+
+-- ==========================================================
+-- 2. INSERTION DES QUARTIERS / ARRONDISSEMENTS CORRESPONDANTS
+-- ==========================================================
+
+-- --- LITTORAL & ATLANTIQUE ---
+INSERT INTO quartiers (nom_quartier, id_ville) VALUES
+('Cadjèhoun', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
+('Fidjrossè', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
+('Haie Vive', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
+('Akpakpa', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
+('Gbégamey', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
+('Godomey', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
+('Calavi Centre', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
+('Zogbadjè', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
+('Akassato', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
+('Kpota', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
+('Allada Centre', (SELECT id FROM villes WHERE nom_ville = 'Allada')),
+('Hinvi', (SELECT id FROM villes WHERE nom_ville = 'Allada')),
+('Ahouandjigo', (SELECT id FROM villes WHERE nom_ville = 'Ouidah')),
+('Pahou', (SELECT id FROM villes WHERE nom_ville = 'Ouidah')),
+('Agonmè', (SELECT id FROM villes WHERE nom_ville = 'Kpomasse')),
+('Toffo Centre', (SELECT id FROM villes WHERE nom_ville = 'Toffo')),
+('Tori Centre', (SELECT id FROM villes WHERE nom_ville = 'Tori-Bossito')),
+('Zè Centre', (SELECT id FROM villes WHERE nom_ville = 'Zè')),
+('Sô-Ava Centre', (SELECT id FROM villes WHERE nom_ville = 'Sô-Ava'));
+
+-- --- OUÉMÉ & PLATEAU ---
+INSERT INTO quartiers (nom_quartier, id_ville) VALUES
+('Ouando', (SELECT id FROM villes WHERE nom_ville = 'Porto-Novo')),
+('Avakpa', (SELECT id FROM villes WHERE nom_ville = 'Porto-Novo')),
+('Tokpota', (SELECT id FROM villes WHERE nom_ville = 'Porto-Novo')),
+('Adjarra Centre', (SELECT id FROM villes WHERE nom_ville = 'Adjarra')),
+('Adjohoun Centre', (SELECT id FROM villes WHERE nom_ville = 'Ajohoun')),
+('Avrankou Centre', (SELECT id FROM villes WHERE nom_ville = 'Avrankou')),
+('Bonou Centre', (SELECT id FROM villes WHERE nom_ville = 'Bonou')),
+('Dangbo Centre', (SELECT id FROM villes WHERE nom_ville = 'Dangbo')),
+('Agblangandan', (SELECT id FROM villes WHERE nom_ville = 'Sèmè-Podji')),
+('Ekpè', (SELECT id FROM villes WHERE nom_ville = 'Sèmè-Podji')),
+('Missérété Centre', (SELECT id FROM villes WHERE nom_ville = 'Akpro-Missérété')),
+('Pobè Centre', (SELECT id FROM villes WHERE nom_ville = 'Pobè')),
+('Adja-Ouère Centre', (SELECT id FROM villes WHERE nom_ville = 'Adja-Ouère')),
+('Ifangni Centre', (SELECT id FROM villes WHERE nom_ville = 'Ifangni')),
+('Kétou Centre', (SELECT id FROM villes WHERE nom_ville = 'Kétou')),
+('Sakété Centre', (SELECT id FROM villes WHERE nom_ville = 'Sakété'));
+
+-- --- ZOU & COLLINES ---
+INSERT INTO quartiers (nom_quartier, id_ville) VALUES
+('Hounli', (SELECT id FROM villes WHERE nom_ville = 'Abomey')),
+('Vidolé', (SELECT id FROM villes WHERE nom_ville = 'Abomey')),
+('Agongointo', (SELECT id FROM villes WHERE nom_ville = 'Bohicon')),
+('Sodohomè', (SELECT id FROM villes WHERE nom_ville = 'Bohicon')),
+('Dassa Centre', (SELECT id FROM villes WHERE nom_ville = 'Dassa-Zoumé')),
+('Glazoué Centre', (SELECT id FROM villes WHERE nom_ville = 'Glazoué')),
+('Savè Centre', (SELECT id FROM villes WHERE nom_ville = 'Savè')),
+('Savalou Centre', (SELECT id FROM villes WHERE nom_ville = 'Savalou')),
+('Bantè Centre', (SELECT id FROM villes WHERE nom_ville = 'Bantè')),
+('Ouèssè Centre', (SELECT id FROM villes WHERE nom_ville = 'Ouèssè')),
+('Agbangnizoun Centre', (SELECT id FROM villes WHERE nom_ville = 'Agbangnizoun')),
+('Djidja Centre', (SELECT id FROM villes WHERE nom_ville = 'Djidja')),
+('Covè Centre', (SELECT id FROM villes WHERE nom_ville = 'Covè')),
+('Zagnanado Centre', (SELECT id FROM villes WHERE nom_ville = 'Zagnanado')),
+('Za-Kpota Centre', (SELECT id FROM villes WHERE nom_ville = 'Za-Kpota')),
+('Zogbodomey Centre', (SELECT id FROM villes WHERE nom_ville = 'Zogbodomey')),
+('Ouinhi Centre', (SELECT id FROM villes WHERE nom_ville = 'Ouinhi'));
+
+-- --- MONO & COUFFO ---
+INSERT INTO quartiers (nom_quartier, id_ville) VALUES
+('Lokossa Centre', (SELECT id FROM villes WHERE nom_ville = 'Lokossa')),
+('Athiémé Centre', (SELECT id FROM villes WHERE nom_ville = 'Athiémé')),
+('Bopa Centre', (SELECT id FROM villes WHERE nom_ville = 'Bopa')),
+('Comè Centre', (SELECT id FROM villes WHERE nom_ville = 'Comè')),
+('Grand-Popo Centre', (SELECT id FROM villes WHERE nom_ville = 'Grand-Popo')),
+('Houéyogbé Centre', (SELECT id FROM villes WHERE nom_ville = 'Houéyogbé')),
+('Aplahoué Centre', (SELECT id FROM villes WHERE nom_ville = 'Aplahoué')),
+('Djakotomey Centre', (SELECT id FROM villes WHERE nom_ville = 'Djakotomey')),
+('Dogbo Centre', (SELECT id FROM villes WHERE nom_ville = 'Dogbo')),
+('Klouékanmè Centre', (SELECT id FROM villes WHERE nom_ville = 'Klouékanmè')),
+('Lalo Centre', (SELECT id FROM villes WHERE nom_ville = 'Lalo')),
+('Toviklin Centre', (SELECT id FROM villes WHERE nom_ville = 'Toviklin'));
+
+-- --- BORGOU & ALIBORI ---
+INSERT INTO quartiers (nom_quartier, id_ville) VALUES
+('Albarika', (SELECT id FROM villes WHERE nom_ville = 'Parakou')),
+('Banikanni', (SELECT id FROM villes WHERE nom_ville = 'Parakou')),
+('Zongo', (SELECT id FROM villes WHERE nom_ville = 'Parakou')),
+('Bembéréké Centre', (SELECT id FROM villes WHERE nom_ville = 'Bembéréké')),
+('N''Dali Centre', (SELECT id FROM villes WHERE nom_ville = 'N''Dali')),
+('Nikki Centre', (SELECT id FROM villes WHERE nom_ville = 'Nikki')),
+('Pèrèrè Centre', (SELECT id FROM villes WHERE nom_ville = 'Pèrèrè')),
+('Sinendé Centre', (SELECT id FROM villes WHERE nom_ville = 'Sinendé')),
+('Tchaourou Centre', (SELECT id FROM villes WHERE nom_ville = 'Tchaourou')),
+('Kandi Centre', (SELECT id FROM villes WHERE nom_ville = 'Kandi')),
+('Banikoara Centre', (SELECT id FROM villes WHERE nom_ville = 'Banikoara')),
+('Gogounou Centre', (SELECT id FROM villes WHERE nom_ville = 'Gogounou')),
+('Karimama Centre', (SELECT id FROM villes WHERE nom_ville = 'Karimama')),
+('Malanville Centre', (SELECT id FROM villes WHERE nom_ville = 'Malanville')),
+('Segbana Centre', (SELECT id FROM villes WHERE nom_ville = 'Segbana'));
+
+-- --- ATACORA & DONGA ---
+INSERT INTO quartiers (nom_quartier, id_ville) VALUES
+('Natitingou Centre', (SELECT id FROM villes WHERE nom_ville = 'Natitingou')),
+('Boukoumbé Centre', (SELECT id FROM villes WHERE nom_ville = 'Boukoumbé')),
+('Cobly Centre', (SELECT id FROM villes WHERE nom_ville = 'Cobly')),
+('Kérou Centre', (SELECT id FROM villes WHERE nom_ville = 'Kérou')),
+('Kouandé Centre', (SELECT id FROM villes WHERE nom_ville = 'Kouandé')),
+('Matéri Centre', (SELECT id FROM villes WHERE nom_ville = 'Matéri')),
+('Pehunco Centre', (SELECT id FROM villes WHERE nom_ville = 'Pehunco')),
+('Tanguiéta Centre', (SELECT id FROM villes WHERE nom_ville = 'Tanguiéta')),
+('Toucountouna Centre', (SELECT id FROM villes WHERE nom_ville = 'Toucountouna')),
+('Djougou Centre', (SELECT id FROM villes WHERE nom_ville = 'Djougou')),
+('Bassila Centre', (SELECT id FROM villes WHERE nom_ville = 'Bassila')),
+('Copargo Centre', (SELECT id FROM villes WHERE nom_ville = 'Copargo')),
+('Ouaké Centre', (SELECT id FROM villes WHERE nom_ville = 'Ouaké'));
