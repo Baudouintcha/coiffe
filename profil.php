@@ -25,6 +25,16 @@ if ($user['role'] === 'admin') {
     exit();
 }
 
+// =================================================================
+// 🔄 CONFIGURATION DYNAMIQUE DES LIENS SELON LE RÔLE
+// =================================================================
+if ($user['role'] === 'client') {
+    $lien_rendezvous = "/coiffons/client/mes_rendezvous.php";
+} else {
+    // Pour le coiffeur, son espace principal de rendez-vous est son agenda
+    $lien_rendezvous = "/coiffons/coiffeurs/agenda_coiffeurs.php";
+}
+
 // 🔄 CALCUL DYNAMIQUE DE L'ARGENT GELÉ POUR LE CLIENT
 $argent_gele = 0;
 if ($user['role'] === 'client' && isset($pdo)) {
@@ -106,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                         <a href="modifier_profil.php" class="btn btn-gold btn-sm py-2 fw-bold" style="border-radius: 8px;">
                             <i class="bi bi-pencil-square me-2"></i> MODIFIER MON PROFIL
                         </a>
-                        <a href="/coiffons/client/mes_rendezvous.php" class="btn btn-outline-warning btn-sm py-2 fw-bold" style="border-radius: 8px;">
+                        <a href="<?php echo $lien_rendezvous; ?>" class="btn btn-outline-warning btn-sm py-2 fw-bold" style="border-radius: 8px;">
                             <i class="bi bi-calendar3 me-2"></i> MES RENDEZ-VOUS
                         </a>
                         <a href="/coiffons/deconnexion.php" class="btn btn-outline-secondary btn-sm py-2 fw-bold" style="border-radius: 8px;">
@@ -229,15 +239,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                         </button>
 
                         <div class="collapse mt-3" id="formulaireSuppression">
-                            <form method="POST" class="p-3 rounded bg-black border border-secondary">
-                                <div class="mb-3">
-                                    <label class="text-warning small fw-bold mb-2" style="font-size: 12px;">Indiquez la raison de votre décision (Obligatoire) :</label>
-                                    <textarea name="raison_depart" class="form-control bg-dark text-white border-secondary small" rows="2" placeholder="Ex: Je n'utilise plus l'application..." required></textarea>
-                                </div>
-                                <button type="submit" name="confirmer_suppression" class="btn btn-danger btn-sm w-100 fw-bold" onclick="return confirm('Êtes-vous sûr à 100% de vouloir détruire votre compte maintenant ?');">
-                                    CONFIRMER L'EFFACEMENT IMMÉDIAT
-                                </button>
-                            </form>
+                            <div class="p-3 rounded bg-black border border-secondary">
+                                <form method="POST">
+                                    <div class="mb-3">
+                                        <label class="text-warning small fw-bold mb-2" style="font-size: 12px;">Indiquez la raison de votre décision (Obligatoire) :</label>
+                                        <textarea name="raison_depart" class="form-control bg-dark text-white border-secondary small" rows="2" placeholder="Ex: Je n'utilise plus l'application..." required></textarea>
+                                    </div>
+                                    <button type="submit" name="confirmer_suppression" class="btn btn-danger btn-sm w-100 fw-bold" onclick="return confirm('Êtes-vous sûr à 100% de vouloir détruire votre compte maintenant ?');">
+                                        CONFIRMER L'EFFACEMENT IMMÉDIAT
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
 

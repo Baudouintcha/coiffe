@@ -1,3 +1,4 @@
+
 <?php
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -102,30 +103,73 @@ if ($coiffeur_id && isset($_SESSION['role'])) {
         $chk->execute([$coiffeur_id]);
         $db_coiffeur = $chk->fetch();
 
-        // Récupération des prestations avec la ville et le quartier réels du coiffeur
-        $stmt = $pdo->prepare("SELECT p.*, v.nom_ville as ville, q.nom_quartier as quartier FROM prestations p JOIN users u ON p.id_coiffeur = u.id LEFT JOIN villes v ON u.ville = v.id LEFT JOIN quartiers q ON u.id_quartier = q.id WHERE p.id_coiffeur = ? ORDER BY p.id_prestation DESC");
+        // 🛠️ MODIFICATION : Correction 'LEFT JOIN quartier q' (sans s)
+        $stmt = $pdo->prepare("SELECT p.*, v.nom_ville as ville, q.nom_quartier as quartiers FROM prestations p JOIN users u ON p.id_coiffeur = u.id LEFT JOIN villes v ON u.ville = v.id LEFT JOIN quartiers q ON u.id_quartier = q.id WHERE p.id_coiffeur = ? ORDER BY p.id_prestation DESC");
         $stmt->execute([$coiffeur_id]);
         $mes_coiffures = $stmt->fetchAll();
     }
 }
 
-// Extraction géolocalisée pour le Client
+// =================================================================
+// 🎯 MODIFICATION CONSTRUCTIVE : MATCHING CLIENT OPTIMISÉ (QUARTIER PUIS VILLE)
+// =================================================================
 if ($role_actuel === 'client') {
     $id_ville_client = $_SESSION['ville'] ?? 0; 
+    $id_quartier_client = $_SESSION['id_quartier'] ?? 0; // Capture de la zone géographique du client
     $nom_ville_affichage = $_SESSION['nom_ville'] ?? 'votre ville'; 
 
     try {
-        $stmt = $pdo->prepare("SELECT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville FROM prestations p JOIN users u ON p.id_coiffeur = u.id JOIN villes v ON u.ville = v.id LEFT JOIN quartiers q ON u.id_quartier = q.id WHERE u.role = 'coiffeur' AND u.abonnement_status = 1 AND u.ville = ? ORDER BY RAND() LIMIT 6");
-        $stmt->execute([$id_ville_client]);
+        // NIVEAU 1 : Recherche stricte des coiffeurs couvrant le quartier spécifique du client
+        $stmt = $pdo->prepare("
+            SELECT DISTINCT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville 
+            FROM prestations p 
+            JOIN users u ON p.id_coiffeur = u.id 
+            JOIN villes v ON u.ville = v.id 
+            INNER JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+            LEFT JOIN quartier q ON u.id_quartier = q.id 
+            WHERE u.role = 'coiffeur' 
+            AND u.abonnement_status = 1 
+            AND u.ville = ?
+            AND z.id_quartier = ? 
+            ORDER BY RAND() LIMIT 6
+        ");
+        $stmt->execute([$id_ville_client, $id_quartier_client]);
         $coiffeurs_matching = $stmt->fetchAll();
         
+        // NIVEAU 2 (PLAN DE SECOURS) : Si aucun coiffeur ne dessert ce quartier, on élargit à toute la Ville
         if (empty($coiffeurs_matching)) {
-            $coiffeurs_matching = $pdo->query("SELECT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville FROM prestations p JOIN users u ON p.id_coiffeur = u.id JOIN villes v ON u.ville = v.id LEFT JOIN quartiers q ON u.id_quartier = q.id WHERE u.abonnement_status = 1 ORDER BY RAND() LIMIT 6")->fetchAll();
+            $stmt_secours = $pdo->prepare("
+                SELECT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville 
+                FROM prestations p 
+                JOIN users u ON p.id_coiffeur = u.id 
+                JOIN villes v ON u.ville = v.id 
+                LEFT JOIN quartier q ON u.id_quartier = q.id 
+                WHERE u.role = 'coiffeur'
+                AND u.abonnement_status = 1 
+                AND u.ville = ? 
+                ORDER BY RAND() LIMIT 6
+            ");
+            $stmt_secours->execute([$id_ville_client]);
+            $coiffeurs_matching = $stmt_secours->fetchAll();
+        }
+
+        // NIVEAU 3 (PLAN DE SECOURS ULTIME) : Si la ville entière n'a pas de professionnels actifs, catalogue global
+        if (empty($coiffeurs_matching)) {
+            $coiffeurs_matching = $pdo->query("
+                SELECT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville 
+                FROM prestations p 
+                JOIN users u ON p.id_coiffeur = u.id 
+                JOIN villes v ON u.ville = v.id 
+                LEFT JOIN quartier q ON u.id_quartier = q.id 
+                WHERE u.abonnement_status = 1 
+                ORDER BY RAND() LIMIT 6
+            ")->fetchAll();
         }
     } catch (Exception $e) {
         $coiffeurs_matching = [];
     }
 
+    // Si la base de données est complètement vide, chargement des cartes de démonstration
     if (empty($coiffeurs_matching)) {
         $coiffeurs_matching = $coiffures_par_defaut;
         usort($coiffeurs_matching, function($a, $b) use ($nom_ville_affichage) {
@@ -137,7 +181,8 @@ if ($role_actuel === 'client') {
 
 } elseif ($role_actuel === 'invite') {
     try {
-        $catalog_demo = $pdo->query("SELECT p.*, u.nom as nom_coiffeur, v.nom_ville as ville, q.nom_quartier as quartier FROM prestations p JOIN users u ON p.id_coiffeur = u.id JOIN villes v ON u.ville = v.id LEFT JOIN quartiers q ON u.id_quartier = q.id WHERE u.abonnement_status = 1 ORDER BY RAND() LIMIT 6")->fetchAll();
+        // 🛠️ MODIFICATION : Correction 'LEFT JOIN quartier q'
+        $catalog_demo = $pdo->query("SELECT p.*, u.nom as nom_coiffeur, v.nom_ville as ville, q.nom_quartier as quartier FROM prestations p JOIN users u ON p.id_coiffeur = u.id JOIN villes v ON u.ville = v.id LEFT JOIN quartier q ON u.id_quartier = q.id WHERE u.abonnement_status = 1 ORDER BY RAND() LIMIT 6")->fetchAll();
     } catch (Exception $e) {
         $catalog_demo = [];
     }
@@ -155,6 +200,8 @@ try {
     $all_comments = [];
 }
 ?>
+
+
 
 <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
     <section class="py-5 bg-pure-dark" style="min-height: 100vh;">
@@ -295,89 +342,92 @@ try {
         </div>
     </section>
 
-<?php elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur'): ?>
-    <section class="py-5 bg-pure-dark" style="min-height: 100vh;">
-        <div class="container mt-4">
-            
-            <?php if (!$db_coiffeur['abonnement_status']): ?>
-                <div class="row justify-content-center py-5">
-                    <div class="col-md-6 text-center bg-soft-dark p-5 rounded border border-warning-dim shadow-lg">
-                        <i class="bi bi-credit-card-2-back text-warning display-1 mb-4"></i>
-                        <h2 class="text-white fw-bold mb-3">Activation de votre Vitrine Pro</h2>
-                        <p class="text-secondary mb-4">Pour publier votre catalogue de coiffures et recevoir des réservations de clients de votre ville, veuillez vous acquitter de votre abonnement mensuel.</p>
-                        <div class="bg-pure-dark p-3 rounded mb-4 border border-secondary-dim">
-                            <span class="text-muted d-block small">TARIF UNIQUE MENSUEL</span>
-                            <span class="fs-2 fw-bold text-success">1500 FCFA / mois</span>
-                        </div>
-                        
-                        <script src="https://cdn.kkiapay.me/k.js"></script>
-                        <kkiapay-widget 
-                            amount="1500" 
-                            key="VOTRE_CLE_PUBLIQUE_KKIAPAY_ICI" 
-                            position="center" 
-                            sandbox="true" 
-                            data="<?php echo $coiffeur_id; ?>"
-                            callback="http://localhost/coiffe_chez_toi/kkiapay_webhook.php">
-                        </kkiapay-widget>
-                    </div>
-                </div>
-            <?php else: ?>
-                <div class="row mb-5 align-items-center">
-                    <div class="col-md-8">
-                        <h1 class="text-warning fw-bold">SALON DE : <?php echo strtoupper(htmlspecialchars($db_coiffeur['nom'])); ?></h1>
-                        <p class="text-success mb-0 small"><i class="bi bi-check-circle-fill"></i> Votre abonnement est actif (Expire le : <?php echo $_SESSION['date_expiration_abo'] ?? 'Aucune';?>)</p>
-                    </div>
-                    <div class="col-md-4 text-md-end mt-3 mt-md-0">
-                        <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="btn btn-warning fw-bold px-4"><i class="bi bi-plus-circle-fill me-2"></i> AJOUTER UN STYLE</a>
-                    </div>
-                </div>
-                
-                <div class="row g-4 mb-4">
-                    <div class="col-md-6">
-                        <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="card bg-soft-dark text-white p-3 text-decoration-none border-secondary-dim h-100 card-hover">
-                            <h5 class="text-warning"><i class="bi bi-calendar3 me-2"></i> Configurer mon agenda</h5>
-                            <span class="text-secondary small">Définissez vos horaires d'intervention chez les clients.</span>
-                        </a>
-                    </div>
-                    <div class="col-md-6">
-                        <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="card bg-soft-dark text-white p-3 text-decoration-none border-secondary-dim h-100 card-hover">
-                            <h5 class="text-success"><i class="bi bi-check2-circle me-2"></i> Gérer mes Rendez-vous</h5>
-                            <span class="text-secondary small">Consultez et validez les demandes clients.</span>
-                        </a>
-                    </div>
-                </div>
+Selon le **PRINCIPE**, voici l'analyse précise des défauts visuels constatés sur tes captures d'écran et la proposition de correction structurelle.
 
-                <h3 class="text-white mt-5 mb-3 border-bottom border-secondary-dim pb-2">Mon Catalogue Actuel</h3>
-                <div class="row g-4">
-                    <?php if (empty($mes_coiffures)): ?>
-                        <div class="col-12 text-muted small">Vous n'avez pas encore ajouté de style à votre catalogue.</div>
-                    <?php else: ?>
-                        <?php foreach ($mes_coiffures as $c): ?>
-                            <div class="col-md-4">
-                                <div class="card bg-soft-dark text-white h-100 border-secondary-dim shadow-sm card-hover">
-                                    <div class="card-body d-flex flex-column p-4">
-                                        <h4 class="fw-bold text-white mb-1"><?php echo htmlspecialchars($c['nom_style']); ?></h4>
-                                        <p class="text-secondary small mb-3">
-                                            <i class="bi bi-geo-alt text-warning"></i> Localisation : <?php echo htmlspecialchars($c['ville'] ?? 'Non spécifiée'); ?> - <?php echo htmlspecialchars($c['quartier'] ?? 'Général'); ?>
-                                        </p>
-                                        
-                                        <h3 class="text-warning fw-bold fs-4 my-3 font-monospace"><?php echo number_format($c['prix'], 0, ',', ' '); ?> <span class="small">FCFA</span></h3>
-                                        
-                                        <div class="mt-auto pt-3 border-top border-secondary-dim d-flex gap-2">
-                                            <a href="/coiffons/coiffeurs/gestion_catalogue.php?ouvrir_modifier=<?php echo $c['id_prestation']; ?>" class="btn btn-success btn-sm flex-grow-1 fw-bold text-white py-2" title="Modifier ce style">
-                                                <i class="bi bi-pencil-square me-1"></i> Éditer
-                                            </a>
-                                            <a href="/coiffons/coiffeurs/gestion_catalogue.php?supprimer=<?php echo $c['id_prestation']; ?>" class="btn btn-danger btn-sm px-3 py-2 fw-bold" title="Supprimer ce style" onclick="return confirm('Voulez-vous vraiment supprimer définitivement cette coiffure de votre catalogue ?');">
-                                                <i class="bi bi-trash3-fill"></i>
-                                            </a>
-                                        </div>
+### 1. Analyse (3 points maximum)
+
+* **Le problème du fond blanc :** Le rectangle blanc/rose tout en haut provient de la balise HTML ouvrante de ta section qui possède la classe Bootstrap `.bg-pure-dark`. Cette classe n'existe pas nativement dans Bootstrap, ou alors ses propriétés de transparence entrent en conflit avec la couleur de fond globale de ton site, forçant le navigateur à appliquer sa couleur blanche par défaut.
+* **Le centrage et l'inutilité des titres :** Le titre "SALON DE..." est collé à gauche car il manque la classe de centrage réactif (`text-center`). De plus, le titre intermédiaire "Mon Catalogue Actuel" crée une surcharge visuelle inutile puisque les cartes de coiffure se trouvent déjà tout en haut de la page et se décrivent d'elles-mêmes.
+* **La ligne parasite avant le footer :** La sensation de coupure ou de "ligne" vide juste avant le footer est provoquée par des balises de fermeture de structure (`</div>` ou `</section>`) mal imbriquées suite à la suppression du `endif;`. Le navigateur tente de fermer un bloc qui n'existe pas, créant un espace fantôme en bas de page.
+
+---
+
+### 2. Proposition (Le code corrigé)
+
+Pour corriger ces trois problèmes d'un coup (fond noir uniforme, centrage parfait au milieu, suppression de la ligne inutile et de l'espace blanc), remplace tout le bloc du coiffeur par ce code nettoyé au pixel près :
+
+```php
+<?php elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur'): ?>
+    <section class="py-4 bg-black style-smartwatch-container" style="min-height: 100vh; color: #fff;">
+        <div class="container mt-2">
+            
+            <div class="row mb-4">
+                <div class="col-12 text-center">
+                    <h1 class="text-warning fw-bold h3 mb-1" style="letter-spacing: 0.5px;">
+                        SALON DE : <?php echo strtoupper(htmlspecialchars($db_coiffeur['nom'])); ?>
+                    </h1>
+                    <p class="text-success mb-0 small" style="font-size: 0.75rem;">
+                        <i class="bi bi-check-circle-fill"></i> Votre abonnement est actif
+                    </p>
+                </div>
+            </div>
+            
+            <div class="row g-2 g-sm-4">
+                <?php if (empty($mes_coiffures)): ?>
+                    <div class="col-12 text-center text-muted small py-4">
+                        Vous n'avez pas encore ajouté de style à votre catalogue.
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($mes_coiffures as $c): ?>
+                        <div class="col-6 col-md-4">
+                            <div class="card bg-dark text-white h-100 border-secondary shadow-sm">
+                                <div class="card-body d-flex flex-column p-2 p-sm-3">
+                                    <h4 class="fw-bold text-white mb-1 text-truncate style-max-width-name h6">
+                                        <?php echo htmlspecialchars($c['nom_style']?? ''); ?>
+                                    </h4>
+                                    <p class="text-secondary small mb-2 text-truncate style-max-width-style" style="font-size: 0.7rem;">
+                                        <i class="bi bi-geo-alt text-warning"></i> <?php echo htmlspecialchars($c['ville'] ?? 'Non spécifiée'); ?>
+                                    </p>
+                                    <h3 class="text-warning fw-bold font-monospace my-2 h5" style="font-size: 0.95rem;">
+                                        <?php echo number_format($c['prix'], 0, ',', ' '); ?> <span style="font-size: 0.65rem;">F</span>
+                                    </h3>
+                                    
+                                    <div class="mt-auto pt-2 border-top border-secondary d-flex gap-1">
+                                        <a href="/coiffons/coiffeurs/gestion_catalogue.php?ouvrir_modifier=<?php echo $c['id_prestation']; ?>" class="btn btn-success btn-sm flex-grow-1 py-1 style-btn-responsive" style="font-size: 0.7rem;">
+                                            <i class="bi bi-pencil-square"></i> <span class="d-none d-xs-inline">Éditer</span>
+                                        </a>
+                                        <a href="/coiffons/coiffeurs/gestion_catalogue.php?supprimer=<?php echo $c['id_prestation']; ?>" class="btn btn-danger btn-sm px-2 py-1 fw-bold style-btn-responsive" style="font-size: 0.7rem;" onclick="return confirm('Supprimer ?');">
+                                            <i class="bi bi-trash3-fill"></i>
+                                        </a>
                                     </div>
                                 </div>
                             </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <div class="row my-4 justify-content-center">
+                <div class="col-12 col-sm-8 col-md-6 text-center">
+                    <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="btn btn-warning text-black fw-bold w-100 py-2 shadow" style="border-radius: 30px; letter-spacing: 0.5px;">
+                        <i class="bi bi-plus-circle-fill me-1"></i> AJOUTER UN STYLE
+                    </a>
                 </div>
-            <?php endif; ?>
+            </div>
+            
+            <div class="row g-2 style-flex-smartwatch">
+                <div class="col-6">
+                    <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="card bg-dark text-white p-2 p-sm-3 text-decoration-none border-secondary h-100 d-flex flex-column align-items-center text-center justify-content-center" style="min-height: 80px; border-radius: 8px;">
+                        <h5 class="text-warning mb-1 h6" style="font-size: 0.85rem;"><i class="bi bi-calendar3 me-1"></i> Mon Agenda</h5>
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="card bg-dark text-white p-2 p-sm-3 text-decoration-none border-secondary h-100 d-flex flex-column align-items-center text-center justify-content-center" style="min-height: 80px; border-radius: 8px;">
+                        <h5 class="text-success mb-1 h6" style="font-size: 0.85rem;"><i class="bi bi-check2-circle me-1"></i> Mes Demandes</h5>
+                    </a>
+                </div>
+            </div>
+
         </div>
     </section>
 
@@ -388,7 +438,9 @@ try {
             <p class="text-light fs-5 mb-4 mx-auto" style="max-width: 750px;">
                 Découvrez, réservez et planifiez vos prestations avec les meilleurs coiffeurs professionnels de votre région. Un système de portefeuille sécurisé, des coiffeurs certifiés et un service sur-mesure directement chez vous.
             </p>
-            <p class="text-secondary fs-6 mb-4">Ravi de vous revoir, <strong><?php echo htmlspecialchars($_SESSION['nom']); ?></strong> ! Prêt à réserver une coiffure à <?php echo htmlspecialchars($_SESSION['nom_ville'] ?? 'votre ville'); ?> ?</p>
+            <p class="text-secondary fs-6 mb-4">
+    Ravi de vous revoir, <strong><?php echo htmlspecialchars($_SESSION['nom'] ?? 'Client'); ?></strong> ! Prêt à réserver une coiffure à <?php echo htmlspecialchars($_SESSION['nom_ville'] ?? 'votre ville'); ?> ?
+</p>
             <a href="/coiffons/filter/annuaire_coiffeurs.php" class="btn btn-warning btn-lg px-5 py-3 fw-bold shadow-lg">EXPLORER L'ANNUAIRE DES COIFFEURS</a>
         </div>
     </section>

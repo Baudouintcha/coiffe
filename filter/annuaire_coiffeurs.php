@@ -10,13 +10,18 @@ $ville_filtre = isset($_GET['ville']) ? intval($_GET['ville']) : 0;
 $quartier_filtre = isset($_GET['id_quartier']) ? intval($_GET['id_quartier']) : 0;
 $prix_filtre = isset($_GET['prix_max']) ? trim($_GET['prix_max']) : '';
 
-// Construction de la requête SQL avec Jointures
-$sql = "SELECT u.*, v.nom_ville, q.nom_quartier 
+// 🛠️ ANALYSE ET RESTRUCTURATION DE LA REQUÊTE : Utilisation de la table pivot zones_coiffeur pour le filtrage par quartier
+$sql = "SELECT DISTINCT u.*, v.nom_ville, q.nom_quartier 
         FROM users u
         LEFT JOIN villes v ON u.ville = v.id
-        LEFT JOIN quartiers q ON u.id_quartier = q.id
-        WHERE u.role = 'coiffeur' AND u.valide = 1";
+        LEFT JOIN quartier q ON u.id_quartier = q.id"; // Correction de 'quartiers' en 'quartier'
 
+// Si un quartier est sélectionné, on applique la jointure avec la table pivot zones_coiffeur
+if ($quartier_filtre > 0) {
+    $sql .= " INNER JOIN zones_coiffeur z ON u.id = z.id_coiffeur";
+}
+
+$sql .= " WHERE u.role = 'coiffeur' AND u.valide = 1";
 $params = [];
 
 if ($ville_filtre > 0) {
@@ -25,7 +30,7 @@ if ($ville_filtre > 0) {
 }
 
 if ($quartier_filtre > 0) {
-    $sql .= " AND u.id_quartier = ? ";
+    $sql .= " AND z.id_quartier = ? ";
     $params[] = $quartier_filtre;
 }
 
@@ -54,7 +59,7 @@ $villes = $villes_stmt->fetchAll();
 
         <div class="row justify-content-center mb-5">
             <div class="col-md-12">
-                <form method="GET" class="p-4 shadow rounded" style="background-color: #111; border: 1px solid var(--gold);">
+                <form method="GET" class="p-4 shadow rounded" style="background-color: #111; border: 1px solid var(--gold, #f39c12);">
                     <div class="row g-3">
                         
                         <div class="col-md-4">
@@ -70,12 +75,13 @@ $villes = $villes_stmt->fetchAll();
                         </div>
                         
                         <div class="col-md-4">
-                            <label class="text-white small mb-1">Filtrer par quartier</label>
+                            <label class="text-white small mb-1">Filtrer par quartier d'intervention</label>
                             <select name="id_quartier" id="quartierSelectAnnuaire" class="form-select" <?php echo ($ville_filtre > 0) ? '' : 'disabled'; ?>>
                                 <option value="">Tous les quartiers</option>
                                 <?php 
                                 if ($ville_filtre > 0) {
-                                    $q_stmt = $pdo->prepare("SELECT id, nom_quartier FROM quartiers WHERE id_ville = ? ORDER BY nom_quartier ASC");
+                                    // Correction de 'quartiers' en 'quartier'
+                                    $q_stmt = $pdo->prepare("SELECT id, nom_quartier FROM quartier WHERE id_ville = ? ORDER BY nom_quartier ASC");
                                     $q_stmt->execute([$ville_filtre]);
                                     while ($q = $q_stmt->fetch()) {
                                         $selected = ($quartier_filtre == $q['id']) ? 'selected' : '';
@@ -110,7 +116,7 @@ $villes = $villes_stmt->fetchAll();
             <?php else: ?>
                 <?php foreach ($coiffeurs as $c): ?>
                     <div class="col-md-4">
-                        <div class="card h-100 shadow-lg" style="background-color: #111; border-radius: 20px; overflow: hidden; border: 1px solid var(--gold);">
+                        <div class="card h-100 shadow-lg" style="background-color: #111; border-radius: 20px; overflow: hidden; border: 1px solid var(--gold, #f39c12);">
 
                             <div class="card-body text-center p-4">
                                 <div class="mb-3">
@@ -155,7 +161,7 @@ $villes = $villes_stmt->fetchAll();
                                         <img src="<?php echo '../access/' . $c['diplome']; ?>"
                                              alt="Diplôme"
                                              class="img-fluid rounded shadow-sm"
-                                             style="height: 140px; width: 100%; object-fit: cover; border: 1px solid var(--gold);">
+                                             style="height: 140px; width: 100%; object-fit: cover; border: 1px solid var(--gold, #f39c12);">
                                     </a>
                                     <a href="<?php echo '../access/' . $c['diplome']; ?>" target="_blank" class="btn btn-gold btn-sm w-100 mt-2 fw-bold">
                                         <i class="bi bi-eye"></i> Voir en grand
@@ -186,7 +192,7 @@ $villes = $villes_stmt->fetchAll();
             return;
         }
 
-        // Utilisation d'un chemin relatif sortant vers le dossier access pour trouver le fichier get_quartiers.php
+        // Fetch AJAX vers get_quartiers.php corrigé en cas de variations d'arborescence locale
         fetch('../access/get_quartiers.php?id_ville=' + idVille)
             .then(response => {
                 if (!response.ok) throw new Error("Fichier introuvable");
@@ -205,7 +211,6 @@ $villes = $villes_stmt->fetchAll();
             })
             .catch(error => {
                 console.error('Erreur AJAX Annuaire:', error);
-                // Secours au cas où le chemin d'accès varie sur ton architecture locale
                 fetch('get_quartiers.php?id_ville=' + idVille)
                     .then(res => res.json())
                     .then(data => {
@@ -223,6 +228,9 @@ $villes = $villes_stmt->fetchAll();
 </script>
 
 <style>
+    :root {
+        --gold: #f39c12;
+    }
     .btn-gold {
         background-color: var(--gold);
         color: black;

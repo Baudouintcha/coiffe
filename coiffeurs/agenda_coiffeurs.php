@@ -21,9 +21,9 @@ if (!$coiffeur_id || $role_actuel !== 'coiffeur') {
     exit();
 }
 
-// Récupération des horaires existants
+// Récupération des horaires existants depuis la table 'disponibilites'
 try {
-    $stmt = $pdo->prepare("SELECT * FROM agenda_coiffeurs WHERE id_coiffeur = ? ORDER BY FIELD(jour, 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche')");
+    $stmt = $pdo->prepare("SELECT * FROM disponibilites WHERE coiffeur_id = ? ORDER BY FIELD(jour_semaine, 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche')");
     $stmt->execute([$coiffeur_id]);
     $horaires_existants = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
@@ -38,6 +38,15 @@ $jours_semaine = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', '
 
 <section class="py-5 bg-pure-dark" style="min-height: 100vh; background-color: #0b0c10 !important;">
     <div class="container mt-4">
+        
+        <!-- Alerte de succès après enregistrement (Ajoutée discrètement pour la communication de page) -->
+        <?php if (isset($_GET['status']) && $_GET['status'] === 'success'): ?>
+            <div class="alert alert-success bg-dark text-success border-success alert-dismissible fade show" role="alert">
+                <strong>🗓️ Succès !</strong> Votre agenda de disponibilité a été enregistré et mis à jour avec succès.
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        <?php endif; ?>
+
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="text-warning fw-bold"><i class="bi bi-calendar3"></i> CONFIGURATION DE MON AGENDA</h1>
             <a href="/coiffons/index.php" class="btn btn-outline-secondary btn-sm fw-bold text-white"><i class="bi bi-arrow-left"></i> Tableau de bord</a>
@@ -64,7 +73,8 @@ $jours_semaine = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', '
                             </thead>
                             <tbody>
                                 <?php foreach ($jours_semaine as $jour): 
-                                    $cle_jour = array_search($jour, array_column($horaires_existants, 'jour'));
+                                    // Utilisation de 'jour_semaine' pour correspondre à la table disponibilites
+                                    $cle_jour = array_search($jour, array_column($horaires_existants, 'jour_semaine'));
                                     $dispo_jour = ($cle_jour !== false) ? $horaires_existants[$cle_jour] : null;
                                 ?>
                                     <tr>
@@ -105,7 +115,8 @@ $jours_semaine = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', '
                     <?php foreach ($horaires_existants as $h): ?>
                         <div class="col-md-4 col-sm-6">
                             <div class="p-3 rounded border border-success text-center shadow-sm" style="background-color: #0b0c10;">
-                                <span class="badge bg-success uppercase px-3 py-2 mb-2 fw-bold"><?php echo htmlspecialchars($h['jour']); ?></span>
+                                <!-- Utilisation de 'jour_semaine' pour l'affichage de l'aperçu -->
+                                <span class="badge bg-success uppercase px-3 py-2 mb-2 fw-bold"><?php echo htmlspecialchars($h['jour_semaine']); ?></span>
                                 <div class="text-white font-monospace fs-5 mt-1">
                                     <?php echo date('H:i', strtotime($h['heure_debut'])); ?> à <?php echo date('H:i', strtotime($h['heure_fin'])); ?>
                                 </div>

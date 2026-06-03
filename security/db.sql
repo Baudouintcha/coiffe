@@ -318,3 +318,8 @@ INSERT INTO quartiers (nom_quartier, id_ville) VALUES
 ('Bassila Centre', (SELECT id FROM villes WHERE nom_ville = 'Bassila')),
 ('Copargo Centre', (SELECT id FROM villes WHERE nom_ville = 'Copargo')),
 ('Ouaké Centre', (SELECT id FROM villes WHERE nom_ville = 'Ouaké'));
+
+
+ALTER TABLE users 
+ADD COLUMN date_expiration_abo DATE DEFAULT NULL AFTER abonnement_status,
+ADD COLUMN renouvellement_auto TINYINT(1) DEFAULT 1 AFTER date_expiration_abo;

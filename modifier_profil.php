@@ -15,6 +15,14 @@ include __DIR__ . '/layout/header.php';
 
 $user_id = $_SESSION['id_user'];
 
+// ➕ MODIFICATION : RÉCUPÉRATION EN AMONT DE TOUS LES QUARTIERS DE LA BASE
+try {
+    $quartiers_stmt = $pdo->query("SELECT * FROM quartier ORDER BY nom_quartier ASC");
+    $liste_quartiers = $quartiers_stmt->fetchAll();
+} catch (Exception $e) {
+    $liste_quartiers = []; // Sécurité si la table est vide
+}
+
 // 2. RÉCUPÉRATION DES INFOS ACTUELLES POUR PRÉ-REMPLIR LE FORMULAIRE
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
@@ -35,15 +43,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $prenom = htmlspecialchars(trim($_POST['prenom']));
     $telephone = htmlspecialchars(trim($_POST['telephone']));
     $ville = htmlspecialchars(trim($_POST['ville']));
-    $quartier = htmlspecialchars(trim($_POST['quartier']));
+    
+    // 🎯 RECTIFICATION SÉCURISÉE : Évite la valeur 0 et applique un vrai NULL si aucun quartier n'est sélectionné
+    $id_quartier = (!empty($_POST['id_quartier'])) ? intval($_POST['id_quartier']) : null;
+
     $nouveau_mdp = $_POST['nouveau_mdp'];
 
-    // Validations de base
+    // Validations de base (CONSERVÉES INTACTES)
     if (empty($nom) || empty($prenom) || empty($telephone)) {
         $erreurs[] = "Le nom, le prénom et le téléphone sont obligatoires.";
     }
 
-    // Gestion de la Photo de Profil (si un fichier est envoyé)
+    // Gestion de la Photo de Profil (si un fichier est envoyé - CONSERVÉ INTACT)
     $chemin_photo = $user['photo_profil']; // Par défaut, on garde l'ancienne
     if (isset($_FILES['photo_profil']) && $_FILES['photo_profil']['error'] === UPLOAD_ERR_OK) {
         $file_tmp = $_FILES['photo_profil']['tmp_name'];
@@ -76,14 +87,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Si aucune erreur, on prépare la mise à jour
     if (empty($erreurs)) {
         try {
-            // Étape A : Mise à jour des infos de base (communes aux clients et coiffeurs)
-            $sql = "UPDATE users SET nom = ?, prenom = ?, telephone = ?, ville = ?, quartier = ?, photo_profil = ? WHERE id = ?";
-            $params = [$nom, $prenom, $telephone, $ville, $quartier, $chemin_photo, $user_id];
+            // ➕ MODIFICATION : REQUÊTE ALTERÉE POUR VISER LA BONNE COLONNE 'id_quartier'
+            $sql = "UPDATE users SET nom = ?, prenom = ?, telephone = ?, ville = ?, id_quartier = ?, photo_profil = ? WHERE id = ?";
+            $params = [$nom, $prenom, $telephone, $ville, $id_quartier, $chemin_photo, $user_id];
             
             $stmt_update = $pdo->prepare($sql);
             $stmt_update->execute($params);
 
-            // Étape B : Gestion du Mot de passe (Uniquement s'il a rempli la case)
+            // Étape B : Gestion du Mot de passe (Uniquement s'il a rempli la case - CONSERVÉ INTACT)
             if (!empty($nouveau_mdp)) {
                 if (strlen($nouveau_mdp) >= 6) {
                     $mdp_hache = password_hash($nouveau_mdp, PASSWORD_BCRYPT);
@@ -157,22 +168,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         <div class="col-md-6">
                             <label class="form-label text-warning small fw-bold">Nom :</label>
-                            <input type="text" name="nom" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['nom']); ?>" required>
+                            <input type="text" name="nom" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['nom'] ?? ''); ?>" required>
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label text-warning small fw-bold">Prénom :</label>
-                            <input type="text" name="prenom" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['prenom']); ?>" required>
+                            <input type="text" name="prenom" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['prenom'] ?? ''); ?>" required>
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label text-muted small fw-bold">Adresse Email (Non modifiable) :</label>
-                            <input type="email" class="form-control bg-black text-secondary border-secondary cursor-not-allowed" value="<?php echo htmlspecialchars($user['email']); ?>" readonly>
+                            <input type="email" class="form-control bg-black text-secondary border-secondary cursor-not-allowed" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" readonly>
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label text-warning small fw-bold">Téléphone (WhatsApp) :</label>
-                            <input type="text" name="telephone" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['telephone']); ?>" required>
+                            <input type="text" name="telephone" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['telephone'] ?? ''); ?>" required>
                         </div>
 
                         <div class="col-md-6">
@@ -181,8 +192,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label text-warning small fw-bold">Quartier :</label>
-                            <input type="text" name="quartier" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['quartier'] ?? ''); ?>" placeholder="Ex: Fidjrossè">
+                            <label class="form-label text-warning small fw-bold">Quartier (Choix ciblé) :</label>
+                            <select name="id_quartier" class="form-select bg-dark text-white border-secondary select-style">
+                                <option value="">-- Sélectionnez votre quartier --</option>
+                                <?php foreach ($liste_quartiers as $q): ?>
+                                    <option value="<?php echo $q['id_quartier']; ?>" <?php echo (isset($user['id_quartier']) && $user['id_quartier'] == $q['id_quartier']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($q['nom_quartier'] ?? ''); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
 
                         <hr class="border-secondary my-3">
@@ -227,11 +245,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .btn-gold:hover {
         background-color: #d35400 !important;
     }
-    .form-control:focus {
+    .form-control:focus, .form-select:focus {
         background-color: #1a1a1a !important;
         border-color: var(--gold) !important;
         box-shadow: none !important;
         color: #fff !important;
+    }
+    .select-style {
+        background-color: #212529;
+        color: #fff;
+        border-radius: 6px;
     }
     .cursor-not-allowed {
         cursor: not-allowed;

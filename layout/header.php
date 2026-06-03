@@ -150,7 +150,10 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
             <?php if ($role_utilisateur == 'coiffeur'): ?>
                 <a href="/coiffons/coiffeurs/valider_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes rendez-vous</a>
                 <a href="/coiffons/coiffeurs/gestion_catalogue.php"><i class="bi bi-scissors"></i> Gérer mes coiffures</a>
-                <a href="/coiffons/coiffeurs/agenda_coiffeurs.php"><i class="bi bi-people"></i> Mes clients</a>
+                
+                <a href="/coiffons/coiffeurs/mes_zones.php" class="text-warning fw-bold"><i class="bi bi-geo-alt"></i> Ma zone d'intervention</a>
+                
+                <a href="/coiffons/coiffeurs/agenda_coiffeurs.php"><i class="bi bi-calendar"></i> Mon agenda</a>
                 <a href="/coiffons/coiffeurs/portefeuille.php"><i class="bi bi-wallet2"></i> Mes gains</a>
                 <a href="/coiffons/profil.php"><i class="bi bi-person-badge"></i> Mon Profil</a>
             <?php endif; ?>
@@ -218,6 +221,7 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
                 </button>
             </div>
         </div>
+        <link rel="stylesheet" href="/coiffons/css/responsive-custom.css">
     </header>
 
     <script>
