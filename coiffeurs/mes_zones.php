@@ -10,11 +10,15 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
     exit();
 }
 
-require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
+require_once __DIR__ . '/../security/config.php';
+include __DIR__ . '/../layout/header.php';
 
 $id_coiffeur = $_SESSION['id_user'];
 $message = "";
+
+// 🎯 CONFIGURATION DES IDS DE TES VILLES PROCHES (Identique à ton get_quartiers.php)
+$id_cotonou = 1; 
+$id_calavi  = 2;
 
 // 2. TRAITEMENT DU FORMULAIRE : Quand le coiffeur valide ses choix
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_zones'])) {
@@ -48,16 +52,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_zones']))
     }
 }
 
-// 3. RÉCUPÉRATION DES DONNÉES POUR L'AFFICHAGE GRAPHIQUE
+// 3. RÉCUPÉRATION DES DONNÉES DE LA DB POUR L'AFFICHAGE DYNAMIQUE
 
-// A. Liste de TOUS les quartiers existants dans l'application
-$all_quartiers_stmt = $pdo->query("SELECT * FROM quartier ORDER BY nom_quartier ASC");
+// 🎯 LIAISON DB : On récupère l'id_ville de ce coiffeur depuis la table 'users'
+$profile_stmt = $pdo->prepare("SELECT ville FROM users WHERE id = ?");
+$profile_stmt->execute([$id_coiffeur]);
+$id_ville_coiffeur = intval($profile_stmt->fetchColumn());
+
+// 🎯 FILTRAGE INTELLIGENT (Option B) : On charge les quartiers liés à sa région dans la DB
+if ($id_ville_coiffeur === $id_cotonou || $id_ville_coiffeur === $id_calavi) {
+    // Si le coiffeur est de Cotonou ou Calavi, la DB renvoie la zone métropolitaine fusionnée
+    $all_quartiers_stmt = $pdo->prepare("SELECT * FROM quartiers WHERE id_ville IN (?, ?) ORDER BY nom_quartier ASC");
+    $all_quartiers_stmt->execute([$id_cotonou, $id_calavi]);
+} else {
+    // Pour toute autre ville, la DB restreint strictement à sa ville d'origine
+    $all_quartiers_stmt = $pdo->prepare("SELECT * FROM quartiers WHERE id_ville = ? ORDER BY nom_quartier ASC");
+    $all_quartiers_stmt->execute([$id_ville_coiffeur]);
+}
+
 $tous_les_quartiers = $all_quartiers_stmt->fetchAll();
 
 // B. Liste des quartiers que ce coiffeur a DEJA cochés par le passé (pour les pré-cocher)
 $mes_zones_stmt = $pdo->prepare("SELECT id_quartier FROM zones_coiffeur WHERE id_coiffeur = ?");
 $mes_zones_stmt->execute([$id_coiffeur]);
-// fetchAll(PDO::FETCH_COLUMN) permet d'obtenir un tableau simple d'identifiants : [1, 3, 12]
 $mes_zones_actives = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 ?>
 
@@ -77,8 +94,10 @@ $mes_zones_actives = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
                     <form method="POST">
                         
-                        <div class="p-3 mb-4 rounded text-center" style="background-color: #161616; border: 1px dashed #333;">
-                            <span class="text-muted small">💡 Plus vous couvrez de zones, plus vous apparaissez dans les résultats de recherche des clients de votre région !</span>
+                        <div class="p-3 mb-4 rounded text-center" style="background-color: #1a1610; border: 1px solid rgba(243, 156, 18, 0.25);">
+                            <span style="color: #f1f1f1; font-size: 0.9rem; font-weight: 500;">
+                                <span style="color: var(--gold);">💡 Conseil :</span> Plus vous couvrez de zones, plus vous apparaîtrez dans les résultats de recherche des clients de votre région élargie !
+                            </span>
                         </div>
 
                         <div class="row g-3 px-2 mb-4">
@@ -101,7 +120,7 @@ $mes_zones_actives = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <div class="col-12 text-center text-muted py-4">
-                                    Aucun quartier configuré dans la base de données. Contactez l'administrateur.
+                                    Aucun quartier disponible pour votre zone géographique actuelle dans la base de données.
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -135,7 +154,6 @@ $mes_zones_actives = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
         background-color: #d35400 !important;
         transform: translateY(-2px);
     }
-    /* Style visuel des blocs de quartiers */
     .zone-card:hover {
         border-color: var(--gold) !important;
         background-color: #222 !important;
@@ -143,7 +161,6 @@ $mes_zones_actives = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     .cursor-pointer {
         cursor: pointer;
     }
-    /* Personnalisation graphique des checkboxes Bootstrap en version dorée */
     .checkbox-gold {
         cursor: pointer;
         width: 1.2em;
@@ -159,4 +176,4 @@ $mes_zones_actives = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 </style>
 
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer.php'; ?>
