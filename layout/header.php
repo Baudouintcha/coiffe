@@ -1,3 +1,4 @@
+
 <?php
 // =================================================================
 // DÉTECTEUR AUTOMATIQUE DE SESSION (SÉCURITÉ ET ANTI-NOTICE)
@@ -196,6 +197,21 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
         <div class="navbar navbar-dark bg-dark shadow-sm">
             <div class="container d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
+                    
+                    <?php 
+                    if ($est_connecte && ($role_utilisateur === 'client' || $role_utilisateur === 'coiffeur')): 
+                        // Calcul sécurisé et dynamique du lien de retour
+                        $page_precedente = $_SERVER['HTTP_REFERER'] ?? '';
+                        if (empty($page_precedente) || strpos($page_precedente, 'connexion.php') !== false || strpos($page_precedente, 'inscription.php') !== false || strpos($page_precedente, 'deconnexion.php') !== false) {
+                            $lien_retour = "/coiffons/index.php";
+                        } else {
+                            $lien_retour = htmlspecialchars($page_precedente);
+                        }
+                    ?>
+                        <a href="<?php echo $lien_retour; ?>" class="btn p-0 me-3 text-warning border-0" style="font-size: 1.8rem; transition: 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" title="Retour">
+                            <i class="bi bi-arrow-left-short"></i>
+                        </a>
+                    <?php endif; ?>
                     <img src="/coiffons/images/logo.png" alt="Logo" class="nav-logo" onclick="openNav()">
                     <a href="/coiffons/index.php" class="navbar-brand d-flex align-items-center">
                         <strong>Coiffe_Chez_Toi</strong>
@@ -221,7 +237,7 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
                 </button>
             </div>
         </div>
-        <link rel="stylesheet" href="/coiffons/css/responsive-custom.css">
+        <link class="stylesheet" href="/coiffons/css/responsive-custom.css">
     </header>
 
     <script>
@@ -251,3 +267,4 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <main>
+
