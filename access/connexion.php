@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../security/config.php';
-include __DIR__ . '/../layout/header.php';
+
 $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
@@ -50,14 +50,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
     // Si c'est l'admin, on l'envoie directement dans le dossier 'first' vers son dashboard
     header("Location: /coiffons/first/admin_dashboard.php");
     exit();
-} else if ($_SESSION['role'] === 'coiffeur') {
-    header("Location: espace_coiffeur.php");
-    exit();
 } else {
-    header("Location: index.php");
+    // 🏆 Le coiffeur ET le client vont sur l'index, le tri se fera là-bas !
+    header("Location: ../index.php");
     exit();
 }
-
             } else {
                 $error = "Identifiants incorrects. Veuillez réessayer.";
             }
@@ -68,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
         $error = "Veuillez remplir tous les champs.";
     }
 }
+include __DIR__ . '/../layout/header.php';
 ?>
 
 <!-- Interface HTML -->
