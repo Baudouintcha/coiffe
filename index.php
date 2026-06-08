@@ -342,21 +342,21 @@ try {
         </div>
     </section>
 
-Selon le **PRINCIPE**, voici l'analyse précise des défauts visuels constatés sur tes captures d'écran et la proposition de correction structurelle.
+///Selon le **PRINCIPE**, voici l'analyse précise des défauts visuels constatés sur tes captures d'écran et la proposition de correction structurelle.
 
-### 1. Analyse (3 points maximum)
+///### 1. Analyse (3 points maximum)
 
-* **Le problème du fond blanc :** Le rectangle blanc/rose tout en haut provient de la balise HTML ouvrante de ta section qui possède la classe Bootstrap `.bg-pure-dark`. Cette classe n'existe pas nativement dans Bootstrap, ou alors ses propriétés de transparence entrent en conflit avec la couleur de fond globale de ton site, forçant le navigateur à appliquer sa couleur blanche par défaut.
-* **Le centrage et l'inutilité des titres :** Le titre "SALON DE..." est collé à gauche car il manque la classe de centrage réactif (`text-center`). De plus, le titre intermédiaire "Mon Catalogue Actuel" crée une surcharge visuelle inutile puisque les cartes de coiffure se trouvent déjà tout en haut de la page et se décrivent d'elles-mêmes.
-* **La ligne parasite avant le footer :** La sensation de coupure ou de "ligne" vide juste avant le footer est provoquée par des balises de fermeture de structure (`</div>` ou `</section>`) mal imbriquées suite à la suppression du `endif;`. Le navigateur tente de fermer un bloc qui n'existe pas, créant un espace fantôme en bas de page.
+///* **Le problème du fond blanc :** Le rectangle blanc/rose tout en haut provient de la balise HTML ouvrante de ta section qui possède la classe Bootstrap `.bg-pure-dark`. Cette classe n'existe pas nativement dans Bootstrap, ou alors ses propriétés de transparence entrent en conflit avec la couleur de fond globale de ton site, forçant le navigateur à appliquer sa couleur blanche par défaut.
+///* **Le centrage et l'inutilité des titres :** Le titre "SALON DE..." est collé à gauche car il manque la classe de centrage réactif (`text-center`). De plus, le titre intermédiaire "Mon Catalogue Actuel" crée une surcharge visuelle inutile puisque les cartes de coiffure se trouvent déjà tout en haut de la page et se décrivent d'elles-mêmes.
+////* **La ligne parasite avant le footer :** La sensation de coupure ou de "ligne" vide juste avant le footer est provoquée par des balises de fermeture de structure (`</div>` ou `</section>`) mal imbriquées suite à la suppression du `endif;`. Le navigateur tente de fermer un bloc qui n'existe pas, créant un espace fantôme en bas de page.
 
----
+////---
 
-### 2. Proposition (Le code corrigé)
+///### 2. Proposition (Le code corrigé)
 
-Pour corriger ces trois problèmes d'un coup (fond noir uniforme, centrage parfait au milieu, suppression de la ligne inutile et de l'espace blanc), remplace tout le bloc du coiffeur par ce code nettoyé au pixel près :
+//////Pour corriger ces trois problèmes d'un coup (fond noir uniforme, centrage parfait au milieu, suppression de la ligne inutile et de l'espace blanc), remplace tout le bloc du coiffeur par ce code nettoyé au pixel près :
 
-```php
+////```php
 <?php elseif (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur'): ?>
     <section class="py-4 bg-black style-smartwatch-container" style="min-height: 100vh; color: #fff;">
         <div class="container mt-2">

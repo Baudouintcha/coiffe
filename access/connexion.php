@@ -47,15 +47,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
 
                 // Redirections adaptées par rôles
                 if ($_SESSION['role'] === 'admin') {
-                    echo "<script>window.location.href='/coiffons/first/admin_dashboard.php';</script>";
-                } else {
-                    if (file_exists('index.php')) {
-                        echo "<script>window.location.href='index.php';</script>";
-                    } else {
-                        echo "<script>window.location.href='../index.php';</script>";
-                    }
-                }
-                exit();
+    // Si c'est l'admin, on l'envoie directement dans le dossier 'first' vers son dashboard
+    header("Location: /coiffons/first/admin_dashboard.php");
+    exit();
+} else if ($_SESSION['role'] === 'coiffeur') {
+    header("Location: espace_coiffeur.php");
+    exit();
+} else {
+    header("Location: index.php");
+    exit();
+}
 
             } else {
                 $error = "Identifiants incorrects. Veuillez réessayer.";

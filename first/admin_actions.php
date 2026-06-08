@@ -24,8 +24,8 @@ if (isset($_GET['success'])) {
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
     
     // 1. Calculs de l'activité globale et comptable
-    $nb_clients = $pdo->query("SELECT COUNT(*) FROM utilisateurs WHERE role = 'client'")->fetchColumn();
-    $nb_coiffeurs = $pdo->query("SELECT COUNT(*) FROM utilisateurs WHERE role = 'coiffeur'")->fetchColumn();
+    $nb_clients = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'client'")->fetchColumn();
+    $nb_coiffeurs = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'coiffeur'")->fetchColumn();
     
     $total_entrees = $pdo->query("SELECT SUM(montant) FROM transactions_plateforme WHERE type_mouvement = 'entree'")->fetchColumn() ?? 0;
     $total_sorties = $pdo->query("SELECT SUM(montant) FROM transactions_plateforme WHERE type_mouvement = 'sortie'")->fetchColumn() ?? 0;
@@ -36,26 +36,26 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
     $fonds_sequestres = $solde_net * 0.4; // Ajustement business simulation
 
     // 2. Récupération des entités pour les tables d'affichage
-    $utilisateurs = $pdo->query("SELECT * FROM utilisateurs ORDER BY id_user DESC")->fetchAll();
-    $commentaires = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN utilisateurs u ON c.id_client = u.id_user ORDER BY c.date_creation DESC")->fetchAll();
+    $users = $pdo->query("SELECT * FROM users ORDER BY id_user DESC")->fetchAll();
+    $commentaires = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN users u ON c.id_client = u.id_user ORDER BY c.date_creation DESC")->fetchAll();
     $motifs_suppression = $pdo->query("SELECT * FROM suppressions_comptes ORDER BY date_demande DESC")->fetchAll();
 
     // 3. EXTRACTION DES DONNÉES POUR LES 4 GRAPHIQUES (ANALYSE TOTALE)
-    // Graphique 1 : Sexe des utilisateurs
-    $data_sexe = $pdo->query("SELECT sexe, COUNT(*) as total FROM utilisateurs WHERE role IN ('client', 'coiffeur') GROUP BY sexe")->fetchAll(PDO::FETCH_ASSOC);
+    // Graphique 1 : Sexe des users
+    $data_sexe = $pdo->query("SELECT sexe, COUNT(*) as total FROM users WHERE role IN ('client', 'coiffeur') GROUP BY sexe")->fetchAll(PDO::FETCH_ASSOC);
     
     // Graphique 2 : Top Coiffeurs (Basé sur le nombre de prestations créées dans leur catalogue à défaut de table RDV complète)
-    $top_coiffeurs = $pdo->query("SELECT u.nom, COUNT(p.id_prestation) as total_styles FROM prestations p JOIN utilisateurs u ON p.id_coiffeur = u.id_user GROUP BY p.id_coiffeur ORDER BY total_styles DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
+    $top_coiffeurs = $pdo->query("SELECT u.nom, COUNT(p.id_prestation) as total_styles FROM prestations p JOIN users u ON p.id_coiffeur = u.id_user GROUP BY p.id_coiffeur ORDER BY total_styles DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
     
     // Graphique 3 : Répartition Financement (Entrées vs Sorties)
     // Préparé dynamiquement pour Chart.js
 
     // Graphique 4 : Villes les plus actives
-    $top_villes = $pdo->query("SELECT ville, COUNT(*) as total FROM utilisateurs WHERE ville IS NOT NULL AND ville != '' GROUP BY ville ORDER BY total DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
+    $top_villes = $pdo->query("SELECT ville, COUNT(*) as total FROM users WHERE ville IS NOT NULL AND ville != '' GROUP BY ville ORDER BY total DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
 
     // 4. 🚨 LOGIQUE DU CENTRE DE DIAGNOSTIC (SOUCIS ET RENDEMENTS)
     // Coiffeurs en baisse de rendement (Inactifs : Aucun style publié dans leur catalogue)
-    $coiffeurs_inactifs = $pdo->query("SELECT nom, email FROM utilisateurs WHERE role = 'coiffeur' AND id_user NOT IN (SELECT DISTINCT id_coiffeur FROM prestations)")->fetchAll();
+    $coiffeurs_inactifs = $pdo->query("SELECT nom, email FROM users WHERE role = 'coiffeur' AND id_user NOT IN (SELECT DISTINCT id_coiffeur FROM prestations)")->fetchAll();
     
     // Soucis d'attrition : Nombre de personnes parties à cause d'un "bug" ou "mauvaise expérience" dans les motifs de suppression
     $bugs_remontes = $pdo->query("SELECT COUNT(*) FROM suppressions_comptes WHERE raison LIKE '%bug%' OR raison LIKE '%problème%' OR raison LIKE '%cher%'")->fetchColumn() ?? 0;
@@ -126,7 +126,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
             <!-- ENREGISTREMENT FLUX SORTANT -->
             <div class="card bg-dark border-secondary p-4 mb-5">
                 <h5 class="text-white mb-3"><i class="bi bi-plus-circle text-danger me-2"></i> Enregistrer un flux sortant (Dépense)</h5>
-                <form action="admin_action.php?action=ajouter_depense" method="POST" class="row g-3">
+                <form action="admin_actions.php?action=ajouter_depense" method="POST" class="row g-3">
                     <div class="col-md-4">
                         <input type="number" name="montant" class="form-control bg-black text-white border-secondary" placeholder="Montant en FCFA" required>
                     </div>
@@ -206,9 +206,9 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                 </div>
             </div>
 
-            <!-- COMPTES UTILISATEURS -->
+            <!-- COMPTES users -->
             <div id="comptes" class="card bg-dark border-secondary p-4 mb-5 pt-4">
-                <h4 class="text-white mb-4"><i class="bi bi-people me-2"></i> Comptes Utilisateurs (Total : <?php echo ($nb_clients + $nb_coiffeurs); ?>)</h4>
+                <h4 class="text-white mb-4"><i class="bi bi-people me-2"></i> Comptes users (Total : <?php echo ($nb_clients + $nb_coiffeurs); ?>)</h4>
                 <div class="table-responsive">
                     <table class="table table-dark table-hover align-middle text-center">
                         <thead>
@@ -217,7 +217,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($utilisateurs as $u): ?>
+                            <?php foreach ($users as $u): ?>
                                 <tr>
                                     <td><img src="<?php echo htmlspecialchars($u['photo_profil'] ?? 'uploads/default.png'); ?>" class="rounded-circle" style="width:35px; height:35px; object-fit:cover;"></td>
                                     <td class="fw-bold text-white"><?php echo htmlspecialchars($u['nom']); ?></td>
@@ -235,7 +235,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                                     </td>
                                     <td>
                                         <?php if ($u['role'] !== 'admin'): ?>
-                                            <a href="admin_action.php?action=supprimer_user&id=<?php echo $u['id_user']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Exclure définitivement ce membre ?');"><i class="bi bi-trash"></i></a>
+                                            <a href="admin_actions.php?action=supprimer_user&id=<?php echo $u['id_user']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Exclure définitivement ce membre ?');"><i class="bi bi-trash"></i></a>
                                         <?php else: ?>
                                             <span class="text-muted small">Protégé</span>
                                         <?php endif; ?>
@@ -269,7 +269,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                                         <td class="text-secondary small"><?php echo nl2br(htmlspecialchars($ms['raison'])); ?></td>
                                         <td class="text-center text-muted small"><?php echo date('d/m/Y H:i', strtotime($ms['date_demande'])); ?></td>
                                         <td class="text-center">
-                                            <a href="admin_action.php?action=supprimer_log_suppression&id=<?php echo $ms['id_suppression']; ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle"></i></a>
+                                            <a href="admin_actions.php?action=supprimer_log_suppression&id=<?php echo $ms['id_suppression']; ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle"></i></a>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -296,7 +296,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                                     <td class="text-light small"><?php echo htmlspecialchars($com['message']); ?></td>
                                     <td class="text-center text-warning"><?php echo str_repeat('⭐', $com['note']); ?></td>
                                     <td class="text-center">
-                                        <a href="admin_action.php?action=supprimer_commentaire&id=<?php echo $com['id_commentaire']; ?>" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i> Supprimer</a>
+                                        <a href="admin_actions.php?action=supprimer_commentaire&id=<?php echo $com['id_commentaire']; ?>" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i> Supprimer</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -373,7 +373,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur') {
     $coiffeur_id = $_SESSION['id_user'];
     
-    $chk = $pdo->prepare("SELECT * FROM utilisateurs WHERE id_user = ?");
+    $chk = $pdo->prepare("SELECT * FROM users WHERE id_user = ?");
     $chk->execute([$coiffeur_id]);
     $db_coiffeur = $chk->fetch();
 
@@ -456,7 +456,7 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur') {
 // =================================================================
 // INTERFACE #3 : L'INTERFACE PUBLIQUE ET CLIENTS
 // =================================================================
-$query_coms = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN utilisateurs u ON c.id_client = u.id_user ORDER BY c.date_creation DESC LIMIT 6");
+$query_coms = $pdo->query("SELECT c.*, u.nom FROM commentaires c JOIN users u ON c.id_client = u.id_user ORDER BY c.date_creation DESC LIMIT 6");
 $all_comments = $query_coms->fetchAll();
 ?>
 <section class="py-5 text-center bg-black border-bottom border-secondary" style="min-height: 55vh; display: flex; align-items: center;">
