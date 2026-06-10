@@ -16,8 +16,8 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] === 'invite') {
     exit();
 }
 
-// 2. RÉCUPÉRATION ET VÉRIFICATION DE L'ID DU COIFFEUR
-$id_coiffeur = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+// 2. RÉCUPÉRATION DE L'ID DEPUIS L'URL
+$id_coiffeur = filter_input(INPUT_GET, 'id_coiffeur', FILTER_VALIDATE_INT);
 
 if (!$id_coiffeur) {
     echo "<div class='container py-5 text-center text-white'><h3>Coiffeur introuvable ou ID invalide.</h3><a href='/coiffons/index.php' class='btn btn-warning mt-3'>Retour à l'accueil</a></div>";
@@ -32,7 +32,9 @@ try {
         FROM users u 
         LEFT JOIN villes v ON u.ville = v.id 
         LEFT JOIN quartiers q ON u.id_quartier = q.id 
-        WHERE u.id = ? AND u.role = 'coiffeur' AND u.abonnement_status = 1
+        WHERE u.id = ? 
+          AND LOWER(u.role) = 'coiffeur' 
+          AND LOWER(u.abonnement_status) = 'actif'
     ");
     $stmt->execute([$id_coiffeur]);
     $coiffeur = $stmt->fetch();
@@ -43,44 +45,65 @@ try {
         exit();
     }
 
-    // 4. REQUÊTE POUR LE CATALOGUE DE SES PRESTATIONS
-    $stmt_presta = $pdo->prepare("SELECT * FROM prestations WHERE id_coiffeur = ? ORDER BY id_prestation DESC");
-    $stmt_presta->execute([$id_coiffeur]);
-    $prestations = $stmt_presta->fetchAll();
+    // 4. REQUÊTE AUTORÉPARATRICE POUR LE CATALOGUE DES PRESTATIONS
+    $stmt_presta = $pdo->prepare("SELECT * FROM prestations");
+    $stmt_presta->execute();
+    $toutes_les_prestas = $stmt_presta->fetchAll();
 
-    // 5. REQUÊTE POUR CALCULER LA NOTE MOYENNE
-    $stmt_note = $pdo->prepare("SELECT AVG(note) as moyenne, COUNT(*) as total FROM commentaires WHERE id_coiffeur = ?");
-    $stmt_note->execute([$id_coiffeur]);
-    $stats_avis = $stmt_note->fetch();
-    $note_moyenne = $stats_avis['moyenne'] ? round($stats_avis['moyenne'], 1) : null;
-
-    // =========================================================================
-    // ➕ AJOUT TECHNIQUE : RÉCUPÉRATION DES PLAGES HORAIRES & DES RDV EXISTANTS
-    // =========================================================================
-    // On récupère le planning hebdomadaire du coiffeur
-    $stmt_dispo = $pdo->prepare("SELECT * FROM disponibilites WHERE coiffeur_id = ?");
-    $stmt_dispo->execute([$id_coiffeur]);
-    $dispos_brutes = $stmt_dispo->fetchAll();
-
-    // Organisation en tableau indexé par le nom du jour en français (minuscules)
-    $planning_coiffeur = [];
-    foreach ($dispos_brutes as $d) {
-        $planning_coiffeur[strtolower(trim($d['jour_semaine']))] = [
-            'debut' => $d['heure_debut'],
-            'fin' => $d['heure_fin']
-        ];
+    $prestations = [];
+    foreach ($toutes_les_prestas as $p) {
+        $cles_nettoyees = array_combine(array_map('trim', array_keys($p)), array_values($p));
+        if (isset($cles_nettoyees['id_coiffeur']) && $cles_nettoyees['id_coiffeur'] == $id_coiffeur) {
+            $prestations[] = $p;
+        }
     }
 
-    // On récupère tous les rendez-vous déjà pris pour ce coiffeur pour bloquer les doublons (Gris)
-    $stmt_rdv = $pdo->prepare("SELECT date_rdv, heure_debut FROM rendez_vous WHERE coiffeur_id = ? AND statut_rdv IN ('en_attente', 'accepte')");
-    $stmt_rdv->execute([$id_coiffeur]);
-    $rdv_existants = $stmt_rdv->fetchAll(PDO::FETCH_ASSOC);
+    // 5. REQUÊTE AUTORÉPARATRICE POUR CALCULER LA NOTE MOYENNE
+    $stmt_note = $pdo->prepare("SELECT * FROM commentaires");
+    $stmt_note->execute();
+    $tous_les_commentaires = $stmt_note->fetchAll();
 
-    // Formatage des réservations pour comparaison rapide en JS : ['2026-06-10 14:00' => true]
+    $total_notes = 0;
+    $compteur_avis = 0;
+    foreach ($tous_les_commentaires as $c) {
+        $cles_c_nettoyees = array_combine(array_map('trim', array_keys($c)), array_values($c));
+        if (isset($cles_c_nettoyees['id_coiffeur']) && $cles_c_nettoyees['id_coiffeur'] == $id_coiffeur) {
+            $total_notes += $cles_c_nettoyees['note'];
+            $compteur_avis++;
+        }
+    }
+    $note_moyenne = $compteur_avis > 0 ? round($total_notes / $compteur_avis, 1) : null;
+    $stats_avis = ['total' => $compteur_avis];
+
+    // =========================================================================
+    // ➕ PLAGES HORAIRES & RDV EXISTANTS
+    // =========================================================================
+    $stmt_dispo = $pdo->prepare("SELECT * FROM disponibilites");
+    $stmt_dispo->execute();
+    $toutes_les_dispos = $stmt_dispo->fetchAll();
+
+    $planning_coiffeur = [];
+    foreach ($toutes_les_dispos as $d) {
+        $cles_d_nettoyees = array_combine(array_map('trim', array_keys($d)), array_values($d));
+        if (isset($cles_d_nettoyees['coiffeur_id']) && $cles_d_nettoyees['coiffeur_id'] == $id_coiffeur) {
+            $planning_coiffeur[strtolower(trim($cles_d_nettoyees['jour_semaine']))] = [
+                'debut' => $cles_d_nettoyees['heure_debut'],
+                'fin' => $cles_d_nettoyees['heure_fin']
+            ];
+        }
+    }
+
+    $stmt_rdv = $pdo->prepare("SELECT * FROM rendez_vous WHERE statut_rdv IN ('en_attente', 'accepte')");
+    $stmt_rdv->execute();
+    $tous_les_rdv = $stmt_rdv->fetchAll(PDO::FETCH_ASSOC);
+
     $busy_slots = [];
-    foreach ($rdv_existants as $r) {
-        $key = $r['date_rdv'] . ' ' . substr($r['heure_debut'], 0, 5);
-        $busy_slots[$key] = true;
+    foreach ($tous_les_rdv as $r) {
+        $cles_r_nettoyees = array_combine(array_map('trim', array_keys($r)), array_values($r));
+        if (isset($cles_r_nettoyees['coiffeur_id']) && $cles_r_nettoyees['coiffeur_id'] == $id_coiffeur) {
+            $key = $cles_r_nettoyees['date_rdv'] . ' ' . substr($cles_r_nettoyees['heure_debut'], 0, 5);
+            $busy_slots[$key] = true;
+        }
     }
 
 } catch (Exception $e) {
@@ -145,7 +168,6 @@ try {
                     $num_jour = date('d', $timestamp);
                     $nom_mois = date('M', $timestamp);
 
-                    // Vérification de la disponibilité du coiffeur ce jour-là
                     $travaille_ce_jour = isset($planning_coiffeur[$jour_fr]);
                     $class_statut = $travaille_ce_jour ? 'day-item-open' : 'day-item-closed';
                     $heure_debut_brute = $travaille_ce_jour ? $planning_coiffeur[$jour_fr]['debut'] : '';
@@ -198,12 +220,12 @@ try {
                                     <?php endif; ?>
                                 </div>
                                 <div class="card-body d-flex flex-column p-4 text-center">
-                                    <h5 class="fw-bold text-white mb-2"><?php echo htmlspecialchars($p['nom_style']); ?></h5>
+                                    <h5 class="fw-bold text-white mb-2"><?php echo htmlspecialchars($p['nom_style'] ?? 'Style sans nom'); ?></h5>
                                     <h4 class="text-warning fw-bold font-monospace mb-3 h5">
-                                        <?php echo number_format($p['prix'], 0, ',', ' '); ?> <span style="font-size: 0.75rem;">FCFA</span>
+                                        <?php echo number_format($p['prix'] ?? 0, 0, ',', ' '); ?> <span style="font-size: 0.75rem;">FCFA</span>
                                     </h4>
                                     <div class="mt-auto">
-                                        <a href="/coiffons/client/reserver.php?coiffeur_id=<?php echo $coiffeur['id']; ?>&presta_id=<?php echo $p['id_prestation']; ?>" class="btn btn-outline-warning btn-sm w-100 py-2 fw-bold">
+                                        <a href="/coiffons/client/reserver.php?coiffeur_id=<?php echo $coiffeur['id']; ?>&presta_id=<?php echo $p['id_prestation'] ?? ''; ?>" class="btn btn-outline-warning btn-sm w-100 py-2 fw-bold">
                                             CHOISIR CE STYLE
                                         </a>
                                     </div>
@@ -219,22 +241,18 @@ try {
 </div>
 
 <script>
-// Injection sécurisée des créneaux indisponibles (Gris) depuis PHP
 const slotsOccupes = <?php echo json_encode($busy_slots); ?>;
 const coiffeurId = <?php echo $id_coiffeur; ?>;
 
 function selectionnerJour(element) {
-    // Retirer la classe active de tous les autres jours
     document.querySelectorAll('.day-selector-card').forEach(el => el.classList.remove('active-day'));
     
-    // Si le jour est fermé (Rouge), on cache la zone et on s'arrête
     if (element.getAttribute('data-open') === '0') {
         document.getElementById('zone-slots-horaires').classList.add('d-none');
         alert("Ce coiffeur ne travaille pas ce jour-là.");
         return;
     }
 
-    // Activer graphiquement le jour sélectionné
     element.classList.add('active-day');
     
     const dateChoisie = element.getAttribute('data-date');
@@ -242,22 +260,22 @@ function selectionnerJour(element) {
     const heureFin = element.getAttribute('data-end');
     
     const containerSlots = document.getElementById('slots-container');
-    containerSlots.innerHTML = ""; // Nettoyage de la grille précédente
+    containerSlots.innerHTML = "";
 
-    // Découpage des heures d'ouverture et fermeture (Ex: "08:00" -> 8)
     let [hStart, mStart] = heureDebut.split(':').map(Number);
     let [hEnd, mEnd] = heureFin.split(':').map(Number);
 
     let heureCourante = hStart;
     let minuteCourante = mStart;
 
-    // Boucle de génération des créneaux de 60 minutes de l'heure d'ouverture à fermeture
+    const urlParams = new URLSearchParams(window.location.search);
+    const prestaId = urlParams.get('presta_id') || '';
+
     while (heureCourante < hEnd || (heureCourante === hEnd && minuteCourante < mEnd)) {
         let formatHeure = String(heureCourante).padStart(2, '0');
         let formatMinute = String(minuteCourante).padStart(2, '0');
         let slotHeure = `${formatHeure}:${formatMinute}`;
         
-        // Clé unique pour vérifier si ce créneau précis est déjà pris en BDD
         let cleVerification = `${dateChoisie} ${slotHeure}`;
 
         let boutonSlot = document.createElement('a');
@@ -265,41 +283,35 @@ function selectionnerJour(element) {
         boutonSlot.innerText = slotHeure;
 
         if (slotsOccupes[cleVerification]) {
-            // 🪙 CRÉNEAU OCCUPÉ : Devient gris et incliquable
             boutonSlot.classList.add('btn-secondary', 'opacity-25', 'disabled');
             boutonSlot.removeAttribute('href');
             boutonSlot.title = "Déjà réservé";
         } else {
-            // 🟢 CRÉNEAU DISPONIBLE : Devient blanc/or cliquable, envoie vers reserver.php
             boutonSlot.classList.add('btn-outline-light', 'text-warning', 'border-warning');
-            // Redirection directe avec injection de la date et de l'heure pré-sélectionnée
-            boutonSlot.href = `/coiffons/client/reserver.php?coiffeur_id=${coiffeurId}&date_rdv=${dateChoisie}&heure_debut=${slotHeure}`;
+            boutonSlot.href = `/coiffons/client/reserver.php?coiffeur_id=${coiffeurId}&presta_id=${prestaId}&date_rdv=${dateChoisie}&heure_debut=${slotHeure}`;
         }
 
         containerSlots.appendChild(boutonSlot);
-
-        // Avancement de 60 minutes pour le créneau suivant
         heureCourante += 1;
     }
 
-    // Rendre la zone visible
     document.getElementById('zone-slots-horaires').classList.remove('d-none');
 }
 </script>
 
 <style>
-    /* --- CSS DE L'AGENDA INTERACTIF --- */
     .day-selector-card {
-        width: 85px;
-        padding: 12px 5px;
-        text-align: center;
-        border-radius: 10px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        border: 2px solid transparent;
-        background-color: #1a1a1a;
-    }
-    /* Vert / Ouvert */
+    /* flex-grow: 1 permet aux cartes de s'étirer pour remplir l'espace */
+    flex: 1 1 75px; 
+    max-width: 90px;
+    padding: 12px 5px;
+    text-align: center;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    background-color: #1a1a1a;
+}
     .day-item-open {
         border-color: rgba(25, 135, 84, 0.3);
     }
@@ -307,14 +319,12 @@ function selectionnerJour(element) {
         background-color: #222;
         border-color: var(--gold);
     }
-    /* Rouge / Fermé */
     .day-item-closed {
         border-color: rgba(220, 53, 69, 0.4);
         background-color: rgba(220, 53, 69, 0.05);
         opacity: 0.5;
         cursor: not-allowed;
     }
-    /* Sélection active */
     .active-day {
         background-color: #ffc107 !important;
         color: black !important;
@@ -328,8 +338,6 @@ function selectionnerJour(element) {
         background-color: #111;
         border: 1px dashed rgba(212, 175, 55, 0.3);
     }
-
-    /* --- CODES DU PORTFOLIO D'ORIGINE PRESERVÉS --- */
     .luxury-profile-card {
         background-color: #121212 !important;
         border: 1px solid rgba(255, 255, 255, 0.05) !important;
