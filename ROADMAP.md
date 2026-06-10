@@ -62,3 +62,8 @@ Le client doit pouvoir voir sa réservation fraîchement créée dans son tablea
 [reserver.php] (Ta page de réservation finale avec calendrier et options)
 
 ...............................................................................
+
+
+Dès que le script reçoit la demande, il récupère la date et l'heure du rendez-vous dans la base de données et les compare avec l'instant présent ($2026$).Nous utilisons la formule de différence absolue :$$\Delta t = t_{\text{rendez-vous}} - t_{\text{actuel}}$$Le robot PHP applique alors une structure conditionnelle stricte :Temps restant (Δt)Règle appliquéeImpact Financier$\Delta t \geq 24$ heuresCas A : Annulation large100% remboursé au Client / 0% pour le Coiffeur$2 \text{h} \leq \Delta t < 24$ heuresCas B : Annulation tardive50% remboursé au Client / 50% de dédommagement au Coiffeur$\Delta t < 2$ heuresCas C : Abus / Dernière minute0% remboursé au Client / 100% conservé par le Coiffeur
+
+...........................................................................................
