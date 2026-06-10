@@ -43,7 +43,6 @@ if ($quartier_filtre > 0) {
 }
 
 // 3. GESTION ÉLASTIQUE DU PRIX (OPTIONNEL)
-// Si l'utilisateur a saisi un budget, on lui montre les coiffeurs "autour" de ce prix (+/- 1500 FCFA) pour élargir ses propositions
 if ($prix_saisie > 0) {
     $marge_basse = max(0, $prix_saisie - 1500); // Pour ne pas descendre en dessous de 0
     $marge_haute = $prix_saisie + 2000;         // On élargit vers le haut pour proposer les coiffeurs qui commencent un peu au-dessus
@@ -53,9 +52,8 @@ if ($prix_saisie > 0) {
     $params[] = $marge_haute;
 
 } elseif (!empty($prix_filtre)) {
-    // Si la saisie manuelle est vide, on regarde si une catégorie rapide a été cochée
     if ($prix_filtre === 'eco') {
-        $sql .= " AND u.tarif_base <= 2000 "; // Ajusté pour donner plus de choix
+        $sql .= " AND u.tarif_base <= 2000 "; 
     } elseif ($prix_filtre === 'moyen') {
         $sql .= " AND u.tarif_base BETWEEN 1500 AND 3500 ";
     } elseif ($prix_filtre === 'premium') {
@@ -214,7 +212,7 @@ try {
                                     <span class="price-amount text-warning"><?php echo number_format($c['tarif_base'], 0, ',', ' '); ?> <small style="font-size: 0.9rem;">FCFA</small></span>
                                 </div>
 
-                                <a href="/coiffons/client/profil_public.php?id=<?php echo $c['id']; ?>" class="btn btn-luxury-gold w-100 py-2.5 fw-bold text-uppercase tracking-wider btn-action mb-3">
+                                <a href="/coiffons/coiffeurs/profil_public.php?id=<?php echo $c['id']; ?>" class="btn btn-luxury-gold w-100 py-2.5 fw-bold text-uppercase tracking-wider btn-action mb-3">
                                     <i class="bi bi-calendar3 me-2"></i> Réserver un créneau
                                 </a>
                             </div>
@@ -293,7 +291,6 @@ try {
         --dark-card: #141414;
     }
 
-    /* Inputs Personnalisés Chic */
     .custom-input {
         background-color: #1e1e1e !important;
         border: 1px solid rgba(255,255,255,0.1) !important;
@@ -306,7 +303,6 @@ try {
         box-shadow: 0 0 8px rgba(212,175,55,0.2) !important;
     }
 
-    /* Bouton Or de Luxe */
     .btn-luxury-gold {
         background: linear-gradient(135deg, var(--gold-premium) 0%, #B38F1D 100%);
         color: black !important;
@@ -320,7 +316,6 @@ try {
         box-shadow: 0 5px 15px rgba(212,175,55,0.3);
     }
 
-    /* Cartes Coiffeurs Style Écrin */
     .card-luxury {
         background-color: var(--dark-card);
         border: 1px solid rgba(255,255,255,0.05);
@@ -334,7 +329,6 @@ try {
         box-shadow: 0 15px 35px rgba(0,0,0,0.6);
     }
 
-    /* Profil Images rondes épurées */
     .profile-img {
         width: 100px;
         height: 100px;
@@ -356,7 +350,6 @@ try {
         margin: 0 auto;
     }
 
-    /* Badge Statut Certifié */
     .badge-status {
         position: absolute;
         bottom: 0;
@@ -370,7 +363,6 @@ try {
         box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     }
 
-    /* Boîtier de prix */
     .price-box {
         background-color: rgba(255,255,255,0.02);
         padding: 12px;

@@ -138,13 +138,11 @@ if ($role_actuel === 'client') {
         $coiffeurs_matching = [];
     }
 
-    // Si vraiment aucun coiffeur n'est en DB (sécurité soutenance)
     if (empty($coiffeurs_matching)) {
         $coiffeurs_matching = $coiffures_par_defaut;
     }
 } elseif ($role_actuel === 'invite') {
     try {
-        // Invité voit les vrais coiffeurs actifs en mode aléatoire global pour lui donner envie
         $catalog_demo = $pdo->query("
             SELECT p.*, u.nom as nom_coiffeur, v.nom_ville as ville, q.nom_quartier as quartier 
             FROM prestations p 
@@ -196,25 +194,27 @@ try {
                     <?php else: ?>
                         <?php foreach ($mes_coiffures as $c): ?>
                             <div class="col-6 col-md-4">
-                                <div class="card luxury-card h-100 border-0">
-                                    <div class="card-body d-flex flex-column p-3">
-                                        <h4 class="fw-bold text-white mb-1 text-truncate h6"><?php echo htmlspecialchars($c['nom_style'] ?? ''); ?></h4>
-                                        <p class="text-secondary small mb-2 text-truncate" style="font-size: 0.7rem;">
-                                            <i class="bi bi-geo-alt text-warning"></i> <?php echo htmlspecialchars($c['ville'] ?? 'Non spécifiée'); ?>
-                                        </p>
-                                        <h3 class="text-warning fw-bold font-monospace my-2 h5" style="font-size: 0.95rem;">
-                                            <?php echo number_format($c['prix'], 0, ',', ' '); ?> <span style="font-size: 0.65rem;">FCFA</span>
-                                        </h3>
-                                        <div class="mt-auto pt-2 d-flex gap-1">
-                                            <a href="/coiffons/coiffeurs/gestion_catalogue.php?ouvrir_modifier=<?php echo $c['id_prestation']; ?>" class="btn btn-success btn-sm flex-grow-1 py-1" style="font-size: 0.7rem;">
-                                                <i class="bi bi-pencil-square"></i> Éditer
-                                            </a>
-                                            <a href="/coiffons/coiffeurs/gestion_catalogue.php?supprimer=<?php echo $c['id_prestation']; ?>" class="btn btn-danger btn-sm px-2 py-1 fw-bold" style="font-size: 0.7rem;" onclick="return confirm('Supprimer ?');">
-                                                <i class="bi bi-trash3-fill"></i>
-                                            </a>
+                                <a href="/coiffons/coiffeurs/gestion_catalogue.php?ouvrir_modifier=<?php echo $c['id_prestation']; ?>" class="text-decoration-none card-clickable-wrapper d-block h-100">
+                                    <div class="card luxury-card h-100 border-0">
+                                        <div class="card-body d-flex flex-column p-3">
+                                            <h4 class="fw-bold text-white mb-1 text-truncate h6"><?php echo htmlspecialchars($c['nom_style'] ?? ''); ?></h4>
+                                            <p class="text-secondary small mb-2 text-truncate" style="font-size: 0.7rem;">
+                                                <i class="bi bi-geo-alt text-warning"></i> <?php echo htmlspecialchars($c['ville'] ?? 'Non spécifiée'); ?>
+                                            </p>
+                                            <h3 class="text-warning fw-bold font-monospace my-2 h5" style="font-size: 0.95rem;">
+                                                <?php echo number_format($c['prix'], 0, ',', ' '); ?> <span style="font-size: 0.65rem;">FCFA</span>
+                                            </h3>
+                                            <div class="mt-auto pt-2 d-flex gap-1">
+                                                <span class="btn btn-success btn-sm flex-grow-1 py-1" style="font-size: 0.7rem;">
+                                                    <i class="bi bi-pencil-square"></i> Éditer
+                                                </span>
+                                                <a href="/coiffons/coiffeurs/gestion_catalogue.php?supprimer=<?php echo $c['id_prestation']; ?>" class="btn btn-danger btn-sm px-2 py-1 fw-bold" style="font-size: 0.7rem;" onclick="event.stopPropagation(); return confirm('Supprimer ?');">
+                                                    <i class="bi bi-trash3-fill"></i>
+                                                </a>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                </a>
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -248,10 +248,10 @@ try {
             <div class="container">
                 <h1 class="text-warning fw-bold h2 mb-3">COIFFE_CHEZ_TOI — VOTRE SALON DE LUXE À DOMICILE</h1>
                 <p class="text-light opacity-75 small mb-4 mx-auto" style="max-width: 750px;">
-                    Découvrez, réservez et planifiez vos prestations avec les meilleurs coiffeurs professionnels de votre région. Un système de portefeuille sécurisé, des professionnels certifiés et un service sur-mesure directement chez vous.
+                    Découvrez, réservez et planifiez vos prestations avec les meilleurs coiffeurs professionnels de votre région.
                 </p>
                 <p class="text-secondary small mb-4">
-                    ✨ Ravi de vous revoir, <strong><?php echo htmlspecialchars($nom_affichage_client ?? 'Client'); ?></strong> ! Prêt à réserver votre prochaine création ?
+                    ✨ Ravi de vous revoir, <strong><?php echo htmlspecialchars($nom_affichage_client ?? 'Client'); ?></strong> !
                 </p>
                 <a href="/coiffons/filter/annuaire_coiffeurs.php" class="btn btn-warning text-black fw-bold px-4 py-2.5 shadow-lg small">EXPLORER L'ANNUAIRE DES COIFFEURS</a>
             </div>
@@ -310,7 +310,7 @@ try {
                 <div class="row g-4">
                     <?php foreach ($catalog_demo as $cd): ?>
                         <div class="col-md-4">
-                            <a href="/coiffons/access/connexion.php?redirect_reason=booking" class="text-decoration-none card-clickable-wrapper d-block h-100">
+                            <a href="/coiffons/access/connexion.php" class="text-decoration-none card-clickable-wrapper d-block h-100">
                                 <div class="card luxury-card h-100 border-0 text-white shadow-sm">
                                     <div class="luxury-card-img-container">
                                         <?php if (!empty($cd['photo_style']) && file_exists(__DIR__ . '/uploads/' . $cd['photo_style'])): ?>
@@ -328,7 +328,7 @@ try {
                                         <p class="text-secondary small mb-3"><i class="bi bi-pin-map text-warning"></i> <?php echo htmlspecialchars($cd['ville']); ?> - <?php echo htmlspecialchars($cd['quartier'] ?? 'Général'); ?></p>
                                         <h3 class="text-warning fw-bold fs-4 my-3 font-monospace"><?php echo number_format($cd['prix'], 0, ',', ' '); ?> <span class="small" style="font-size: 0.8rem;">FCFA</span></h3>
                                         <div class="mt-auto w-100">
-                                            <span class="btn btn-outline-warning btn-sm w-100 fw-bold py-2">PRENDRE RDV AVEC <?php echo strtoupper(htmlspecialchars($cd['nom_coiffeur'])); ?></span>
+                                            <span class="btn btn-outline-warning btn-sm w-100 fw-bold py-2">REJOINDRE POUR PRENDRE RDV</span>
                                         </div>
                                     </div>
                                 </div>
@@ -381,12 +381,10 @@ try {
 </div>
 
 <style>
-    /* Reset partiel pour supprimer l'effet de cassure horizontal */
     .luxury-main-wrapper section {
         border: none !important;
     }
 
-    /* Style unique des Cards Noires */
     .luxury-card {
         background-color: #121212 !important;
         border: 1px solid rgba(255, 255, 255, 0.05) !important;
@@ -395,14 +393,12 @@ try {
         transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.3s ease;
     }
 
-    /* Effet d'élévation fluide au survol des cartes cliquables */
     .card-clickable-wrapper:hover .luxury-card {
         transform: translateY(-5px);
-        border-color: #D4AF37 !important; /* Bordure Or subtile au survol */
+        border-color: #D4AF37 !important; 
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5) !important;
     }
 
-    /* Gestionnaire de taille d'images fixe pour garder l'alignement de la grille */
     .luxury-card-img-container {
         width: 100%;
         height: 200px;
@@ -416,14 +412,12 @@ try {
         object-fit: cover;
     }
 
-    /* Conteneur de remplacement de l'image si vide */
     .luxury-placeholder-img {
         width: 100%;
         height: 100%;
         background: linear-gradient(135deg, #151515 0%, #222222 100%);
     }
 
-    /* Ajustement de l'italique des messages */
     .italic {
         font-style: italic;
     }

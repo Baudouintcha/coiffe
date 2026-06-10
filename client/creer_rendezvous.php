@@ -18,97 +18,19 @@ $id_prestation = isset($_GET['id_prestation']) ? intval($_GET['id_prestation']) 
 $erreur = "";
 $succes = "";
 
-// 1. RÉCUPÉRATION DE LA ZONE GÉOGRAPHIQUE DU CLIENT
-$ville_client = 1; 
-if (isset($pdo)) {
-    $stmt_client = $pdo->prepare("SELECT ville FROM users WHERE id = ?");
-    $stmt_client->execute([$id_client]);
-    $client_zone = $stmt_client->fetch();
-    if ($client_zone) {
-        $ville_client = $client_zone['ville'];
-    }
-}
+// =========================================================================
+// CONFIGURATION DU MODE TEST (Idéal pour tes simulations avant le jury)
+// =========================================================================
+$mode_test = true; // Passe à false quand ta table portefeuilles sera active
+$solde_test_simulation = 15000; // Modifie cette valeur pour tester (ex: 500 pour voir le blocage)
+// =========================================================================
 
-// 2. CAS DU CATALOGUE : RÉCUPÉRATION DE LA BDD
-$prestations_zone = [];
-if ($id_prestation === 0) {
-    if (isset($pdo)) {
-        try {
-            $stmt_zone = $pdo->prepare("
-                SELECT p.id_prestation, p.nom_style, p.prix, u.nom AS nom_coiffeur, u.prenom AS prenom_coiffeur
-                FROM prestations p 
-                JOIN users u ON p.id_coiffeur = u.id 
-                WHERE u.role = 'coiffeur' AND u.ville = ?
-                ORDER BY RAND()
-            ");
-            $stmt_zone->execute([$ville_client]);
-            $prestations_zone = $stmt_zone->fetchAll();
-        } catch (Exception $e) {
-            // Anti-crash si structure en cours de manipulation
-        }
-    }
-
-    // =========================================================================
-    // TRUC A ENLEVER APRES LES TESTS : INJECTION DE COIFFURES PAR DÉFAUT
-    // (Tu pourras supprimer tout ce bloc IF ci-dessous quand ta BDD sera remplie)
-    // =========================================================================
-    if (empty($prestations_zone)) {
-        $prestations_zone = [
-            [
-                'id_prestation' => 101,
-                'nom_style' => 'Dégradé Américain (Waves)',
-                'prix' => 3000,
-                'prenom_coiffeur' => 'Marc',
-                'nom_coiffeur' => 'Koffi',
-                'image_test' => 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=500&q=80',
-                'description' => 'Un dégradé à blanc ultra-propre avec des contours au rasoir dessinés au millimètre.'
-            ],
-            [
-                'id_prestation' => 102,
-                'nom_style' => 'Tresses Africaines (Nattes)',
-                'prix' => 7000,
-                'prenom_coiffeur' => 'Chantal',
-                'nom_coiffeur' => 'Gandonou',
-                'image_test' => 'https://images.unsplash.com/photo-1605497746445-97d1b0a9eaf4?w=500&q=80',
-                'description' => 'Des nattes collées protectrices et soignées. Idéal pour nourrir et laisser reposer vos cheveux.'
-            ],
-            [
-                'id_prestation' => 103,
-                'nom_style' => 'Dreadlocks & Locks Roots',
-                'prix' => 12000,
-                'prenom_coiffeur' => 'Innocent',
-                'nom_coiffeur' => 'Dossou',
-                'image_test' => 'https://images.unsplash.com/photo-1595642527925-4d41cb781653?w=500&q=80',
-                'description' => 'Départ ou reprise de locks au crochet. Soin complet du cuir chevelu inclus.'
-            ]
-        ];
-    }
-    // =========================================================================
-    // FIN DU TRUC A ENLEVER APRES LES TESTS
-    // =========================================================================
-}
-
-// 3. CAS DU CALENDRIER : CHARGEMENT DES INFOS DU STYLE SÉLECTIONNÉ
+// 1. CHARGEMENT DES INFOS DE LA PRESTATION (ET DU COIFFEUR ASSOCIÉ)
 $prestation = null;
-if ($id_prestation > 0) {
-    
-    // =========================================================================
-    // TRUC A ENLEVER APRES LES TESTS : SIMULATION DU CLIC SUR UN STYLE DE TEST
-    // =========================================================================
-    if ($id_prestation >= 101) {
-        $simulation_zone = [
-            101 => ['id_prestation' => 101, 'nom_style' => 'Dégradé Américain (Waves)', 'prix' => 3000, 'prenom_coiffeur' => 'Marc', 'nom_coiffeur' => 'Koffi'],
-            102 => ['id_prestation' => 102, 'nom_style' => 'Tresses Africaines (Nattes)', 'prix' => 7000, 'prenom_coiffeur' => 'Chantal', 'nom_coiffeur' => 'Gandonou'],
-            103 => ['id_prestation' => 103, 'nom_style' => 'Dreadlocks & Locks Roots', 'prix' => 12000, 'prenom_coiffeur' => 'Innocent', 'nom_coiffeur' => 'Dossou']
-        ];
-        $prestation = $simulation_zone[$id_prestation] ?? null;
-    } 
-    // =========================================================================
-    // FIN DU TRUC A ENLEVER
-    // =========================================================================
-    else if (isset($pdo)) {
+if ($id_prestation > 0 && isset($pdo)) {
+    try {
         $stmt = $pdo->prepare("
-            SELECT p.*, u.nom AS nom_coiffeur, u.prenom AS prenom_coiffeur, v.nom_ville, q.nom_quartier
+            SELECT p.*, u.id AS id_coiffeur, u.nom AS nom_coiffeur, u.prenom AS prenom_coiffeur, v.nom_ville, q.nom_quartier
             FROM prestations p
             JOIN users u ON p.id_coiffeur = u.id
             LEFT JOIN villes v ON u.ville = v.id
@@ -117,53 +39,84 @@ if ($id_prestation > 0) {
         ");
         $stmt->execute([$id_prestation]);
         $prestation = $stmt->fetch();
+    } catch (Exception $e) {
+        $erreur = "Erreur lors du chargement de la prestation.";
     }
 }
 
-// Récupération du solde du client (Fictif ou Réel)
-$solde_client = 15000; 
-if (isset($pdo)) {
+// Sécurité si aucune prestation n'est reçue
+if (!$prestation) {
+    echo "<div class='container mt-5 py-5 text-center'><div class='alert alert-danger fw-bold'>Prestation introuvable. Veuillez sélectionner une coiffure valide depuis le catalogue ou le profil d'un coiffeur.</div></div>";
+    include __DIR__ . '/../layout/footer.php';
+    exit();
+}
+
+// 2. RÉCUPÉRATION DU SOLDE (RÉEL OU SIMULÉ)
+$solde_client = $solde_test_simulation; 
+
+if (!$mode_test && isset($pdo)) {
+    // Si on n'est plus en mode test, on prend le vrai solde en BDD
     $stmt_wallet = $pdo->prepare("SELECT solde FROM portefeuilles WHERE user_id = ?");
     $stmt_wallet->execute([$id_client]);
     $wallet = $stmt_wallet->fetch();
-    if ($wallet) { $solde_client = $wallet['solde']; }
+    if ($wallet) { 
+        $solde_client = $wallet['solde']; 
+    }
 }
 
-// 4. TRAITEMENT DU FORMULAIRE DE RÉSERVATION (BOUTON CLIQUÉ)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id_prestation = intval($_POST['id_prestation']);
+// 3. BARRIÈRE FINANCIÈRE : On vérifie si le solde est suffisant
+$prix_prestation = $prestation['prix'];
+if ($solde_client < $prix_prestation) {
+    $erreur = "🚨 Solde insuffisant ! Votre solde actuel est de " . number_format($solde_client, 0, ',', ' ') . " F CFA, alors que cette prestation coûte " . number_format($prix_prestation, 0, ',', ' ') . " F CFA. Veuillez recharger votre portefeuille pour pouvoir réserver.";
+}
+
+// 4. TRAITEMENT DU FORMULAIRE DE RÉSERVATION (SOUUMISSION POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($erreur)) {
+    $id_prestation_post = intval($_POST['id_prestation']);
     $date_rdv = trim($_POST['date_rdv']);
     $heure_rdv = trim($_POST['heure_rdv']);
+    $id_coiffeur = $prestation['id_coiffeur'];
     
     if (empty($date_rdv) || empty($heure_rdv)) {
-        $erreur = "Veuillez sélectionner un jour et une heure.";
+        $erreur = "Veuillez sélectionner un jour et une heure pour votre rendez-vous.";
     } else {
-        // Détermination du prix pour la notification dynamique
-        $prix_animation = 0;
-        if ($id_prestation >= 101) {
-            $simulation_zone = [101 => 3000, 102 => 7000, 103 => 12000];
-            $prix_animation = $simulation_zone[$id_prestation] ?? 5000;
-        } else if (isset($pdo)) {
-            $stmt_p = $pdo->prepare("SELECT prix FROM prestations WHERE id_prestation = ?");
-            $stmt_p->execute([$id_prestation]);
-            $p_data = $stmt_p->fetch();
-            $prix_animation = $p_data['prix'] ?? 0;
+        if (isset($pdo)) {
+            try {
+                // On lance l'écriture du rendez-vous
+                $stmt_insert = $pdo->prepare("
+                    INSERT INTO rendez_vous (id_client, id_coiffeur, id_prestation, date_rdv, heure_rdv, statut_rdv, date_creation)
+                    VALUES (?, ?, ?, ?, ?, 'en_attente', NOW())
+                ");
+                $stmt_insert->execute([$id_client, $id_coiffeur, $id_prestation_post, $date_rdv, $heure_rdv]);
+
+                // S'il n'est pas en mode test, on met aussi à jour le vrai portefeuille en BDD
+                if (!$mode_test) {
+                    $nouveau_solde = $solde_client - $prix_prestation;
+                    $stmt_update_wallet = $pdo->prepare("UPDATE portefeuilles SET solde = ? WHERE user_id = ?");
+                    $stmt_update_wallet->execute([$nouveau_solde, $id_client]);
+                    $solde_client = $nouveau_solde;
+                } else {
+                    // En mode test, on simule juste le calcul visuel
+                    $solde_client = $solde_client - $prix_prestation;
+                }
+
+                $prix_formate = number_format($prix_prestation, 0, ',', ' ');
+
+                $succes = "
+                    <div class='text-start'>
+                        <h5 class='text-success fw-bold'><i class='bi bi-send-check-fill'></i> Demande envoyée au coiffeur !</h5>
+                        <p class='mb-2 small text-white-50'>Le professionnel a été notifié de votre demande pour le créneau choisi.</p>
+                        <div class='p-3 rounded bg-dark border border-warning my-3'>
+                            <span class='text-warning fw-bold d-block'><i class='bi bi-shield-lock-fill'></i> Sécurisation des fonds :</span>
+                            <span class='fs-5 fw-bold font-monospace text-white'>$prix_formate F CFA</span> ont été temporairement <strong>gelés</strong> sur votre portefeuille.
+                        </div>
+                        <small class='text-muted d-block italic'>* Si le coiffeur décline ou ne répond pas, ce montant sera instantanément libéré sur votre solde.</small>
+                    </div>
+                ";
+            } catch (Exception $e) {
+                $erreur = "Erreur technique lors de la réservation : " . $e->getMessage();
+            }
         }
-
-        $prix_formate = number_format($prix_animation, 0, ',', ' ');
-
-        // Injection du HTML personnalisé et explicatif dans la notification
-        $succes = "
-            <div class='text-start'>
-                <h5 class='text-success fw-bold'><i class='bi bi-send-check-fill'></i> Demande envoyée au coiffeur !</h5>
-                <p class='mb-2 small text-white-50'>Le professionnel a été notifié de votre demande pour le créneau choisi.</p>
-                <div class='p-3 rounded bg-dark border border-warning my-3'>
-                    <span class='text-warning fw-bold d-block'><i class='bi bi-shield-lock-fill'></i> Sécurisation des fonds :</span>
-                    <span class='fs-5 fw-bold font-monospace text-white'>$prix_formate F CFA</span> ont été temporairement <strong>gelés</strong> sur votre portefeuille.
-                </div>
-                <small class='text-muted d-block italic'>* Si le coiffeur décline ou ne répond pas, ce montant sera instantanément libéré sur votre solde.</small>
-            </div>
-        ";
     }
 }
 ?>
@@ -178,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </h2>
 
                 <?php if (!empty($erreur)): ?>
-                    <div class="alert alert-danger text-center fw-bold"><?php echo $erreur; ?></div>
+                    <div class="alert alert-danger text-center fw-bold mb-4"><?php echo $erreur; ?></div>
                 <?php endif; ?>
 
                 <?php if (!empty($succes)): ?>
@@ -186,108 +139,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php echo $succes; ?>
                         <hr class="border-secondary">
                         <div class="text-center">
-                            <a href="creer_rendezvous.php" class="btn btn-warning btn-sm fw-bold text-black px-4" style="border-radius: 8px;">
-                                <i class="bi bi-calendar-plus"></i> Planifier un autre RDV
+                            <a href="../index.php" class="btn btn-warning btn-sm fw-bold text-black px-4" style="border-radius: 8px;">
+                                <i class="bi bi-house-door-fill"></i> Retour à l'accueil
                             </a>
                         </div>
                     </div>
                 <?php endif; ?>
 
-                <?php if (empty($succes)): ?>
-                    
-                    <?php if ($id_prestation === 0): ?>
-                        <div class="card p-4 mb-4" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
-                            <h5 class="text-warning mb-4 text-center fw-bold">
-                                <i class="bi bi-geo-alt-fill text-danger"></i> Coiffures disponibles dans votre secteur
-                            </h5>
-                            
-                            <div class="row g-4">
-                                <?php foreach ($prestations_zone as $pz): ?>
-                                    <?php 
-                                        $img = $pz['image_test'] ?? 'https://images.unsplash.com/photo-1562322140-8baeececf3df?w=500&q=80'; 
-                                        $desc = $pz['description'] ?? 'Une coiffure soignée réalisée à domicile par un professionnel expérimenté de votre secteur.';
-                                    ?>
-                                    <div class="col-md-6">
-                                        <div class="card bg-dark border-secondary h-100 p-0 overflow-hidden" style="border-radius: 15px;">
-                                            
-                                            <img src="<?php echo $img; ?>" class="w-100" style="height: 180px; object-fit: cover;" alt="Coiffure">
-                                            
-                                            <div class="p-3 d-flex flex-column justify-content-between h-100">
-                                                <div>
-                                                    <h5 class="text-warning fw-bold mb-1"><?php echo htmlspecialchars($pz['nom_style']); ?></h5>
-                                                    <small class="text-muted d-block mb-2">💇‍♂️ Par : <?php echo htmlspecialchars($pz['prenom_coiffeur'] . ' ' . $pz['nom_coiffeur']); ?></small>
-                                                    
-                                                    <p class="small text-secondary mb-3"><?php echo htmlspecialchars($desc); ?></p>
-                                                </div>
-                                                
-                                                <div class="d-flex justify-content-between align-items-center pt-2 border-top border-secondary">
-                                                    <span class="fs-4 fw-bold text-warning font-monospace"><?php echo number_format($pz['prix'], 0, ',', ' '); ?> F</span>
-                                                    <a href="creer_rendezvous.php?id_prestation=<?php echo $pz['id_prestation']; ?>" class="btn btn-warning btn-sm fw-bold text-black px-3" style="border-radius: 8px;">
-                                                        Réserver <i class="bi bi-chevron-right"></i>
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
+                <?php if (empty($erreur) && empty($succes) && $prestation): ?>
+                    <form method="POST" id="formReservation">
+                        <input type="hidden" name="id_prestation" value="<?php echo $prestation['id_prestation']; ?>">
+                        <input type="hidden" name="date_rdv" id="input_date_rdv" required>
+                        <input type="hidden" name="heure_rdv" id="input_heure_rdv" required>
 
-                    <?php if ($prestation): ?>
-                        <form method="POST" id="formReservation">
-                            <input type="hidden" name="id_prestation" value="<?php echo $prestation['id_prestation']; ?>">
-                            <input type="hidden" name="date_rdv" id="input_date_rdv" required>
-                            <input type="hidden" name="heure_rdv" id="input_heure_rdv" required>
-
-                            <div class="card p-4 mb-4 text-start" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
-                                <div class="d-flex justify-content-between align-items-start border-bottom border-secondary pb-2 mb-3">
-                                    <div>
-                                        <h4 class="text-warning font-monospace mb-1"><?php echo htmlspecialchars($prestation['nom_style']); ?></h4>
-                                        <small class="text-secondary">Professionnel : <strong class="text-white"><?php echo htmlspecialchars(strtoupper($prestation['prenom_coiffeur'] . ' ' . $prestation['nom_coiffeur'])); ?></strong></small>
-                                    </div>
-                                    <span class="fs-4 fw-bold text-warning"><?php echo number_format($prestation['prix'], 0, ',', ' '); ?> F</span>
+                        <div class="card p-4 mb-4 text-start" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
+                            <div class="d-flex justify-content-between align-items-start border-bottom border-secondary pb-2 mb-3">
+                                <div>
+                                    <h4 class="text-warning font-monospace mb-1"><?php echo htmlspecialchars($prestation['nom_style']); ?></h4>
+                                    <small class="text-secondary">Professionnel : <strong class="text-white"><?php echo htmlspecialchars(strtoupper($prestation['prenom_coiffeur'] . ' ' . $prestation['nom_coiffeur'])); ?></strong></small>
+                                    <?php if (!empty($prestation['nom_quartier'])): ?>
+                                        <br><small class="text-muted"><i class="bi bi-geo-alt"></i> Secteur : <?php echo htmlspecialchars($prestation['nom_quartier']); ?></small>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="mt-2 text-end small text-success fw-bold">💰 Votre solde : <?php echo number_format($solde_client, 0, ',', ' '); ?> FCFA</div>
+                                <span class="fs-4 fw-bold text-warning"><?php echo number_format($prestation['prix'], 0, ',', ' '); ?> F</span>
                             </div>
+                            <div class="mt-2 text-end small text-success fw-bold">💰 Votre solde disponible : <?php echo number_format($solde_client, 0, ',', ' '); ?> FCFA <?php echo $mode_test ? '(Mode Simulation)' : ''; ?></div>
+                        </div>
 
-                            <h5 class="text-warning mb-2"><i class="bi bi-calendar3"></i> 1. Choisissez le jour du rendez-vous</h5>
-                            <div class="days-slider mb-4">
+                        <h5 class="text-warning mb-2"><i class="bi bi-calendar3"></i> 1. Choisissez le jour du rendez-vous</h5>
+                        <div class="days-slider mb-4">
+                            <?php 
+                            $jours_semaine = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+                            for ($i = 0; $i < 7; $i++) {
+                                $timestamp = strtotime("+$i days");
+                                $date_val = date('Y-m-d', $timestamp);
+                                $nom_jour = $jours_semaine[date('w', $timestamp)];
+                                $num_jour = date('d', $timestamp);
+                                
+                                echo "
+                                <div class='day-card' data-date='$date_val' onclick='selectDay(this)'>
+                                    <span class='day-name'>$nom_jour</span>
+                                    <span class='day-num'>$num_jour</span>
+                                </div>";
+                            }
+                            ?>
+                        </div>
+
+                        <div id="section_heures" style="display:none;">
+                            <h5 class="text-warning mb-2"><i class="bi bi-clock"></i> 2. À quelle heure le coiffeur doit venir ?</h5>
+                            <div class="hours-grid mb-5">
                                 <?php 
-                                $jours_semaine = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-                                for ($i = 0; $i < 7; $i++) {
-                                    $timestamp = strtotime("+$i days");
-                                    $date_val = date('Y-m-d', $timestamp);
-                                    $nom_jour = $jours_semaine[date('w', $timestamp)];
-                                    $num_jour = date('d', $timestamp);
-                                    
-                                    echo "
-                                    <div class='day-card' data-date='$date_val' onclick='selectDay(this)'>
-                                        <span class='day-name'>$nom_jour</span>
-                                        <span class='day-num'>$num_jour</span>
-                                    </div>";
+                                $heures_dispos = ['08:00', '09:30', '11:00', '12:30', '14:00', '15:30', '17:00', '18:30', '20:00'];
+                                foreach ($heures_dispos as $h) {
+                                    echo "<div class='hour-circle' data-time='$h' onclick='selectHour(this)'>$h</div>";
                                 }
                                 ?>
                             </div>
+                        </div>
 
-                            <div id="section_heures" style="display:none;">
-                                <h5 class="text-warning mb-2"><i class="bi bi-clock"></i> 2. À quelle heure le coiffeur doit venir ?</h5>
-                                <div class="hours-grid mb-5">
-                                    <?php 
-                                    $heures_dispos = ['08:00', '09:30', '11:00', '12:30', '14:00', '15:30', '17:00', '18:30', '20:00'];
-                                    foreach ($heures_dispos as $h) {
-                                        echo "<div class='hour-circle' data-time='$h' onclick='selectHour(this)'>$h</div>";
-                                    }
-                                    ?>
-                                </div>
-                            </div>
+                        <button type="submit" id="btnValider" class="btn btn-warning w-100 py-3 fw-bold text-uppercase fs-5 text-black" style="display:none; border-radius: 30px; background-color: var(--gold); border:none;">
+                            <i class="bi bi-shield-lock-fill"></i> Bloquer ce créneau & Réserver
+                        </button>
 
-                            <button type="submit" id="btnValider" class="btn btn-warning w-100 py-3 fw-bold text-uppercase fs-5 text-black" style="display:none; border-radius: 30px; background-color: var(--gold); border:none;">
-                                <i class="bi bi-shield-lock-fill"></i> Bloquer ce créneau & Demander
-                            </button>
-
-                        </form>
-                    <?php endif; ?>
+                    </form>
                 <?php endif; ?>
 
             </div>
@@ -296,10 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </section>
 
 <style>
-    /* Slider de Jours (Carrés) */
-    .days-slider {
-        display: flex; gap: 12px; overflow-x: auto; padding: 10px 0; scrollbar-width: none;
-    }
+    .days-slider { display: flex; gap: 12px; overflow-x: auto; padding: 10px 0; scrollbar-width: none; }
     .days-slider::-webkit-scrollbar { display: none; }
     .day-card {
         background-color: #111; border: 1px solid #333; border-radius: 12px;
@@ -315,10 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .day-card.selected .day-name { color: #222; }
     .day-card .day-num { font-size: 1.4rem; font-weight: bold; }
 
-    /* Grille d'heures (Cercles) */
-    .hours-grid {
-        display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 15px; padding-top: 10px;
-    }
+    .hours-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 15px; padding-top: 10px; }
     .hour-circle {
         background-color: #111; border: 1px solid #333; color: #fff; height: 45px;
         border-radius: 25px; display: flex; justify-content: center; align-items: center;

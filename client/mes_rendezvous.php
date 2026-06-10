@@ -19,7 +19,7 @@ $id_client = $_SESSION['id_user'];
 
 $rendezvous = [];
 
-// Récupération de l'historique avec TES vrais attributs : client_id, coiffeur_id, coiffure_id, statut_rdv
+// Récupération de l'historique avec TES vrais attributs (Corrigé : heure_debut au lieu de heure_rdv)
 if (isset($pdo)) {
     try {
         $stmt = $pdo->prepare("SELECT r.*, p.nom_style, p.prix, u.nom AS coiffeur_nom, u.prenom AS coiffeur_prenom, u.telephone AS coiffeur_telephone 
@@ -27,7 +27,7 @@ if (isset($pdo)) {
                                JOIN prestations p ON r.coiffure_id = p.id_prestation 
                                JOIN users u ON r.coiffeur_id = u.id 
                                WHERE r.client_id = ? 
-                               ORDER BY r.date_rdv DESC, r.heure_rdv DESC");
+                               ORDER BY r.date_rdv DESC, r.heure_debut DESC");
         $stmt->execute([$id_client]);
         $rendezvous = $stmt->fetchAll();
     } catch (Exception $e) {
@@ -37,13 +37,12 @@ if (isset($pdo)) {
 
 // =========================================================================
 // TRUC A ENLEVER APRES LES TESTS : INJECTION DE FAUX RDV SI LA BDD EST VIDE
-// (Tu pourras supprimer tout ce bloc IF ci-dessous quand tes tests seront finis)
 // =========================================================================
 if (empty($rendezvous)) {
     $rendezvous = [
         [
             'date_rdv' => date('Y-m-d', strtotime('+1 days')),
-            'heure_rdv' => '14:00:00',
+            'heure_debut' => '14:00:00', // Harmonisé
             'coiffeur_nom' => 'Koffi',
             'coiffeur_prenom' => 'Marc',
             'nom_style' => 'Dégradé Américain (Waves)',
@@ -54,7 +53,7 @@ if (empty($rendezvous)) {
         ],
         [
             'date_rdv' => date('Y-m-d', strtotime('+3 days')),
-            'heure_rdv' => '09:30:00',
+            'heure_debut' => '09:30:00', // Harmonisé
             'coiffeur_nom' => 'Gandonou',
             'coiffeur_prenom' => 'Chantal',
             'nom_style' => 'Tresses Africaines (Nattes)',
@@ -65,7 +64,7 @@ if (empty($rendezvous)) {
         ],
         [
             'date_rdv' => date('Y-m-d', strtotime('-5 days')),
-            'heure_rdv' => '11:00:00',
+            'heure_debut' => '11:00:00', // Harmonisé
             'coiffeur_nom' => 'Dossou',
             'coiffeur_prenom' => 'Innocent',
             'nom_style' => 'Dreadlocks Premium',
@@ -76,8 +75,6 @@ if (empty($rendezvous)) {
         ]
     ];
 }
-// =========================================================================
-// FIN DU TRUC A ENLEVER APRES LES TESTS
 // =========================================================================
 ?>
 
@@ -111,19 +108,19 @@ if (empty($rendezvous)) {
                             <tr>
                                 <td>
                                     <strong><?php echo htmlspecialchars(date('d/m/Y', strtotime($rdv['date_rdv']))); ?></strong><br>
-                                    <small class="text-secondary"><?php echo htmlspecialchars(substr($rdv['heure_rdv'], 0, 5)); ?></small>
+                                    <small class="text-secondary"><?php echo htmlspecialchars(substr($rdv['heure_debut'], 0, 5)); ?></small>
                                 </td>
                                 <td><?php echo htmlspecialchars(strtoupper($rdv['coiffeur_nom'] . ' ' . $rdv['coiffeur_prenom'])); ?></td>
                                 <td><?php echo htmlspecialchars($rdv['nom_style']); ?></td>
                                 <td class="text-success fw-bold">
                                     <?php echo number_format($rdv['prix'], 0, ',', ' '); ?> FCFA
                                 </td>
-                                <td><?php echo htmlspecialchars($rdv['adresse_prestation']); ?></td>
+                                <td><?php echo htmlspecialchars($rdv['adresse_prestation'] ?? 'À domicile'); ?></td>
                                 <td>
                                     <?php if ($rdv['statut_rdv'] == 'en_attente'): ?>
                                         <span class="badge bg-warning text-dark mb-1 d-inline-block">En attente de validation</span><br>
-                                        <span class="badge bg-outline-warning border border-warning text-warning small style="font-size: 0.75rem;"><i class="bi bi-shield-lock"></i> Argent Gelé</span>
-                                    <?php elseif ($rdv['statut_rdv'] == 'confirme'): ?>
+                                        <span class="badge bg-outline-warning border border-warning text-warning" style="font-size: 0.75rem;"><i class="bi bi-shield-lock"></i> Argent Gelé</span>
+                                    <?php elseif ($rdv['statut_rdv'] == 'confirme' || $rdv['statut_rdv'] == 'accepte'): ?>
                                         <span class="badge bg-primary">Confirmé</span>
                                     <?php elseif ($rdv['statut_rdv'] == 'termine'): ?>
                                         <span class="badge bg-success">Terminé</span>
@@ -153,7 +150,7 @@ if (empty($rendezvous)) {
 
 <style>
     .btn-gold {
-        background-color: var(--gold);
+        background-color: #ffc107;
         color: black;
         border: none;
         border-radius: 8px;
@@ -161,6 +158,7 @@ if (empty($rendezvous)) {
 
     .btn-gold:hover {
         background-color: #c99b2c;
+        color: black;
     }
 </style>
 

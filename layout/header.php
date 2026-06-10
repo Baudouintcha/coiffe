@@ -1,4 +1,3 @@
-
 <?php
 // =================================================================
 // DÉTECTEUR AUTOMATIQUE DE SESSION (SÉCURITÉ ET ANTI-NOTICE)
@@ -124,7 +123,7 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
     <div id="mySidebar" class="sidebar">
         <button class="closebtn text-warning" onclick="closeNav()">&times;</button>
         <div class="px-4 mb-4 text-center">
-            <h5 class="text-warning small mb-0">BIENVENU</h5>
+            <h5 class="text-warning small mb-0">BIENVENUE</h5>
             <p class="fw-bold"><?php echo strtoupper($nom_utilisateur); ?></p>
             <hr class="border-warning">
         </div>
@@ -135,7 +134,9 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
             <a href="/coiffons/filter/annuaire_coiffeurs.php" class="text-warning fw-bold"><i class="bi bi-search"></i> Trouver un coiffeur</a>
         <?php endif; ?>
 
-        <a href="/coiffons/client/catalogue.php"><i class="bi bi-images"></i> Catalogue des styles</a>
+        <?php if ($role_utilisateur !== 'coiffeur' && $role_utilisateur !== 'admin'): ?>
+            <a href="/coiffons/client/catalogue.php"><i class="bi bi-images"></i> Catalogue des styles</a>
+        <?php endif; ?>
 
         <?php if (!$est_connecte): ?>
             <a href="/coiffons/access/inscription.php"><i class="bi bi-person-plus"></i> Créer un compte</a>
@@ -143,7 +144,6 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
         <?php else: ?>
             
             <?php if ($role_utilisateur == 'client'): ?>
-                <a href="/coiffons/client/creer_rendezvous.php" class="text-warning fw-bold"><i class="bi bi-calendar-event"></i> Planifier un RDV</a>
                 <a href="/coiffons/client/mes_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes RDV</a>
                 <a href="/coiffons/profil.php"><i class="bi bi-person-circle"></i> Mon Profil</a>
             <?php endif; ?>
@@ -151,9 +151,7 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
             <?php if ($role_utilisateur == 'coiffeur'): ?>
                 <a href="/coiffons/coiffeurs/valider_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes rendez-vous</a>
                 <a href="/coiffons/coiffeurs/gestion_catalogue.php"><i class="bi bi-scissors"></i> Gérer mes coiffures</a>
-                
                 <a href="/coiffons/coiffeurs/mes_zones.php" class="text-warning fw-bold"><i class="bi bi-geo-alt"></i> Ma zone d'intervention</a>
-                
                 <a href="/coiffons/coiffeurs/agenda_coiffeurs.php"><i class="bi bi-calendar"></i> Mon agenda</a>
                 <a href="/coiffons/coiffeurs/portefeuille.php"><i class="bi bi-wallet2"></i> Mes gains</a>
                 <a href="/coiffons/profil.php"><i class="bi bi-person-badge"></i> Mon Profil</a>
@@ -166,7 +164,7 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
             <a href="/coiffons/deconnexion.php" class="text-danger fw-bold border border-danger rounded text-center m-3 py-2"><i class="bi bi-power"></i> Déconnexion</a>
         <?php endif; ?>
 
-        <a href="https://wa.me/2290100000000" target="_blank" class="mt-2 small text-secondary text-decoration-none">
+        <a href="https://wa.me/2290100000000" target="_blank" class="mt-2 px-4 small text-secondary text-decoration-none">
             <i class="bi bi-whatsapp"></i> Support 24/7
         </a>
     </div>
@@ -200,7 +198,6 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
                     
                     <?php 
                     if ($est_connecte && ($role_utilisateur === 'client' || $role_utilisateur === 'coiffeur')): 
-                        // Calcul sécurisé et dynamique du lien de retour
                         $page_precedente = $_SERVER['HTTP_REFERER'] ?? '';
                         if (empty($page_precedente) || strpos($page_precedente, 'connexion.php') !== false || strpos($page_precedente, 'inscription.php') !== false || strpos($page_precedente, 'deconnexion.php') !== false) {
                             $lien_retour = "/coiffons/index.php";
@@ -225,12 +222,7 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
                         </a>
                     <?php endif; ?>
 
-                    <?php if ($role_utilisateur == 'client'): ?>
-                        <a href="/coiffons/client/creer_rendezvous.php" class="btn btn-outline-warning btn-sm fw-bold px-3 py-2">
-                            <i class="bi bi-calendar-event"></i> Planifier un RDV
-                        </a>
-                    <?php endif; ?>
-                </div>
+                    </div>
 
                 <button class="navbar-toggler border-warning shadow-none" type="button" onclick="toggleAboutUs()">
                     <span class="navbar-toggler-icon"></span>
@@ -241,19 +233,16 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
     </header>
 
     <script>
-        // Fonction Sidebar
         function openNav() {
             document.getElementById("mySidebar").style.width = "280px";
             document.getElementById("mainOverlay").style.display = "block";
         }
 
-        // Ajout de la fermeture de la sidebar après clic
         function closeNav() {
             document.getElementById("mySidebar").style.width = "0";
             document.getElementById("mainOverlay").style.display = "none";
         }
 
-        // Fonction unique et souveraine pour le panneau About Us
         function toggleAboutUs() {
             var collapseElement = document.getElementById("navbarHeader");
             if (collapseElement.classList.contains("show")) {
@@ -267,4 +256,3 @@ $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <main>
-
