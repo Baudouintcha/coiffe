@@ -1,258 +1,220 @@
 <?php
 // =================================================================
-// DÉTECTEUR AUTOMATIQUE DE SESSION (SÉCURITÉ ET ANTI-NOTICE)
+// DÉTECTEUR AUTOMATIQUE DE SESSION & SYSTÈME DE NOTIFICATIONS
 // =================================================================
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . '/../security/config.php';
 
-// Initialisation des variables de session pour éviter les erreurs "Notice" PHP
 $est_connecte = isset($_SESSION['id_user']);
 $role_utilisateur = $_SESSION['role'] ?? 'invite';
 $nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
+
+$nb_notifs = 0;
+$liste_notifs = [];
+
+if ($est_connecte) {
+    $user_logge_id = $_SESSION['id_user'];
+
+    // 1. Compte des notifications non lues
+    $stmt_count = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE id_user = ? AND statut_lecture = 'non_lu'");
+    $stmt_count->execute([$user_logge_id]);
+    $nb_notifs = $stmt_count->fetchColumn();
+
+    // 2. Liste des 5 dernières notifications
+    $stmt_list = $pdo->prepare("SELECT * FROM notifications WHERE id_user = ? ORDER BY date_notification DESC LIMIT 5");
+    $stmt_list->execute([$user_logge_id]);
+    $liste_notifs = $stmt_list->fetchAll();
+}
+
+// Action : Marquer tout comme lu
+if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
+    if ($est_connecte) {
+        $pdo->prepare("UPDATE notifications SET statut = 'lu' WHERE user_id = ?")->execute([$_SESSION['id_user']]);
+        header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
+        exit();
+    }
+}
 ?>
 <!doctype html>
 <html lang="fr">
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Coiffe_Chez_Toi</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
     <style>
-        :root {
-            --gold: #D4AF37;
-            --dark-bg: #121212;
-            --card-bg: #1e1e1e;
+        :root { --gold: #D4AF37; --dark-bg: #121212; }
+        
+        /* RESTAURATION DE TA POLICE D'ORIGINE POUR TOUT LE SITE */
+        body { 
+            background-color: var(--dark-bg); 
+            color: white; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
         }
+        
+        .navbar-dark.bg-dark { background-color: #000 !important; border-bottom: 2px solid var(--gold); }
+        .nav-logo { height: 45px; transition: 0.3s; cursor: pointer; }
+        .nav-logo:hover { transform: scale(1.1); }
 
-        body {
-            background-color: var(--dark-bg);
-            color: white;
-            font-family: 'Segoe UI', sans-serif;
-            overflow-x: hidden;
-        }
+        /* --- SIDEBAR ACCORDEON --- */
+        .sidebar { height: 100%; width: 0; position: fixed; z-index: 3000; top: 0; left: 0; background-color: #000; overflow-x: hidden; transition: 0.5s; padding-top: 60px; border-right: 2px solid var(--gold); }
+        .sidebar a, .sidebar .accordion-button { padding: 12px 32px; text-decoration: none; font-size: 1rem; color: white; display: block; transition: 0.3s; background: none; border: none; width: 100%; text-align: left; font-family: 'Segoe UI', sans-serif; }
+        .sidebar a:hover, .sidebar .accordion-button:hover { color: var(--gold); background-color: #111; }
+        
+        /* Style spécifique accordéon */
+        .sidebar .accordion-item { background: transparent; border: none; }
+        .sidebar .accordion-button { color: var(--gold); font-weight: bold; font-size: 0.9rem; }
+        .sidebar .accordion-button::after { filter: invert(1) sepia(1) saturate(5) hue-rotate(10deg); }
+        .sidebar .accordion-button:not(.collapsed) { background-color: #080808; color: var(--gold); box-shadow: none; }
+        .sidebar .submenu-link { padding-left: 50px !important; font-size: 0.9rem !important; opacity: 0.8; border-bottom: 1px solid #111; }
 
-        .navbar-dark.bg-dark {
-            background-color: #000 !important;
-            border-bottom: 2px solid var(--gold);
-        }
-
-        .nav-logo {
-            height: 45px;
-            margin-right: 12px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        .nav-logo:hover {
-            transform: scale(1.1);
-        }
-
-        /* --- STYLE DU MENU LATÉRAL (SIDEBAR) --- */
-        .sidebar {
-            height: 100%;
-            width: 0;
-            position: fixed;
-            z-index: 3000;
-            top: 0;
-            left: 0;
-            background-color: #000;
-            overflow-x: hidden;
-            transition: 0.5s;
-            padding-top: 60px;
-            border-right: 2px solid var(--gold);
-        }
-
-        .sidebar a {
-            padding: 15px 32px;
-            text-decoration: none;
-            font-size: 1.1rem;
-            color: white;
-            display: block;
-            transition: 0.3s;
-            border-bottom: 1px solid #111;
-        }
-
-        .sidebar a:hover {
-            color: var(--gold);
-            background-color: #111;
-            padding-left: 45px;
-        }
-
-        .sidebar .closebtn {
-            position: absolute;
-            top: 10px;
-            right: 25px;
-            font-size: 36px;
-            border: none;
-            background: none;
-        }
-
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 2999;
-            top: 0;
-            left: 0;
-        }
-
-        .btn-gold {
-            background-color: var(--gold);
-            color: black;
-            font-weight: bold;
-            border: none;
-        }
-
-        /* Animation pour le dropdown About Us */
-        #navbarHeader {
-            transition: all 0.4s ease-in-out;
-        }
+        .sidebar-overlay { display: none; position: fixed; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 2999; top: 0; left: 0; }
+        
+        /* Notifications */
+        .no-arrow::after { display: none !important; }
+        .animate-pulse-bell { animation: pulseBell 1.5s infinite; }
+        @keyframes pulseBell { 0% { transform: scale(0.9); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(0.9); opacity: 0.8; } }
     </style>
 </head>
-
 <body>
 
-    <div id="mainOverlay" class="sidebar-overlay" onclick="closeNav()"></div>
+<div id="mainOverlay" class="sidebar-overlay" onclick="closeNav()"></div>
 
-    <div id="mySidebar" class="sidebar">
-        <button class="closebtn text-warning" onclick="closeNav()">&times;</button>
-        <div class="px-4 mb-4 text-center">
-            <h5 class="text-warning small mb-0">BIENVENUE</h5>
-            <p class="fw-bold"><?php echo strtoupper($nom_utilisateur); ?></p>
-            <hr class="border-warning">
-        </div>
-
-        <a href="/coiffons/index.php"><i class="bi bi-house-door"></i> Accueil</a>
-
-        <?php if ($role_utilisateur !== 'coiffeur' && $role_utilisateur !== 'admin'): ?>
-            <a href="/coiffons/filter/annuaire_coiffeurs.php" class="text-warning fw-bold"><i class="bi bi-search"></i> Trouver un coiffeur</a>
-        <?php endif; ?>
-
-        <?php if ($role_utilisateur !== 'coiffeur' && $role_utilisateur !== 'admin'): ?>
-            <a href="/coiffons/client/catalogue.php"><i class="bi bi-images"></i> Catalogue des styles</a>
-        <?php endif; ?>
-
-        <?php if (!$est_connecte): ?>
-            <a href="/coiffons/access/inscription.php"><i class="bi bi-person-plus"></i> Créer un compte</a>
-            <a href="/coiffons/access/connexion.php"><i class="bi bi-box-arrow-in-right"></i> Se connecter</a>
-        <?php else: ?>
-            
-            <?php if ($role_utilisateur == 'client'): ?>
-                <a href="/coiffons/client/mes_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes RDV</a>
-                <a href="/coiffons/profil.php"><i class="bi bi-person-circle"></i> Mon Profil</a>
-            <?php endif; ?>
-
-            <?php if ($role_utilisateur == 'coiffeur'): ?>
-                <a href="/coiffons/coiffeurs/valider_rendezvous.php"><i class="bi bi-calendar-check"></i> Mes rendez-vous</a>
-                <a href="/coiffons/coiffeurs/gestion_catalogue.php"><i class="bi bi-scissors"></i> Gérer mes coiffures</a>
-                <a href="/coiffons/coiffeurs/mes_zones.php" class="text-warning fw-bold"><i class="bi bi-geo-alt"></i> Ma zone d'intervention</a>
-                <a href="/coiffons/coiffeurs/agenda_coiffeurs.php"><i class="bi bi-calendar"></i> Mon agenda</a>
-                <a href="/coiffons/coiffeurs/portefeuille.php"><i class="bi bi-wallet2"></i> Mes gains</a>
-                <a href="/coiffons/profil.php"><i class="bi bi-person-badge"></i> Mon Profil</a>
-            <?php endif; ?>
-
-            <?php if ($role_utilisateur == 'admin'): ?>
-                <a href="/coiffons/index.php"><i class="bi bi-shield-lock"></i> Tableau de bord Admin</a>
-            <?php endif; ?>
-
-            <a href="/coiffons/deconnexion.php" class="text-danger fw-bold border border-danger rounded text-center m-3 py-2"><i class="bi bi-power"></i> Déconnexion</a>
-        <?php endif; ?>
-
-        <a href="https://wa.me/2290100000000" target="_blank" class="mt-2 px-4 small text-secondary text-decoration-none">
-            <i class="bi bi-whatsapp"></i> Support 24/7
-        </a>
+<div id="mySidebar" class="sidebar">
+    <button class="closebtn text-warning" style="position:absolute; top:10px; right:25px; font-size:36px; background:none; border:none;" onclick="closeNav()">&times;</button>
+    
+    <div class="px-4 mb-3 text-center">
+        <h5 class="text-warning small mb-0">BIENVENUE</h5>
+        <p class="fw-bold mb-2"><?php echo strtoupper($nom_utilisateur); ?></p>
+        <hr class="border-warning my-1">
     </div>
 
-    <header data-bs-theme="dark">
-        <div class="collapse text-bg-dark" id="navbarHeader">
-            <div class="container">
-                <div class="row">
-                    <div class="col-sm-8 col-md-7 py-4">
-                        <h4 class="text-warning">About us</h4>
-                        <p class="text-body-secondary">
-                            Sur notre site, nous présentons uniquement les coiffures que nous avons la possibilité de réaliser.
-                            <br><strong>Note importante :</strong> Nous ne sommes pas des magiciens, si vos contours sont partis, ils sont partis !
-                        </p>
+    <a href="/coiffons/index.php"><i class="bi bi-house-door me-2"></i> Accueil</a>
+
+    <?php if ($role_utilisateur == 'coiffeur'): ?>
+        <div class="accordion accordion-flush" id="accordionSidebar">
+            
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#act">
+                        <i class="bi bi-calendar-event me-2"></i> Mon Activité
+                    </button>
+                </h2>
+                <div id="act" class="accordion-collapse collapse" data-bs-parent="#accordionSidebar">
+                    <div class="accordion-body p-0">
+                        <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="submenu-link">Mes demandes</a>
+                        <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="submenu-link">Mon agenda</a>
                     </div>
-                    <div class="col-sm-4 offset-md-1 py-4">
-                        <h4 class="text-warning">Contact</h4>
-                        <ul class="list-unstyled">
-                            <li><a href="#" class="text-white text-decoration-none">Follow on X</a></li>
-                            <li><a href="#" class="text-white text-decoration-none">Facebook</a></li>
-                            <li><a href="#" class="text-white text-decoration-none">Instagram</a></li>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#conf">
+                        <i class="bi bi-tools me-2"></i> Ma Configuration
+                    </button>
+                </h2>
+                <div id="conf" class="accordion-collapse collapse" data-bs-parent="#accordionSidebar">
+                    <div class="accordion-body p-0">
+                        <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="submenu-link">Mes coiffures</a>
+                        <a href="/coiffons/coiffeurs/mes_zones.php" class="submenu-link">Zones d'intervention</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#biz">
+                        <i class="bi bi-briefcase me-2"></i> Mon Business
+                    </button>
+                </h2>
+                <div id="biz" class="accordion-collapse collapse" data-bs-parent="#accordionSidebar">
+                    <div class="accordion-body p-0">
+                        <a href="/coiffons/coiffeurs/portefeuille.php" class="submenu-link">Mes gains</a>
+                        <a href="/coiffons/profil.php" class="submenu-link">Mon Profil</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php elseif ($role_utilisateur == 'client'): ?>
+        <a href="/coiffons/client/mes_rendezvous.php"><i class="bi bi-calendar-check me-2"></i> Mes RDV</a>
+        <a href="/coiffons/profil.php"><i class="bi bi-person-circle me-2"></i> Mon Profil</a>
+    <?php endif; ?>
+
+    <?php if ($est_connecte): ?>
+        <div class="px-4 py-3 mt-3">
+            <a href="/coiffons/deconnexion.php" class="btn btn-outline-danger w-100 fw-bold py-2 d-flex align-items-center justify-content-center" style="font-size: 0.9rem; border-radius: 6px; transition: 0.2s;">
+                <i class="bi bi-power me-2"></i> Déconnexion
+            </a>
+        </div>
+    <?php else: ?>
+        <div class="px-4 py-3 mt-3">
+            <a href="/coiffons/access/connexion.php" class="btn btn-warning w-100 fw-bold py-2 text-dark d-flex align-items-center justify-content-center" style="font-size: 0.9rem; border-radius: 6px;">
+                <i class="bi bi-box-arrow-in-right me-2"></i> Connexion
+            </a>
+        </div>
+    <?php endif; ?>
+</div>
+
+<header>
+    <div class="navbar navbar-dark bg-dark shadow-sm">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <?php if ($est_connecte): ?>
+                    <button class="btn text-warning border-0 p-0 me-3 fs-3" onclick="history.back()"><i class="bi bi-arrow-left-short"></i></button>
+                <?php endif; ?>
+                <img src="/coiffons/images/logo.png" alt="Logo" class="nav-logo" onclick="openNav()">
+                <a href="/coiffons/index.php" class="navbar-brand ms-2"><strong>Coiffe_Chez_Toi</strong></a>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <?php if ($est_connecte): ?>
+                    <div class="dropdown">
+                        <a class="text-warning position-relative dropdown-toggle no-arrow" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-bell fs-4"></i>
+                            <?php if ($nb_notifs > 0): ?>
+                                <span class="position-absolute top-0 start-50 p-1 bg-danger border border-black rounded-circle animate-pulse-bell"></span>
+                            <?php endif; ?>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark border-secondary shadow-lg p-2 mt-2" style="width: 280px; background-color: #0c0c0c;">
+                            <div class="d-flex justify-content-between border-bottom border-secondary pb-2 mb-2 px-2 small">
+                                <span class="text-warning fw-bold">Alertes (<?php echo $nb_notifs; ?>)</span>
+                                <?php if ($nb_notifs > 0): ?><a href="?action_notif=marquer_lu" class="text-muted text-decoration-none">Tout lire</a><?php endif; ?>
+                            </div>
+                            <?php if (empty($liste_notifs)): ?>
+                                <li class="text-muted text-center py-2 small">Rien à signaler</li>
+                            <?php else: ?>
+                                <?php foreach ($liste_notifs as $n): ?>
+                                    <li class="p-2 rounded mb-1 <?php echo ($n['statut'] == 'non_lu') ? 'bg-dark' : ''; ?>">
+                                        <p class="mb-0 text-light small" style="white-space:normal;"><?php echo htmlspecialchars($n['message']); ?></p>
+                                        <small class="text-muted" style="font-size:0.6rem;"><?php echo date('d/m H:i', strtotime($n['created_at'])); ?></small>
+                                    </li>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </ul>
                     </div>
-                </div>
+                <?php endif; ?>
+                <button class="navbar-toggler border-warning" type="button" data-bs-toggle="collapse" data-bs-target="#navbarHeader"><span class="navbar-toggler-icon"></span></button>
             </div>
         </div>
+    </div>
 
-        <div class="navbar navbar-dark bg-dark shadow-sm">
-            <div class="container d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    
-                    <?php 
-                    if ($est_connecte && ($role_utilisateur === 'client' || $role_utilisateur === 'coiffeur')): 
-                        $page_precedente = $_SERVER['HTTP_REFERER'] ?? '';
-                        if (empty($page_precedente) || strpos($page_precedente, 'connexion.php') !== false || strpos($page_precedente, 'inscription.php') !== false || strpos($page_precedente, 'deconnexion.php') !== false) {
-                            $lien_retour = "/coiffons/index.php";
-                        } else {
-                            $lien_retour = htmlspecialchars($page_precedente);
-                        }
-                    ?>
-                        <a href="<?php echo $lien_retour; ?>" class="btn p-0 me-3 text-warning border-0" style="font-size: 1.8rem; transition: 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" title="Retour">
-                            <i class="bi bi-arrow-left-short"></i>
-                        </a>
-                    <?php endif; ?>
-                    <img src="/coiffons/images/logo.png" alt="Logo" class="nav-logo" onclick="openNav()">
-                    <a href="/coiffons/index.php" class="navbar-brand d-flex align-items-center">
-                        <strong>Coiffe_Chez_Toi</strong>
-                    </a>
-                </div>
-
-                <div class="d-none d-md-flex align-items-center me-3 gap-2">
-                    <?php if ($role_utilisateur !== 'coiffeur' && $role_utilisateur !== 'admin'): ?>
-                        <a href="/coiffons/filter/annuaire_coiffeurs.php" class="btn btn-warning btn-sm fw-bold px-3 py-2 text-dark">
-                            <i class="bi bi-search"></i> Trouver un coiffeur
-                        </a>
-                    <?php endif; ?>
-
-                    </div>
-
-                <button class="navbar-toggler border-warning shadow-none" type="button" onclick="toggleAboutUs()">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
+    <div class="collapse bg-dark border-bottom border-secondary" id="navbarHeader">
+        <div class="container py-4">
+            <div class="row">
+                <div class="col-sm-8"><h4 class="text-warning">À propos</h4><p class="text-secondary small">Expertise en coiffure à domicile. Nous réalisons vos styles préférés chez vous.</p></div>
+                <div class="col-sm-4"><h4 class="text-warning">Contact</h4><ul class="list-unstyled small"><li>Instagram</li><li>WhatsApp</li></ul></div>
             </div>
         </div>
-        <link class="stylesheet" href="/coiffons/css/responsive-custom.css">
-    </header>
+    </div>
+</header>
 
-    <script>
-        function openNav() {
-            document.getElementById("mySidebar").style.width = "280px";
-            document.getElementById("mainOverlay").style.display = "block";
-        }
-
-        function closeNav() {
-            document.getElementById("mySidebar").style.width = "0";
-            document.getElementById("mainOverlay").style.display = "none";
-        }
-
-        function toggleAboutUs() {
-            var collapseElement = document.getElementById("navbarHeader");
-            if (collapseElement.classList.contains("show")) {
-                collapseElement.classList.remove("show");
-            } else {
-                collapseElement.classList.add("show");
-            }
-        }
-    </script>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-    <main>
+<script>
+    function openNav() { document.getElementById("mySidebar").style.width = "280px"; document.getElementById("mainOverlay").style.display = "block"; }
+    function closeNav() { document.getElementById("mySidebar").style.width = "0"; document.getElementById("mainOverlay").style.display = "none"; }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<main>

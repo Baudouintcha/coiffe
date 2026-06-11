@@ -323,3 +323,36 @@ INSERT INTO quartiers (nom_quartier, id_ville) VALUES
 ALTER TABLE users 
 ADD COLUMN date_expiration_abo DATE DEFAULT NULL AFTER abonnement_status,
 ADD COLUMN renouvellement_auto TINYINT(1) DEFAULT 1 AFTER date_expiration_abo;
+
+
+ALTER TABLE commentaires 
+ADD COLUMN id_rdv INT NULL AFTER id_commentaire,
+ADD COLUMN id_coiffeur INT NULL AFTER id_client,
+ADD COLUMN type_commentaire ENUM('public', 'plainte') NOT NULL DEFAULT 'public' AFTER note,
+ADD COLUMN statut_admin ENUM('en_attente', 'traite') NOT NULL DEFAULT 'en_attente' AFTER type_commentaire;
+
+ALTER TABLE commentaires MODIFY id_rdv INT UNSIGNED NULL;
+
+ALTER TABLE commentaires 
+ADD CONSTRAINT fk_commentaires_rdv 
+FOREIGN KEY (id_rdv) REFERENCES rendez_vous(id) 
+ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE commentaires 
+ADD COLUMN statut_moderation ENUM('en_attente', 'approuve', 'rejete') NOT NULL DEFAULT 'en_attente' AFTER statut_admin;
+
+
+CREATE TABLE notifications (
+    id_notification INT AUTO_INCREMENT PRIMARY KEY,
+    id_user INT NOT NULL,
+    id_rdv INT UNSIGNED NULL,
+    message TEXT NOT NULL,
+    statut_lecture ENUM('non_lu', 'lu') NOT NULL DEFAULT 'non_lu',
+    date_notification DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+ALTER TABLE notifications 
+ADD CONSTRAINT fk_notifications_rdv 
+FOREIGN KEY (id_rdv) REFERENCES rendez_vous(id) 
+ON DELETE CASCADE ON UPDATE CASCADE;

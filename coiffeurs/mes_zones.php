@@ -16,7 +16,7 @@ include __DIR__ . '/../layout/header.php';
 $id_coiffeur = $_SESSION['id_user'];
 $message = "";
 
-// 🎯 CONFIGURATION DES IDS DE TES VILLES PROCHES (Identique à ton get_quartiers.php)
+// 🎯 CONFIGURATION DES IDS DE TES VILLES PROCHES
 $id_cotonou = 1; 
 $id_calavi  = 2;
 
@@ -24,14 +24,13 @@ $id_calavi  = 2;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_zones'])) {
     
     try {
-        // Début d'une transaction pour s'assurer que tout se passe bien ou rien
         $pdo->beginTransaction();
 
-        // Étape A : On purge les anciennes zones de ce coiffeur pour repartir sur du propre
+        // Étape A : On purge les anciennes zones de ce coiffeur
         $delete_stmt = $pdo->prepare("DELETE FROM zones_coiffeur WHERE id_coiffeur = ?");
         $delete_stmt->execute([$id_coiffeur]);
 
-        // Étape B : Si le coiffeur a coché au moins un quartier, on insère ses choix
+        // Étape B : Si le coiffeur a coché au moins un quartier, on insère
         if (isset($_POST['quartiers_choisis']) && is_array($_POST['quartiers_choisis'])) {
             $insert_stmt = $pdo->prepare("INSERT INTO zones_coiffeur (id_coiffeur, id_quartier) VALUES (?, ?)");
             
@@ -40,42 +39,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_zones']))
             }
         }
 
-        // On valide définitivement les changements dans la base de données
         $pdo->commit();
-        
         $message = "<div class='alert alert-success text-center fw-bold'>✅ Vos zones d'intervention ont été mises à jour avec succès !</div>";
         
     } catch (Exception $e) {
-        // En cas de bug, on annule tout pour ne pas corrompre la base
         $pdo->rollBack();
         $message = "<div class='alert alert-danger text-center fw-bold'>❌ Une erreur est survenue : " . $e->getMessage() . "</div>";
     }
 }
 
-// 3. RÉCUPÉRATION DES DONNÉES DE LA DB POUR L'AFFICHAGE DYNAMIQUE
+// 3. RÉCUPÉRATION DES DONNÉES DE LA DB AVEC JOINTURE POUR LA VILLE
 
-// 🎯 LIAISON DB : On récupère l'id_ville de ce coiffeur depuis la table 'users'
+// Récupérer la ville d'origine du coiffeur
 $profile_stmt = $pdo->prepare("SELECT ville FROM users WHERE id = ?");
 $profile_stmt->execute([$id_coiffeur]);
 $id_ville_coiffeur = intval($profile_stmt->fetchColumn());
 
-// 🎯 FILTRAGE INTELLIGENT (Option B) : On charge les quartiers liés à sa région dans la DB
+// Requête SQL optimisée avec un JOIN pour récupérer le nom de la ville lié au quartier
 if ($id_ville_coiffeur === $id_cotonou || $id_ville_coiffeur === $id_calavi) {
-    // Si le coiffeur est de Cotonou ou Calavi, la DB renvoie la zone métropolitaine fusionnée
-    $all_quartiers_stmt = $pdo->prepare("SELECT * FROM quartiers WHERE id_ville IN (?, ?) ORDER BY nom_quartier ASC");
+    $all_quartiers_stmt = $pdo->prepare("
+        SELECT q.*, v.nom_ville 
+        FROM quartiers q 
+        JOIN villes v ON q.id_ville = v.id 
+        WHERE q.id_ville IN (?, ?) 
+        ORDER BY v.nom_ville ASC, q.nom_quartier ASC
+    ");
     $all_quartiers_stmt->execute([$id_cotonou, $id_calavi]);
 } else {
-    // Pour toute autre ville, la DB restreint strictement à sa ville d'origine
-    $all_quartiers_stmt = $pdo->prepare("SELECT * FROM quartiers WHERE id_ville = ? ORDER BY nom_quartier ASC");
+    $all_quartiers_stmt = $pdo->prepare("
+        SELECT q.*, v.nom_ville 
+        FROM quartiers q 
+        JOIN villes v ON q.id_ville = v.id 
+        WHERE q.id_ville = ? 
+        ORDER BY q.nom_quartier ASC
+    ");
     $all_quartiers_stmt->execute([$id_ville_coiffeur]);
 }
 
 $tous_les_quartiers = $all_quartiers_stmt->fetchAll();
 
-// B. Liste des quartiers que ce coiffeur a DEJA cochés par le passé (pour les pré-cocher)
+// B. Liste des quartiers déjà cochés (CORRECTIF : conversion forcée en INT pour bloquer le bug)
 $mes_zones_stmt = $pdo->prepare("SELECT id_quartier FROM zones_coiffeur WHERE id_coiffeur = ?");
 $mes_zones_stmt->execute([$id_coiffeur]);
-$mes_zones_actives = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+$raw_zones = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+$mes_zones_actives = array_map('intval', $raw_zones); // <--- Forçage de type strict
 ?>
 
 <section class="py-5" style="background-color: #000; min-height: 90vh; color: #fff;">
@@ -110,9 +117,10 @@ $mes_zones_actives = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
                                                        name="quartiers_choisis[]" 
                                                        value="<?php echo $q['id']; ?>" 
                                                        id="quartier-<?php echo $q['id']; ?>"
-                                                       <?php echo in_array($q['id'], $mes_zones_actives) ? 'checked' : ''; ?>>
+                                                       <?php echo in_array(intval($q['id']), $mes_zones_actives, true) ? 'checked' : ''; ?>>
                                                 <label class="form-check-label text-white small fw-semibold cursor-pointer w-100" for="quartier-<?php echo $q['id']; ?>">
-                                                    <?php echo htmlspecialchars($q['nom_quartier']); ?>
+                                                    <?php echo htmlspecialchars($q['nom_quartier']); ?> 
+                                                    <span class="d-block text-muted style-subcity" style="font-size: 0.75rem;">(<?php echo htmlspecialchars($q['nom_ville']); ?>)</span>
                                                 </label>
                                             </div>
                                         </div>
@@ -141,39 +149,15 @@ $mes_zones_actives = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 </section>
 
 <style>
-    :root {
-        --gold: #f39c12;
-    }
-    .btn-gold {
-        background-color: var(--gold) !important;
-        color: #000 !important;
-        border: none !important;
-        transition: 0.3s ease-in-out;
-    }
-    .btn-gold:hover {
-        background-color: #d35400 !important;
-        transform: translateY(-2px);
-    }
-    .zone-card:hover {
-        border-color: var(--gold) !important;
-        background-color: #222 !important;
-    }
-    .cursor-pointer {
-        cursor: pointer;
-    }
-    .checkbox-gold {
-        cursor: pointer;
-        width: 1.2em;
-        height: 1.2em;
-    }
-    .checkbox-gold:checked {
-        background-color: var(--gold) !important;
-        border-color: var(--gold) !important;
-    }
-    .checkbox-gold:focus {
-        box-shadow: 0 0 0 0.25rem rgba(243, 156, 18, 0.25) !important;
-        border-color: var(--gold) !important;
-    }
+    :root { --gold: #f39c12; }
+    .btn-gold { background-color: var(--gold) !important; color: #000 !important; border: none !important; transition: 0.3s ease-in-out; }
+    .btn-gold:hover { background-color: #d35400 !important; transform: translateY(-2px); }
+    .zone-card:hover { border-color: var(--gold) !important; background-color: #222 !important; }
+    .cursor-pointer { cursor: pointer; }
+    .checkbox-gold { cursor: pointer; width: 1.2em; height: 1.2em; }
+    .checkbox-gold:checked { background-color: var(--gold) !important; border-color: var(--gold) !important; }
+    .checkbox-gold:focus { box-shadow: 0 0 0 0.25rem rgba(243, 156, 18, 0.25) !important; border-color: var(--gold) !important; }
+    .style-subcity { opacity: 0.6; font-style: italic; }
 </style>
 
 <?php include __DIR__ . '/../layout/footer.php'; ?>

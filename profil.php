@@ -39,6 +39,10 @@ $bloc4_val = ""; $bloc4_lbl = ""; $bloc4_icon = ""; $bloc4_link = ""; $bloc4_sub
 
 $argent_gele = 0;
 
+// Initialisation des variables de graphiques (Coiffeur)
+$stats_rdv = ['en_attente' => 0, 'accepte' => 0, 'termine' => 0, 'annule' => 0];
+$stats_villes = [];
+
 try {
     if ($user['role'] === 'coiffeur') {
         // 1. Rendez-vous en attente
@@ -47,7 +51,7 @@ try {
         $bloc1_val = intval($stmt_rdv->fetchColumn());
         $bloc1_lbl = "Demandes en attente";
         $bloc1_icon = "bi-calendar-check";
-        $bloc1_link = "/coiffons/coiffeurs/agenda_coiffeurs.php";
+        $bloc1_link = "/coiffons/coiffeurs/valider_rendezvous.php";
         $bloc1_sub = "Voir les demandes →";
 
         // 2. Flux financier : Gains bloqués en cours
@@ -82,9 +86,29 @@ try {
         $bloc4_link = "#";
         $bloc4_sub = "Total clients uniques";
 
+        // 📊 DONNÉES GRAPHIQUE 1 : Répartition de TOUS les RDV par statut
+        $stmt_chart_rdv = $pdo->prepare("SELECT statut_rdv, COUNT(*) as total FROM rendez_vous WHERE coiffeur_id = ? GROUP BY statut_rdv");
+        $stmt_chart_rdv->execute([$user_id]);
+        while ($row = $stmt_chart_rdv->fetch()) {
+            if (array_key_exists($row['statut_rdv'], $stats_rdv)) {
+                $stats_rdv[$row['statut_rdv']] = intval($row['total']);
+            }
+        }
+
+        // 📊 DONNÉES GRAPHIQUE 2 : Nombre de zones couvertes par Ville d'appartenance
+        $stmt_chart_zones = $pdo->prepare("
+            SELECT v.nom_ville, COUNT(zc.id_quartier) as total 
+            FROM zones_coiffeur zc
+            JOIN quartiers q ON zc.id_quartier = q.id
+            JOIN villes v ON q.id_ville = v.id
+            WHERE zc.id_coiffeur = ?
+            GROUP BY v.nom_ville
+        ");
+        $stmt_chart_zones->execute([$user_id]);
+        $stats_villes = $stmt_chart_zones->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
     } else {
         // CONFIGURATION CLIENT
-        // 1. Nombre de rendez-vous actifs planifiés
         $stmt_rdv_cl = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE client_id = ? AND statut_rdv IN ('en_attente', 'accepte')");
         $stmt_rdv_cl->execute([$user_id]);
         $bloc1_val = intval($stmt_rdv_cl->fetchColumn());
@@ -93,7 +117,6 @@ try {
         $bloc1_link = "/coiffons/client/mes_rendezvous.php";
         $bloc1_sub = "Consulter mon agenda →";
 
-        // 2. Argent en cours de sécurisation
         $stmt_gele = $pdo->prepare("
             SELECT SUM(p.prix) as total_gele 
             FROM rendez_vous r
@@ -110,7 +133,6 @@ try {
         $bloc2_link = "#solde-section";
         $bloc2_sub = "Paiements sécurisés";
 
-        // 3. Nombre de coiffeurs testés
         $stmt_coiff_visite = $pdo->prepare("SELECT COUNT(DISTINCT coiffeur_id) FROM rendez_vous WHERE client_id = ? AND statut_rdv = 'termine'");
         $stmt_coiff_visite->execute([$user_id]);
         $bloc3_val = intval($stmt_coiff_visite->fetchColumn());
@@ -119,7 +141,6 @@ try {
         $bloc3_link = "/coiffons/index.php";
         $bloc3_sub = "Prendre un nouveau RDV →";
 
-        // 4. Statut du compte client
         $bloc4_val = "<span class='text-success' style='font-size:0.85rem; font-weight:700;'><i class='bi bi-circle-fill me-1' style='font-size:7px;'></i> ACTIF</span>";
         $bloc4_lbl = "Statut du compte";
         $bloc4_icon = "bi-shield-check";
@@ -156,12 +177,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
 }
 ?>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <section class="py-5" style="background: linear-gradient(135deg, #050505 0%, #0d0d0d 100%); min-height: 95vh; color: #fff;">
     <div class="container mt-4">
         
         <div class="row mb-5">
             <div class="col-12 text-center">
-                <h2 class="text-warning fw-bold h4 mb-1" style="letter-spacing: 2px;">MON MON ESPACE PERSONNEL</h2>
+                <h2 class="text-warning fw-bold h4 mb-1" style="letter-spacing: 2px;">MON ESPACE PERSONNEL</h2>
                 <p class="text-secondary small text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">Suivi de vos activités et de vos réservations</p>
             </div>
         </div>
@@ -252,6 +275,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                             </div>
                         </div>
                     </div>
+
+                    <?php if ($user['role'] === 'coiffeur'): ?>
+                        <h5 class="text-warning fw-bold mb-3 small" style="letter-spacing: 1px;"><i class="bi bi-bar-chart-line-fill me-2"></i> ANALYSE ET COUVERTURE VISUELLE</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="p-3 bg-black rounded border border-secondary text-center">
+                                    <span class="text-secondary d-block mb-2" style="font-size: 11px; font-weight:600;">SITUATION DES RENDEZ-VOUS</span>
+                                    <div style="max-height: 160px; display: flex; justify-content: center;">
+                                        <canvas id="chartRdv"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="p-3 bg-black rounded border border-secondary text-center">
+                                    <span class="text-secondary d-block mb-2" style="font-size: 11px; font-weight:600;">QUARTIERS COUVERTS PAR VILLE</span>
+                                    <div style="max-height: 160px; display: flex; justify-content: center;">
+                                        <canvas id="chartZones"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
 
                     <h5 id="solde-section" class="text-warning fw-bold mb-3 small" style="letter-spacing: 1px;"><i class="bi bi-wallet2 me-2"></i> MON PORTEFEUILLE NUMÉRIQUE</h5>
                     <div class="p-3 mb-4 rounded border-luxury-gold" style="background: rgba(255,255,255,0.01);">
@@ -374,6 +419,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
     </div>
 </section>
 
+<?php if ($user['role'] === 'coiffeur'): ?>
+<script>
+    // 1. Graphe en Anneau (Statuts Rendez-vous)
+    const ctxRdv = document.getElementById('chartRdv').getContext('2d');
+    new Chart(ctxRdv, {
+        type: 'doughnut',
+        data: {
+            labels: ['En attente', 'Acceptés', 'Terminés', 'Annulés'],
+            datasets: [{
+                data: [
+                    <?php echo $stats_rdv['en_attente']; ?>,
+                    <?php echo $stats_rdv['accepte']; ?>,
+                    <?php echo $stats_rdv['termine']; ?>,
+                    <?php echo $stats_rdv['annule']; ?>
+                ],
+                backgroundColor: ['#f1c40f', '#2ecc71', '#3498db', '#e74c3c'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            plugins: { legend: { display: true, position: 'right', labels: { color: '#888', font: { size: 9 } } } },
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    // 2. Graphe en Barres (Zones d'intervention par Ville)
+    const ctxZones = document.getElementById('chartZones').getContext('2d');
+    new Chart(ctxZones, {
+        type: 'bar',
+        data: {
+            labels: [<?php echo '"' . implode('","', array_column($stats_villes, 'nom_ville')) . '"'; ?>],
+            datasets: [{
+                label: 'Quartiers',
+                data: [<?php echo implode(',', array_column($stats_villes, 'total')); ?>],
+                backgroundColor: '#f39c12',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#222' }, ticks: { color: '#888', font: { size: 9 } } },
+                x: { grid: { display: false }, ticks: { color: '#888', font: { size: 9 } } }
+            },
+            plugins: { legend: { display: false } },
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+</script>
+<?php endif; ?>
+
 <?php if ($user['role'] === 'coiffeur' && !empty($user['diplome']) && pathinfo($user['diplome'], PATHINFO_EXTENSION) !== 'pdf'): ?>
 <div class="modal fade" id="diplomeModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-md">
@@ -392,107 +489,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
 
 <style>
     /* Structure Métallique Sombre */
-    .custom-profile-card {
-        background-color: #0f0f0f !important;
-        border: 1px solid rgba(255, 255, 255, 0.04) !important;
-        border-radius: 14px !important;
-    }
-
-    /* Traitement Or Premium */
-    .border-gold-premium {
-        border: 2px solid #f39c12 !important;
-        padding: 3px;
-        background: linear-gradient(to bottom, #f39c12, #d35400);
-    }
-    .border-luxury-gold {
-        border: 1px dashed rgba(243, 156, 18, 0.25) !important;
-    }
-
-    /* Badges Style */
-    .badge-role-luxury {
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        padding: 5px 12px;
-        font-size: 0.65rem;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        border-radius: 4px;
-        color: #b3b3b3;
-    }
-
-    /* Boutons de Commandes */
-    .btn-gold-action {
-        background-color: #f39c12 !important;
-        color: #000 !important;
-        border: none !important;
-        font-size: 0.7rem !important;
-        letter-spacing: 0.5px;
-        border-radius: 6px !important;
-        transition: all 0.2s ease-in-out;
-    }
-    .btn-gold-action:hover {
-        background-color: #e67e22 !important;
-        transform: translateY(-1px);
-    }
-    .btn-outline-luxury {
-        background-color: transparent !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        color: #fff !important;
-        font-size: 0.7rem !important;
-        border-radius: 6px !important;
-        transition: 0.2s;
-    }
-    .btn-outline-luxury:hover {
-        border-color: #f39c12 !important;
-        color: #f39c12 !important;
-    }
-    .btn-outline-danger-silent {
-        background-color: rgba(220, 53, 69, 0.02) !important;
-        border: 1px solid rgba(220, 53, 69, 0.15) !important;
-        color: #dc3545 !important;
-        font-size: 0.7rem !important;
-        border-radius: 6px !important;
-    }
-    .btn-outline-danger-silent:hover {
-        background-color: #dc3545 !important;
-        color: #fff !important;
-    }
-    .border-danger-silent {
-        border: 1px dashed rgba(220, 53, 69, 0.2) !important;
-    }
-
-    /* Grille des boîtes de statistiques */
-    .metric-box {
-        background-color: #080808;
-        border: 1px solid rgba(255, 255, 255, 0.02);
-        padding: 12px;
-        border-radius: 8px;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-    .highlight-metric {
-        background: linear-gradient(135deg, #090909 0%, #111111 100%);
-        border: 1px solid rgba(243, 156, 18, 0.1) !important;
-    }
-
-    /* Clignotant de Flux */
-    .pulse-dot {
-        width: 5px;
-        height: 5px;
-        background-color: #f39c12;
-        border-radius: 50%;
-        display: inline-block;
-        animation: active-pulse 1.6s infinite ease-in-out;
-        margin-right: 3px;
-        vertical-align: middle;
-    }
-    @keyframes active-pulse {
-        0% { transform: scale(0.8); opacity: 0.4; }
-        50% { transform: scale(1.2); opacity: 1; }
-        100% { transform: scale(0.8); opacity: 0.4; }
-    }
+    .custom-profile-card { background-color: #0f0f0f !important; border: 1px solid rgba(255, 255, 255, 0.04) !important; border-radius: 14px !important; }
+    .border-gold-premium { border: 2px solid #f39c12 !important; padding: 3px; background: linear-gradient(to bottom, #f39c12, #d35400); }
+    .border-luxury-gold { border: 1px dashed rgba(243, 156, 18, 0.25) !important; }
+    .badge-role-luxury { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); padding: 5px 12px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px; border-radius: 4px; color: #b3b3b3; }
+    .btn-gold-action { background-color: #f39c12 !important; color: #000 !important; border: none !important; font-size: 0.7rem !important; letter-spacing: 0.5px; border-radius: 6px !important; transition: all 0.2s ease-in-out; }
+    .btn-gold-action:hover { background-color: #e67e22 !important; transform: translateY(-1px); }
+    .btn-outline-luxury { background-color: transparent !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; color: #fff !important; font-size: 0.7rem !important; border-radius: 6px !important; transition: 0.2s; }
+    .btn-outline-luxury:hover { border-color: #f39c12 !important; color: #f39c12 !important; }
+    .btn-outline-danger-silent { background-color: rgba(220, 53, 69, 0.02) !important; border: 1px solid rgba(220, 53, 69, 0.15) !important; color: #dc3545 !important; font-size: 0.7rem !important; border-radius: 6px !important; }
+    .btn-outline-danger-silent:hover { background-color: #dc3545 !important; color: #fff !important; }
+    .border-danger-silent { border: 1px dashed rgba(220, 53, 69, 0.2) !important; }
+    .metric-box { background-color: #080808; border: 1px solid rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 8px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+    .highlight-metric { background: linear-gradient(135deg, #090909 0%, #111111 100%); border: 1px solid rgba(243, 156, 18, 0.1) !important; }
+    .pulse-dot { width: 5px; height: 5px; background-color: #f39c12; border-radius: 50%; display: inline-block; animation: active-pulse 1.6s infinite ease-in-out; margin-right: 3px; vertical-align: middle; }
+    @keyframes active-pulse { 0% { transform: scale(0.8); opacity: 0.4; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(0.8); opacity: 0.4; } }
 </style>
 
 <?php include __DIR__ . '/layout/footer.php'; ?>
