@@ -17,21 +17,29 @@ $liste_notifs = [];
 if ($est_connecte) {
     $user_logge_id = $_SESSION['id_user'];
 
-    // 1. Compte des notifications non lues
+    // 1. Compte des notifications non lues en Base de Données
     $stmt_count = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE id_user = ? AND statut_lecture = 'non_lu'");
     $stmt_count->execute([$user_logge_id]);
     $nb_notifs = $stmt_count->fetchColumn();
 
-    // 2. Liste des 5 dernières notifications
+    // 2. Liste des 5 dernières notifications en Base de Données
     $stmt_list = $pdo->prepare("SELECT * FROM notifications WHERE id_user = ? ORDER BY date_notification DESC LIMIT 5");
     $stmt_list->execute([$user_logge_id]);
     $liste_notifs = $stmt_list->fetchAll();
+
+    // 3. Ajustement du compteur global si une notification de session (Abonnement) est active
+    if ($role_utilisateur === 'coiffeur' && isset($_SESSION['alerte_abo_cloche'])) {
+        $nb_notifs++;
+    }
+    
+    // 💡 ASTUCE EXPERT : Si vous ajoutez une autre notification basée sur les SESSIONS plus bas, 
+    // n'oubliez pas de faire un "$nb_notifs++;" pour que la pastille rouge s'allume !
 }
 
 // Action : Marquer tout comme lu
 if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
     if ($est_connecte) {
-        $pdo->prepare("UPDATE notifications SET statut = 'lu' WHERE user_id = ?")->execute([$_SESSION['id_user']]);
+        $pdo->prepare("UPDATE notifications SET statut_lecture = 'lu' WHERE id_user = ?")->execute([$_SESSION['id_user']]);
         header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
         exit();
     }
@@ -48,7 +56,6 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
     <style>
         :root { --gold: #D4AF37; --dark-bg: #121212; }
         
-        /* RESTAURATION DE TA POLICE D'ORIGINE POUR TOUT LE SITE */
         body { 
             background-color: var(--dark-bg); 
             color: white; 
@@ -64,7 +71,6 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
         .sidebar a, .sidebar .accordion-button { padding: 12px 32px; text-decoration: none; font-size: 1rem; color: white; display: block; transition: 0.3s; background: none; border: none; width: 100%; text-align: left; font-family: 'Segoe UI', sans-serif; }
         .sidebar a:hover, .sidebar .accordion-button:hover { color: var(--gold); background-color: #111; }
         
-        /* Style spécifique accordéon */
         .sidebar .accordion-item { background: transparent; border: none; }
         .sidebar .accordion-button { color: var(--gold); font-weight: bold; font-size: 0.9rem; }
         .sidebar .accordion-button::after { filter: invert(1) sepia(1) saturate(5) hue-rotate(10deg); }
@@ -96,11 +102,10 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
 
     <?php if ($role_utilisateur == 'coiffeur'): ?>
         <div class="accordion accordion-flush" id="accordionSidebar">
-            
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#act">
-                        <i class="bi bi-calendar-event me-2"></i> Mon Activité
+                        <i class="bi bi-calendar-event me-2"></i> Mon Activity
                     </button>
                 </h2>
                 <div id="act" class="accordion-collapse collapse" data-bs-parent="#accordionSidebar">
@@ -140,6 +145,7 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
             </div>
         </div>
     <?php elseif ($role_utilisateur == 'client'): ?>
+        <a href="/coiffons/filter/annuaire_coiffeurs.php"><i class="bi bi-search-heart me-2"></i> Trouver un coiffeur</a>
         <a href="/coiffons/client/mes_rendezvous.php"><i class="bi bi-calendar-check me-2"></i> Mes RDV</a>
         <a href="/coiffons/profil.php"><i class="bi bi-person-circle me-2"></i> Mon Profil</a>
     <?php endif; ?>
@@ -160,20 +166,29 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
 </div>
 
 <header>
-    <div class="navbar navbar-dark bg-dark shadow-sm">
-        <div class="container d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
+    <div class="navbar navbar-dark bg-dark shadow-sm py-2">
+        <div class="container d-flex justify-content-between align-items-center flex-nowrap">
+            
+            <div class="d-flex align-items-center text-truncate">
                 <?php if ($est_connecte): ?>
-                    <button class="btn text-warning border-0 p-0 me-3 fs-3" onclick="history.back()"><i class="bi bi-arrow-left-short"></i></button>
+                    <button class="btn text-warning border-0 p-0 me-2 fs-3" onclick="history.back()"><i class="bi bi-arrow-left-short"></i></button>
                 <?php endif; ?>
-                <img src="/coiffons/images/logo.png" alt="Logo" class="nav-logo" onclick="openNav()">
-                <a href="/coiffons/index.php" class="navbar-brand ms-2"><strong>Coiffe_Chez_Toi</strong></a>
+                <img src="/coiffons/images/logo.png" alt="Logo" class="nav-logo flex-shrink-0" onclick="openNav()">
+                <a href="/coiffons/index.php" class="navbar-brand ms-2 mb-0 h1 fs-6 text-truncate"><strong>Coiffe_Chez_Toi</strong></a>
             </div>
 
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2 gap-sm-3 flex-shrink-0">
+                
+                <?php if ($role_utilisateur == 'client'): ?>
+                    <a href="/coiffons/filter/annuaire_coiffeurs.php" class="btn btn-outline-warning btn-sm d-flex align-items-center px-2 py-1 fw-bold" title="Trouver un coiffeur" style="font-size: 0.85rem;">
+                        <i class="bi bi-search <?php echo $est_connecte ? 'me-md-1' : 'me-1'; ?>"></i> 
+                        <span class="d-none d-md-inline">Trouver un coiffeur</span>
+                    </a>
+                <?php endif; ?>
+
                 <?php if ($est_connecte): ?>
-                    <div class="dropdown">
-                        <a class="text-warning position-relative dropdown-toggle no-arrow" href="#" role="button" data-bs-toggle="dropdown">
+                    <div class="dropdown d-flex align-items-center">
+                        <a class="text-warning position-relative dropdown-toggle no-arrow d-flex align-items-center p-1" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-bell fs-4"></i>
                             <?php if ($nb_notifs > 0): ?>
                                 <span class="position-absolute top-0 start-50 p-1 bg-danger border border-black rounded-circle animate-pulse-bell"></span>
@@ -182,30 +197,101 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
                         <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark border-secondary shadow-lg p-2 mt-2" style="width: 280px; background-color: #0c0c0c;">
                             <div class="d-flex justify-content-between border-bottom border-secondary pb-2 mb-2 px-2 small">
                                 <span class="text-warning fw-bold">Alertes (<?php echo $nb_notifs; ?>)</span>
-                                <?php if ($nb_notifs > 0): ?><a href="?action_notif=marquer_lu" class="text-muted text-decoration-none">Tout lire</a><?php endif; ?>
+                                <?php if ($nb_notifs > 0 && !empty($liste_notifs)): ?>
+                                    <a href="?action_notif=marquer_lu" class="text-muted text-decoration-none">Tout lire</a>
+                                <?php endif; ?>
                             </div>
-                            <?php if (empty($liste_notifs)): ?>
+
+                            <?php
+                            // =================================================================
+                            // CENTRALISATION DES NOTIFICATIONS DANS UN TABLEAU UNIQUE
+                            // =================================================================
+                            $toutes_les_notifs = [];
+
+                            // 1. Notification Prioritaire : Échéance Abonnement Coiffeur
+                            if ($role_utilisateur === 'coiffeur' && isset($_SESSION['alerte_abo_cloche'])) {
+                                $toutes_les_notifs[] = [
+                                    'type'   => 'danger',
+                                    'message'=> $_SESSION['alerte_abo_cloche'],
+                                    'icone'  => 'bi-exclamation-triangle-fill animate-pulse-bell',
+                                    'lien'   => '/coiffons/coiffeurs/portefeuille.php',
+                                    'date'   => 'Urgent'
+                                ];
+                            }
+
+                            // 🛠️ ZONE DE RAJOUT : COMMENT AJOUTER UNE NOUVELLE NOTIFICATION ?
+                            // Il vous suffit de copier/coller le modèle ci-dessous et d'adapter vos conditions :
+                            /*
+                            if (VOTRE_CONDITION_ICI) {
+                                $toutes_les_notifs[] = [
+                                    'type'   => 'warning',          // Choix : 'danger', 'warning', 'info' ou 'standard'
+                                    'message'=> "Votre message",    // Le texte qui sera écrit dans la cloche
+                                    'icone'  => 'bi-chat-left-text',// L'icône Bootstrap de votre choix
+                                    'lien'   => '/votre_lien.php',  // Où va le coiffeur quand il clique dessus
+                                    'date'   => 'Maintenant'        // Le petit texte affiché en bas à droite
+                                ];
+                            }
+                            */
+
+                            // 2. Intégration des notifications standards provenant de la Base de Données
+                            foreach ($liste_notifs as $n) {
+                                $toutes_les_notifs[] = [
+                                    'type'   => ($n['statut_lecture'] == 'non_lu') ? 'info' : 'standard',
+                                    'message'=> $n['message'],
+                                    'icone'  => 'bi-info-circle',
+                                    'lien'   => '#', 
+                                    'date'   => date('d/m H:i', strtotime($n['date_notification']))
+                                ];
+                            }
+                            ?>
+
+                            <?php if (empty($toutes_les_notifs)): ?>
                                 <li class="text-muted text-center py-2 small">Rien à signaler</li>
                             <?php else: ?>
-                                <?php foreach ($liste_notifs as $n): ?>
-                                    <li class="p-2 rounded mb-1 <?php echo ($n['statut'] == 'non_lu') ? 'bg-dark' : ''; ?>">
-                                        <p class="mb-0 text-light small" style="white-space:normal;"><?php echo htmlspecialchars($n['message']); ?></p>
-                                        <small class="text-muted" style="font-size:0.6rem;"><?php echo date('d/m H:i', strtotime($n['created_at'])); ?></small>
+                                <?php foreach ($toutes_les_notifs as $notif): ?>
+                                    <?php 
+                                    // Gestion des designs selon le niveau d'importance ('type')
+                                    $bg_style = '';
+                                    $text_class = 'text-light';
+                                    
+                                    if ($notif['type'] === 'danger') {
+                                        $bg_style = 'background-color: #1a0505; border: 1px solid #4a1414;';
+                                        $text_class = 'text-danger fw-bold';
+                                    } elseif ($notif['type'] === 'warning') {
+                                        $bg_style = 'background-color: #241c08; border: 1px solid #543d0a;';
+                                        $text_class = 'text-warning fw-bold';
+                                    } elseif ($notif['type'] === 'info') {
+                                        $bg_style = 'background-color: #0b131f;';
+                                        $text_class = 'text-info';
+                                    }
+                                    ?>
+                                    <li class="p-2 rounded mb-1" style="<?php echo $bg_style; ?>">
+                                        <a href="<?php echo $notif['lien']; ?>" class="text-decoration-none">
+                                            <p class="mb-0 <?php echo $text_class; ?> small" style="white-space:normal;">
+                                                <i class="bi <?php echo $notif['icone']; ?> me-1"></i> 
+                                                <?php echo htmlspecialchars($notif['message']); ?>
+                                            </p>
+                                            <small class="text-muted d-block text-end" style="font-size:0.6rem;"><?php echo $notif['date']; ?></small>
+                                        </a>
                                     </li>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </ul>
                     </div>
                 <?php endif; ?>
-                <button class="navbar-toggler border-warning" type="button" data-bs-toggle="collapse" data-bs-target="#navbarHeader"><span class="navbar-toggler-icon"></span></button>
+
+                <button class="navbar-toggler border-warning p-1" type="button" data-bs-toggle="collapse" data-bs-target="#navbarHeader">
+                    <span class="navbar-toggler-icon" style="width: 1.25rem; height: 1.25rem;"></span>
+                </button>
             </div>
+
         </div>
     </div>
 
     <div class="collapse bg-dark border-bottom border-secondary" id="navbarHeader">
         <div class="container py-4">
             <div class="row">
-                <div class="col-sm-8"><h4 class="text-warning">À propos</h4><p class="text-secondary small">Expertise en coiffure à domicile. Nous réalisons vos styles préférés chez vous.</p></div>
+                <div class="col-sm-8"><h4 class="text-warning">À propos</h4><p class="text-secondary small">Expertise en coiffure à domicile. Nous realizons vos styles préférés chez vous.</p></div>
                 <div class="col-sm-4"><h4 class="text-warning">Contact</h4><ul class="list-unstyled small"><li>Instagram</li><li>WhatsApp</li></ul></div>
             </div>
         </div>
