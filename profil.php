@@ -89,6 +89,7 @@ try {
         // 📊 DONNÉES GRAPHIQUE 1 : Répartition de TOUS les RDV par statut
         $stmt_chart_rdv = $pdo->prepare("SELECT statut_rdv, COUNT(*) as total FROM rendez_vous WHERE coiffeur_id = ? GROUP BY statut_rdv");
         $stmt_chart_rdv->execute([$user_id]);
+        $while_row = true;
         while ($row = $stmt_chart_rdv->fetch()) {
             if (array_key_exists($row['statut_rdv'], $stats_rdv)) {
                 $stats_rdv[$row['statut_rdv']] = intval($row['total']);
@@ -205,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                     <div class="mb-4">
                         <span class="badge-role-luxury">
                             <i class="bi <?php echo $user['role'] === 'coiffeur' ? 'bi-scissors' : 'bi-person-fill'; ?> me-1 text-warning"></i>
-                            COMPTE COMPTE // <?php echo strtoupper($user['role']); ?>
+                            COMPTE // <?php echo strtoupper($user['role']); ?>
                         </span>
                     </div>
 
@@ -311,13 +312,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                             </div>
                             <div class="col-md-5 text-md-end">
                                 <?php if ($user['role'] === 'client'): ?>
-                                    <a href="recharger_compte.php" class="btn btn-gold-action btn-sm px-3 fw-bold w-100 py-2">
-                                        <i class="bi bi-plus-circle me-1"></i> RECHARGER MON COMPTE
+                                    <a href="/coiffons/client/mon_portefeuille.php" class="btn btn-gold-action btn-sm px-3 fw-bold w-100 py-2">
+                                        <i class="bi bi-gear-fill me-1"></i> GÉRER MON PORTEFEUILLE
                                     </a>
                                 <?php else: ?>
-                                    <span class="badge bg-dark border border-secondary text-secondary py-2 px-2 small d-block text-center" style="font-size: 10px;">
-                                        Total de vos gains accumulés
-                                    </span>
+                                    <a href="/coiffons/coiffeurs/portefeuille.php" class="btn btn-outline-luxury btn-sm px-3 fw-bold w-100 py-2">
+                                        <i class="bi bi-graph-up-arrow me-1"></i> SUIVRE MES GAINS
+                                    </a>
                                 <?php endif; ?>
                             </div>
                         </div>
