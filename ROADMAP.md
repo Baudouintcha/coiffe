@@ -71,15 +71,18 @@ Dès que le script reçoit la demande, il récupère la date et l'heure du rende
 ...........................................................................................
 1* 📋 ###LISTING OFFICIEL DES COMPOSANTS À METTRE EN PLACE
 
-1. Architecture Base de Données (SQL)Ajustement de la table rendez_vous : S'assurer que la colonne statut_rdv gère bien l'état 'annule'.Création de la table avis_plaintes : * id, rendez_vous_id, client_id, coiffeur_id, note (1 à 5), commentaire (text), type ('avis' ou 'plainte'), statut_admin ('en_attente', 'traite'), date_creation.
+***********1. Architecture Base de Données (SQL)Ajustement de la table rendez_vous : S'assurer que la colonne statut_rdv gère bien l'état 'annule'.Création de la table avis_plaintes : * id, rendez_vous_id, client_id, coiffeur_id, note (1 à 5), commentaire (text), type ('avis' ou 'plainte'), statut_admin ('en_attente', 'traite'), date_creation.*******
 
 
-2. Interface Client (Fichiers existants à mettre à jour & Nouveaux)mes_rendezvous.php (Mise à jour finale) : * Affichage du badge gris "Annulé" (déjà prêt).Dès que le statut passe à 'termine', le bouton "Gérer" devient "Noter la prestation".formulaire_notation.php (Nouvelle Modale ou Nouvelle Page) :Interface d'étoiles dynamiques (JavaScript).Champ texte qui s'adapte : si note < 3, le titre devient "Déposer une plainte (confidentiel)", sinon "Laisser un commentaire public".
+********2. Interface Client (Fichiers existants à mettre à jour & Nouveaux)mes_rendezvous.php (Mise à jour finale) : * Affichage du badge gris "Annulé" (déjà prêt).Dès que le statut passe à 'termine', le bouton "Gérer" devient "Noter la prestation".formulaire_notation.php (Nouvelle Modale ou Nouvelle Page) :Interface d'étoiles dynamiques (JavaScript).Champ texte qui s'adapte : si note < 3, le titre devient "Déposer une plainte (confidentiel)", sinon "Laisser un commentaire public".***************
 
-3. Interface Artisan / Coiffeurdashboard_coiffeur.php & mes_avis.php (Nouveaux composants) :Section "Avis clients" : Liste des notes $\ge$ 3 avec les commentaires.Calcul de sa note moyenne générale.Cadre Flottant de Signalement (Alerte Rouge) : Si une ligne dans avis_plaintes a le type 'plainte' pour son ID, le bloc s'affiche automatiquement en haut de son tableau de bord sans lui montrer le texte de la plainte.
+***********3. Interface Artisan / Coiffeurdashboard_coiffeur.php & mes_avis.php (Nouveaux composants) :Section "Avis clients" : Liste des notes $\ge$ 3 avec les commentaires.Calcul de sa note moyenne générale.Cadre Flottant de Signalement (Alerte Rouge) : Si une ligne dans avis_plaintes a le type 'plainte' pour son ID, le bloc s'affiche automatiquement en haut de son tableau de bord sans lui montrer le texte de la plainte.**********
 
 
+    si haut ont tous étét implimentés déja 
 
+
+    
 4. Interface Administration (Statistiques & Modération)admin/plaintes.php (Nouvelle page) :Listing de toutes les plaintes des clients avec le détail textuel, le nom du coiffeur visé et un bouton "Marquer comme traité / Contacter l'artisan".admin/stats_coiffeurs.php (Mise à jour) :Intégration de la moyenne des notes dans les algorithmes de classement des coiffeurs.
 
 
