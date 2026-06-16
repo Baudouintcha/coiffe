@@ -41,44 +41,52 @@ $argent_gele = 0;
 
 // Initialisation des variables partagées (Graphiques & Avis)
 $stats_rdv = ['en_attente' => 0, 'accepte' => 0, 'termine' => 0, 'annule' => 0];
-$stats_villes = []; // Utilisé par le coiffeur (Quartiers par Ville)
-$stats_mensuelles = array_fill(1, 12, 0); // Utilisé par le client (Fréquence par mois)
+$stats_villes = []; 
+$stats_mensuelles = array_fill(1, 12, 0); 
 $commentaires = [];
 $note_moyenne = 0;
 $total_avis = 0;
 
-try {
-    if ($user['role'] === 'coiffeur') {
-        
-        // REQUÊTES DES AVIS (COIFFEUR) : Sécurisées et limitées aux 10 derniers
+if ($user['role'] === 'coiffeur') {
+    
+    // REQUÊTES DES AVIS (COIFFEUR)
+    try {
         $stmt_com = $pdo->prepare("
             SELECT r.date_creation, r.commentaire, r.note, u.nom, u.prenom 
             FROM rendez_vous r
             JOIN users u ON r.client_id = u.id
             WHERE r.coiffeur_id = ? AND r.commentaire IS NOT NULL
-            ORDER BY r.date_creation DESC
-            LIMIT 10
+            ORDER BY r.date_creation DESC LIMIT 10
         ");
         $stmt_com->execute([$user_id]);
         $commentaires = $stmt_com->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {}
 
-        // Calcul de la note moyenne du coiffeur
+    try {
         $stmt_note = $pdo->prepare("SELECT AVG(note) as moyenne, COUNT(*) as total FROM rendez_vous WHERE coiffeur_id = ? AND note IS NOT NULL");
         $stmt_note->execute([$user_id]);
         $note_data = $stmt_note->fetch();
         $note_moyenne = $note_data['moyenne'] ?? 0;
         $total_avis = $note_data['total'] ?? 0;
+    } catch (Exception $e) {}
 
-        // 1. Demandes en attente
+    // BLOC 1 : Demandes en attente
+    $bloc1_lbl = "Demandes en attente";
+    $bloc1_icon = "bi-calendar-check";
+    $bloc1_link = "/coiffons/coiffeurs/valider_rendezvous.php";
+    $bloc1_sub = "Voir les demandes →";
+    try {
         $stmt_rdv = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE coiffeur_id = ? AND statut_rdv = 'en_attente'");
         $stmt_rdv->execute([$user_id]);
         $bloc1_val = intval($stmt_rdv->fetchColumn());
-        $bloc1_lbl = "Demandes en attente";
-        $bloc1_icon = "bi-calendar-check";
-        $bloc1_link = "/coiffons/coiffeurs/valider_rendezvous.php";
-        $bloc1_sub = "Voir les demandes →";
+    } catch (Exception $e) { $bloc1_val = 0; }
 
-        // 2. Gains sécurisés (en attente ou acceptés)
+    // BLOC 2 : Gains sécurisés
+    $bloc2_lbl = "Gains sécurisés";
+    $bloc2_icon = "bi-shield-lock";
+    $bloc2_link = "#solde-section";
+    $bloc2_sub = "Rendez-vous à venir";
+    try {
         $stmt_gains_encours = $pdo->prepare("
             SELECT SUM(p.prix) FROM rendez_vous r 
             JOIN prestations p ON r.coiffure_id = p.id_prestation 
@@ -87,30 +95,32 @@ try {
         $stmt_gains_encours->execute([$user_id]);
         $gains_futurs = $stmt_gains_encours->fetchColumn() ?? 0;
         $bloc2_val = number_format($gains_futurs, 0, ',', ' ') . " <span style='font-size:0.75rem;'>FCFA</span>";
-        $bloc2_lbl = "Gains sécurisés";
-        $bloc2_icon = "bi-shield-lock";
-        $bloc2_link = "#solde-section";
-        $bloc2_sub = "Rendez-vous à venir";
+    } catch (Exception $e) { $bloc2_val = "0 <span style='font-size:0.75rem;'>FCFA</span>"; }
 
-        // 3. Zones d'intervention
+    // BLOC 3 : Zones d'intervention
+    $bloc3_lbl = "Quartiers couverts";
+    $bloc3_icon = "bi-geo-alt";
+    $bloc3_link = "/coiffons/coiffeurs/mes_zones.php";
+    $bloc3_sub = "Modifier mes zones →";
+    try {
         $stmt_zones = $pdo->prepare("SELECT COUNT(*) FROM zones_coiffeur WHERE id_coiffeur = ?");
         $stmt_zones->execute([$user_id]);
         $bloc3_val = intval($stmt_zones->fetchColumn()) . " <span style='font-size:0.75rem; color:#888;'>zones</span>";
-        $bloc3_lbl = "Quartiers couverts";
-        $bloc3_icon = "bi-geo-alt";
-        $bloc3_link = "/coiffons/coiffeurs/mes_zones.php";
-        $bloc3_sub = "Modifier mes zones →";
+    } catch (Exception $e) { $bloc3_val = "0 <span style='font-size:0.75rem; color:#888;'>zones</span>"; }
 
-        // 4. Clients uniques
+    // BLOC 4 : Clients uniques
+    $bloc4_lbl = "Clients fidélisés";
+    $bloc4_icon = "bi-people";
+    $bloc4_link = "#";
+    $bloc4_sub = "Total clients uniques";
+    try {
         $stmt_clients = $pdo->prepare("SELECT COUNT(DISTINCT client_id) FROM rendez_vous WHERE coiffeur_id = ?");
         $stmt_clients->execute([$user_id]);
         $bloc4_val = intval($stmt_clients->fetchColumn());
-        $bloc4_lbl = "Clients fidélisés";
-        $bloc4_icon = "bi-people";
-        $bloc4_link = "#";
-        $bloc4_sub = "Total clients uniques";
+    } catch (Exception $e) { $bloc4_val = 0; }
 
-        // 📊 GRAPH 1 (COIFFEUR) : Statuts globaux
+    // 📊 GRAPH 1 (COIFFEUR)
+    try {
         $stmt_chart_rdv = $pdo->prepare("SELECT statut_rdv, COUNT(*) as total FROM rendez_vous WHERE coiffeur_id = ? GROUP BY statut_rdv");
         $stmt_chart_rdv->execute([$user_id]);
         while ($row = $stmt_chart_rdv->fetch()) {
@@ -118,8 +128,10 @@ try {
                 $stats_rdv[$row['statut_rdv']] = intval($row['total']);
             }
         }
+    } catch (Exception $e) {}
 
-        // 📊 GRAPH 2 (COIFFEUR) : Répartition par ville
+    // 📊 GRAPH 2 (COIFFEUR)
+    try {
         $stmt_chart_zones = $pdo->prepare("
             SELECT v.nom_ville, COUNT(zc.id_quartier) as total 
             FROM zones_coiffeur zc
@@ -130,30 +142,39 @@ try {
         ");
         $stmt_chart_zones->execute([$user_id]);
         $stats_villes = $stmt_chart_zones->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Exception $e) {}
 
-    } else {
-        // REQUÊTES DES AVIS LAISSÉS (CLIENT) : Sécurisées et limitées aux 10 derniers
+} else {
+    // REQUÊTES DES AVIS LAISSÉS (CLIENT)
+    try {
         $stmt_com = $pdo->prepare("
             SELECT r.date_creation, r.commentaire, r.note, u.nom, u.prenom 
             FROM rendez_vous r
             JOIN users u ON r.coiffeur_id = u.id
             WHERE r.client_id = ? AND r.commentaire IS NOT NULL
-            ORDER BY r.date_creation DESC
-            LIMIT 10
+            ORDER BY r.date_creation DESC LIMIT 10
         ");
         $stmt_com->execute([$user_id]);
         $commentaires = $stmt_com->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {}
 
-        // 1. Rendez-vous prévus
+    // BLOC 1 : Rendez-vous prévus
+    $bloc1_lbl = "Rendez-vous prévus";
+    $bloc1_icon = "bi-calendar3";
+    $bloc1_link = "/coiffons/client/mes_rendezvous.php";
+    $bloc1_sub = "Consulter mon agenda →";
+    try {
         $stmt_rdv_cl = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE client_id = ? AND statut_rdv IN ('en_attente', 'accepte')");
         $stmt_rdv_cl->execute([$user_id]);
         $bloc1_val = intval($stmt_rdv_cl->fetchColumn());
-        $bloc1_lbl = "Rendez-vous prévus";
-        $bloc1_icon = "bi-calendar3";
-        $bloc1_link = "/coiffons/client/mes_rendezvous.php";
-        $bloc1_sub = "Consulter mon agenda →";
+    } catch (Exception $e) { $bloc1_val = 0; }
 
-        // 2. Fonds en attente
+    // BLOC 2 : Fonds en attente
+    $bloc2_lbl = "Fonds en attente";
+    $bloc2_icon = "bi-lock-fill";
+    $bloc2_link = "#solde-section";
+    $bloc2_sub = "Paiements sécurisés";
+    try {
         $stmt_gele = $pdo->prepare("
             SELECT SUM(p.prix) as total_gele 
             FROM rendez_vous r
@@ -163,30 +184,29 @@ try {
         $stmt_gele->execute([$user_id]);
         $result_gele = $stmt_gele->fetch();
         $argent_gele = $result_gele['total_gele'] ?? 0;
-        
         $bloc2_val = number_format($argent_gele, 0, ',', ' ') . " <span style='font-size:0.75rem;'>FCFA</span>";
-        $bloc2_lbl = "Fonds en attente";
-        $bloc2_icon = "bi-lock-fill";
-        $bloc2_link = "#solde-section";
-        $bloc2_sub = "Paiements sécurisés";
+    } catch (Exception $e) { $bloc2_val = "0 <span style='font-size:0.75rem;'>FCFA</span>"; }
 
-        // 3. Coiffeurs visités
+    // BLOC 3 : Coiffeurs visités
+    $bloc3_lbl = "Coiffeurs testés";
+    $bloc3_icon = "bi-scissors";
+    $bloc3_link = "/coiffons/index.php";
+    $bloc3_sub = "Prendre un nouveau RDV →";
+    try {
         $stmt_coiff_visite = $pdo->prepare("SELECT COUNT(DISTINCT coiffeur_id) FROM rendez_vous WHERE client_id = ? AND statut_rdv = 'termine'");
         $stmt_coiff_visite->execute([$user_id]);
         $bloc3_val = intval($stmt_coiff_visite->fetchColumn());
-        $bloc3_lbl = "Coiffeurs testés";
-        $bloc3_icon = "bi-scissors";
-        $bloc3_link = "/coiffons/index.php";
-        $bloc3_sub = "Prendre un nouveau RDV →";
+    } catch (Exception $e) { $bloc3_val = 0; }
 
-        // 4. Statut d'activité du compte client
-        $bloc4_val = "<span class='text-success' style='font-size:0.85rem; font-weight:700;'><i class='bi bi-circle-fill me-1' style='font-size:7px;'></i> ACTIF</span>";
-        $bloc4_lbl = "Statut du compte";
-        $bloc4_icon = "bi-shield-check";
-        $bloc4_link = "#";
-        $bloc4_sub = "Profil vérifié";
+    // BLOC 4 : Statut
+    $bloc4_val = "<span class='text-success' style='font-size:0.85rem; font-weight:700;'><i class='bi bi-circle-fill me-1' style='font-size:7px;'></i> ACTIF</span>";
+    $bloc4_lbl = "Statut du compte";
+    $bloc4_icon = "bi-shield-check";
+    $bloc4_link = "#";
+    $bloc4_sub = "Profil vérifié";
 
-        // 📊 GRAPH 1 (CLIENT) : Statuts de ses propres rendez-vous
+    // 📊 GRAPH 1 (CLIENT)
+    try {
         $stmt_chart_rdv_cl = $pdo->prepare("SELECT statut_rdv, COUNT(*) as total FROM rendez_vous WHERE client_id = ? GROUP BY statut_rdv");
         $stmt_chart_rdv_cl->execute([$user_id]);
         while ($row = $stmt_chart_rdv_cl->fetch()) {
@@ -194,8 +214,10 @@ try {
                 $stats_rdv[$row['statut_rdv']] = intval($row['total']);
             }
         }
+    } catch (Exception $e) {}
 
-        // 📊 GRAPH 2 (CLIENT) : Analyse temporelle (Fréquence de coiffure par mois sur l'année en cours)
+    // 📊 GRAPH 2 (CLIENT)
+    try {
         $stmt_chart_mois = $pdo->prepare("
             SELECT MONTH(date_creation) as mois, COUNT(*) as total 
             FROM rendez_vous 
@@ -206,11 +228,7 @@ try {
         while ($row = $stmt_chart_mois->fetch()) {
             $stats_mensuelles[intval($row['mois'])] = intval($row['total']);
         }
-    }
-} catch (Exception $e) {
-    // Mode dégradation sans erreur fatale si la BDD a un problème passager
-    $bloc1_val = 0; $bloc1_lbl = "Indisponible"; $bloc1_icon = "bi-exclamation-triangle";
-    $bloc2_val = "0 FCFA"; $bloc2_lbl = "Calcul impossible"; $bloc2_icon = "bi-exclamation-triangle";
+    } catch (Exception $e) {}
 }
 
 $lien_rendezvous = ($user['role'] === 'client') ? "/coiffons/client/mes_rendezvous.php" : "/coiffons/coiffeurs/agenda_coiffeurs.php";
@@ -558,12 +576,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                             <?php if(!empty($commentaires)): ?>
                                 <?php foreach($commentaires as $com): ?>
                                     <tr style="border-bottom: 1px solid #111;">
-                                        <td class="ps-3 py-3 fw-bold text-white"><?php echo htmlspecialchars($com['prenom']) . ' ' . htmlspecialchars($com['nom']); ?></td>
+                                        <td class="ps-3 py-3 fw-bold text-white"><?php echo htmlspecialchars($com['prenom'] ?? '') . ' ' . htmlspecialchars($com['nom'] ?? ''); ?></td>
                                         <td class="text-warning">
-                                            <?php for($i=1; $i<=5; $i++) echo $i <= $com['note'] ? '★' : '☆'; ?>
+                                            <?php for($i=1; $i<=5; $i++) echo $i <= ($com['note'] ?? 0) ? '★' : '☆'; ?>
                                         </td>
-                                        <td class="text-muted italic">"<?php echo htmlspecialchars($com['commentaire']); ?>"</td>
-                                        <td class="pe-3 py-3 text-end text-muted font-monospace" style="font-size:0.75rem;"><?php echo htmlspecialchars($com['date_creation']); ?></td>
+                                        <td class="text-muted italic">"<?php echo htmlspecialchars($com['commentaire'] ?? ''); ?>"</td>
+                                        <td class="pe-3 py-3 text-end text-muted font-monospace" style="font-size:0.75rem;"><?php echo htmlspecialchars($com['date_creation'] ?? ''); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
@@ -596,7 +614,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
 <?php endif; ?>
 
 <script>
-    // 1. Graphe en Anneau (Partagé : Statuts de rendez-vous Coiffeur ET Client)
     const ctxRdv = document.getElementById('chartRdv').getContext('2d');
     new Chart(ctxRdv, {
         type: 'doughnut',
@@ -620,18 +637,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
         }
     });
 
-    // 2. Traitement Conditionnel du Deuxième Graphique pour Éviter les Erreurs JavaScript
     const ctxDyna = document.getElementById('chartDynamiqueRole').getContext('2d');
     
     <?php if ($user['role'] === 'coiffeur'): ?>
-        // Configuration Coiffeur : Barres verticales des quartiers par ville
         new Chart(ctxDyna, {
             type: 'bar',
             data: {
-                labels: [<?php echo '"' . implode('","', array_column($stats_villes, 'nom_ville')) . '"'; ?>],
+                labels: [<?php echo !empty($stats_villes) ? '"' . implode('","', array_column($stats_villes, 'nom_ville')) . '"' : '"Aucune donnée"'; ?>],
                 datasets: [{
                     label: 'Quartiers',
-                    data: [<?php echo implode(',', array_column($stats_villes, 'total')); ?>],
+                    data: [<?php echo !empty($stats_villes) ? implode(',', array_column($stats_villes, 'total')) : '0'; ?>],
                     backgroundColor: '#f39c12',
                     borderRadius: 4
                 }]
@@ -647,7 +662,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
             }
         });
     <?php else: ?>
-        // Configuration Client : Courbe de fréquence mensuelle d'achats / coiffures sur l'année
         new Chart(ctxDyna, {
             type: 'line',
             data: {
@@ -677,7 +691,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
 </script>
 
 <style>
-    /* Structure Métallique Sombre */
     .custom-profile-card { background-color: #0f0f0f !important; border: 1px solid rgba(255, 255, 255, 0.04) !important; border-radius: 14px !important; }
     .border-gold-premium { border: 2px solid #f39c12 !important; padding: 3px; background: linear-gradient(to bottom, #f39c12, #d35400); }
     .border-luxury-gold { border: 1px dashed rgba(243, 156, 18, 0.25) !important; }
