@@ -39,13 +39,37 @@ $bloc4_val = ""; $bloc4_lbl = ""; $bloc4_icon = ""; $bloc4_link = ""; $bloc4_sub
 
 $argent_gele = 0;
 
-// Initialisation des variables de graphiques (Coiffeur)
+// Initialisation des variables partagées (Graphiques & Avis)
 $stats_rdv = ['en_attente' => 0, 'accepte' => 0, 'termine' => 0, 'annule' => 0];
-$stats_villes = [];
+$stats_villes = []; // Utilisé par le coiffeur (Quartiers par Ville)
+$stats_mensuelles = array_fill(1, 12, 0); // Utilisé par le client (Fréquence par mois)
+$commentaires = [];
+$note_moyenne = 0;
+$total_avis = 0;
 
 try {
     if ($user['role'] === 'coiffeur') {
-        // 1. Rendez-vous en attente
+        
+        // REQUÊTES DES AVIS (COIFFEUR) : Sécurisées et limitées aux 10 derniers
+        $stmt_com = $pdo->prepare("
+            SELECT r.date_creation, r.commentaire, r.note, u.nom, u.prenom 
+            FROM rendez_vous r
+            JOIN users u ON r.client_id = u.id
+            WHERE r.coiffeur_id = ? AND r.commentaire IS NOT NULL
+            ORDER BY r.date_creation DESC
+            LIMIT 10
+        ");
+        $stmt_com->execute([$user_id]);
+        $commentaires = $stmt_com->fetchAll(PDO::FETCH_ASSOC);
+
+        // Calcul de la note moyenne du coiffeur
+        $stmt_note = $pdo->prepare("SELECT AVG(note) as moyenne, COUNT(*) as total FROM rendez_vous WHERE coiffeur_id = ? AND note IS NOT NULL");
+        $stmt_note->execute([$user_id]);
+        $note_data = $stmt_note->fetch();
+        $note_moyenne = $note_data['moyenne'] ?? 0;
+        $total_avis = $note_data['total'] ?? 0;
+
+        // 1. Demandes en attente
         $stmt_rdv = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE coiffeur_id = ? AND statut_rdv = 'en_attente'");
         $stmt_rdv->execute([$user_id]);
         $bloc1_val = intval($stmt_rdv->fetchColumn());
@@ -54,7 +78,7 @@ try {
         $bloc1_link = "/coiffons/coiffeurs/valider_rendezvous.php";
         $bloc1_sub = "Voir les demandes →";
 
-        // 2. Flux financier : Gains bloqués en cours
+        // 2. Gains sécurisés (en attente ou acceptés)
         $stmt_gains_encours = $pdo->prepare("
             SELECT SUM(p.prix) FROM rendez_vous r 
             JOIN prestations p ON r.coiffure_id = p.id_prestation 
@@ -77,7 +101,7 @@ try {
         $bloc3_link = "/coiffons/coiffeurs/mes_zones.php";
         $bloc3_sub = "Modifier mes zones →";
 
-        // 4. Nombre de clients uniques
+        // 4. Clients uniques
         $stmt_clients = $pdo->prepare("SELECT COUNT(DISTINCT client_id) FROM rendez_vous WHERE coiffeur_id = ?");
         $stmt_clients->execute([$user_id]);
         $bloc4_val = intval($stmt_clients->fetchColumn());
@@ -86,17 +110,16 @@ try {
         $bloc4_link = "#";
         $bloc4_sub = "Total clients uniques";
 
-        // 📊 DONNÉES GRAPHIQUE 1 : Répartition de TOUS les RDV par statut
+        // 📊 GRAPH 1 (COIFFEUR) : Statuts globaux
         $stmt_chart_rdv = $pdo->prepare("SELECT statut_rdv, COUNT(*) as total FROM rendez_vous WHERE coiffeur_id = ? GROUP BY statut_rdv");
         $stmt_chart_rdv->execute([$user_id]);
-        $while_row = true;
         while ($row = $stmt_chart_rdv->fetch()) {
             if (array_key_exists($row['statut_rdv'], $stats_rdv)) {
                 $stats_rdv[$row['statut_rdv']] = intval($row['total']);
             }
         }
 
-        // 📊 DONNÉES GRAPHIQUE 2 : Nombre de zones couvertes par Ville d'appartenance
+        // 📊 GRAPH 2 (COIFFEUR) : Répartition par ville
         $stmt_chart_zones = $pdo->prepare("
             SELECT v.nom_ville, COUNT(zc.id_quartier) as total 
             FROM zones_coiffeur zc
@@ -109,7 +132,19 @@ try {
         $stats_villes = $stmt_chart_zones->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     } else {
-        // CONFIGURATION CLIENT
+        // REQUÊTES DES AVIS LAISSÉS (CLIENT) : Sécurisées et limitées aux 10 derniers
+        $stmt_com = $pdo->prepare("
+            SELECT r.date_creation, r.commentaire, r.note, u.nom, u.prenom 
+            FROM rendez_vous r
+            JOIN users u ON r.coiffeur_id = u.id
+            WHERE r.client_id = ? AND r.commentaire IS NOT NULL
+            ORDER BY r.date_creation DESC
+            LIMIT 10
+        ");
+        $stmt_com->execute([$user_id]);
+        $commentaires = $stmt_com->fetchAll(PDO::FETCH_ASSOC);
+
+        // 1. Rendez-vous prévus
         $stmt_rdv_cl = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE client_id = ? AND statut_rdv IN ('en_attente', 'accepte')");
         $stmt_rdv_cl->execute([$user_id]);
         $bloc1_val = intval($stmt_rdv_cl->fetchColumn());
@@ -118,6 +153,7 @@ try {
         $bloc1_link = "/coiffons/client/mes_rendezvous.php";
         $bloc1_sub = "Consulter mon agenda →";
 
+        // 2. Fonds en attente
         $stmt_gele = $pdo->prepare("
             SELECT SUM(p.prix) as total_gele 
             FROM rendez_vous r
@@ -134,6 +170,7 @@ try {
         $bloc2_link = "#solde-section";
         $bloc2_sub = "Paiements sécurisés";
 
+        // 3. Coiffeurs visités
         $stmt_coiff_visite = $pdo->prepare("SELECT COUNT(DISTINCT coiffeur_id) FROM rendez_vous WHERE client_id = ? AND statut_rdv = 'termine'");
         $stmt_coiff_visite->execute([$user_id]);
         $bloc3_val = intval($stmt_coiff_visite->fetchColumn());
@@ -142,16 +179,38 @@ try {
         $bloc3_link = "/coiffons/index.php";
         $bloc3_sub = "Prendre un nouveau RDV →";
 
+        // 4. Statut d'activité du compte client
         $bloc4_val = "<span class='text-success' style='font-size:0.85rem; font-weight:700;'><i class='bi bi-circle-fill me-1' style='font-size:7px;'></i> ACTIF</span>";
         $bloc4_lbl = "Statut du compte";
         $bloc4_icon = "bi-shield-check";
         $bloc4_link = "#";
         $bloc4_sub = "Profil vérifié";
+
+        // 📊 GRAPH 1 (CLIENT) : Statuts de ses propres rendez-vous
+        $stmt_chart_rdv_cl = $pdo->prepare("SELECT statut_rdv, COUNT(*) as total FROM rendez_vous WHERE client_id = ? GROUP BY statut_rdv");
+        $stmt_chart_rdv_cl->execute([$user_id]);
+        while ($row = $stmt_chart_rdv_cl->fetch()) {
+            if (array_key_exists($row['statut_rdv'], $stats_rdv)) {
+                $stats_rdv[$row['statut_rdv']] = intval($row['total']);
+            }
+        }
+
+        // 📊 GRAPH 2 (CLIENT) : Analyse temporelle (Fréquence de coiffure par mois sur l'année en cours)
+        $stmt_chart_mois = $pdo->prepare("
+            SELECT MONTH(date_creation) as mois, COUNT(*) as total 
+            FROM rendez_vous 
+            WHERE client_id = ? AND YEAR(date_creation) = YEAR(CURDATE()) 
+            GROUP BY MONTH(date_creation)
+        ");
+        $stmt_chart_mois->execute([$user_id]);
+        while ($row = $stmt_chart_mois->fetch()) {
+            $stats_mensuelles[intval($row['mois'])] = intval($row['total']);
+        }
     }
 } catch (Exception $e) {
-    $argent_gele = 7000; 
-    $bloc1_val = 1; $bloc1_lbl = "Aperçu"; $bloc1_icon = "bi-exclamation-triangle";
-    $bloc2_val = "7 000 FCFA"; $bloc2_lbl = "Fonds sécurisés"; $bloc2_icon = "bi-lock";
+    // Mode dégradation sans erreur fatale si la BDD a un problème passager
+    $bloc1_val = 0; $bloc1_lbl = "Indisponible"; $bloc1_icon = "bi-exclamation-triangle";
+    $bloc2_val = "0 FCFA"; $bloc2_lbl = "Calcul impossible"; $bloc2_icon = "bi-exclamation-triangle";
 }
 
 $lien_rendezvous = ($user['role'] === 'client') ? "/coiffons/client/mes_rendezvous.php" : "/coiffons/coiffeurs/agenda_coiffeurs.php";
@@ -210,12 +269,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                         </span>
                     </div>
 
+                    <?php if ($user['role'] === 'coiffeur'): ?>
+                        <div class="metric-box highlight-metric p-3 mb-4 text-center">
+                            <span class="text-secondary small text-uppercase fw-bold d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">Réputation globale</span>
+                            <div class="d-flex align-items-center justify-content-center">
+                                <span class="h3 fw-bold text-warning mb-0 me-2"><?php echo number_format($note_moyenne, 1); ?></span>
+                                <div class="text-start">
+                                    <div class="text-warning small" style="line-height: 1;">
+                                        <?php for($i=1; $i<=5; $i++) echo $i <= round($note_moyenne) ? '★' : '☆'; ?>
+                                    </div>
+                                    <span class="text-muted extra-small" style="font-size: 0.65rem; font-weight: 600;"><?php echo $total_avis; ?> avis</span>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
                     <hr style="border-color: rgba(255,255,255,0.06);" class="my-3">
 
                     <div class="d-grid gap-2 mt-2">
                         <a href="modifier_profil.php" class="btn btn-gold-action fw-bold py-2">
                             <i class="bi bi-pencil-square me-2"></i> MODIFIER MON PROFIL
                         </a>
+                        
+                        <button type="button" class="btn btn-outline-luxury fw-bold py-2" data-bs-toggle="modal" data-bs-target="#commentsModal">
+                            <span class="pulse-dot"></span> 
+                            <?php echo $user['role'] === 'coiffeur' ? 'HISTORIQUE DES AVIS RECUS' : 'MES DERNIERS AVIS LAISSÉS'; ?>
+                        </button>
+
                         <a href="<?php echo $lien_rendezvous; ?>" class="btn btn-outline-luxury fw-bold py-2">
                             <i class="bi bi-calendar3 me-2"></i> MES RENDEZ-VOUS
                         </a>
@@ -277,27 +357,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                         </div>
                     </div>
 
-                    <?php if ($user['role'] === 'coiffeur'): ?>
-                        <h5 class="text-warning fw-bold mb-3 small" style="letter-spacing: 1px;"><i class="bi bi-bar-chart-line-fill me-2"></i> ANALYSE ET COUVERTURE VISUELLE</h5>
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-6">
-                                <div class="p-3 bg-black rounded border border-secondary text-center">
-                                    <span class="text-secondary d-block mb-2" style="font-size: 11px; font-weight:600;">SITUATION DES RENDEZ-VOUS</span>
-                                    <div style="max-height: 160px; display: flex; justify-content: center;">
-                                        <canvas id="chartRdv"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="p-3 bg-black rounded border border-secondary text-center">
-                                    <span class="text-secondary d-block mb-2" style="font-size: 11px; font-weight:600;">QUARTIERS COUVERTS PAR VILLE</span>
-                                    <div style="max-height: 160px; display: flex; justify-content: center;">
-                                        <canvas id="chartZones"></canvas>
-                                    </div>
+                    <h5 class="text-warning fw-bold mb-3 small" style="letter-spacing: 1px;"><i class="bi bi-bar-chart-line-fill me-2"></i> ANALYSE ET COUVERTURE VISUELLE</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="p-3 bg-black rounded border border-secondary text-center">
+                                <span class="text-secondary d-block mb-2" style="font-size: 11px; font-weight:600;">
+                                    <?php echo $user['role'] === 'coiffeur' ? 'SITUATION DES DEMANDES' : 'STATUTS DE MES RÉSERVATIONS'; ?>
+                                </span>
+                                <div style="max-height: 160px; display: flex; justify-content: center;">
+                                    <canvas id="chartRdv"></canvas>
                                 </div>
                             </div>
                         </div>
-                    <?php endif; ?>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-black rounded border border-secondary text-center">
+                                <span class="text-secondary d-block mb-2" style="font-size: 11px; font-weight:600;">
+                                    <?php echo $user['role'] === 'coiffeur' ? 'QUARTIERS COUVERTS PAR VILLE' : 'FRÉQUENCE DE MES SÉANCES (2026)'; ?>
+                                </span>
+                                <div style="max-height: 160px; display: flex; justify-content: center;">
+                                    <canvas id="chartDynamiqueRole"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <h5 id="solde-section" class="text-warning fw-bold mb-3 small" style="letter-spacing: 1px;"><i class="bi bi-wallet2 me-2"></i> MON PORTEFEUILLE NUMÉRIQUE</h5>
                     <div class="p-3 mb-4 rounded border-luxury-gold" style="background: rgba(255,255,255,0.01);">
@@ -312,9 +394,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                             </div>
                             <div class="col-md-5 text-md-end">
                                 <?php if ($user['role'] === 'client'): ?>
-                                    <a href="/coiffons/client/mon_portefeuille.php" class="btn btn-gold-action btn-sm px-3 fw-bold w-100 py-2">
-                                        <i class="bi bi-gear-fill me-1"></i> GÉRER MON PORTEFEUILLE
-                                    </a>
+                                    <button type="button" class="btn btn-gold-action btn-sm px-3 fw-bold w-100 py-2" data-bs-toggle="modal" data-bs-target="#modalRechargeClient">
+                                        <i class="bi bi-cash-coin me-1"></i> RECHARGER MON COMPTE
+                                    </button>
                                 <?php else: ?>
                                     <a href="/coiffons/coiffeurs/portefeuille.php" class="btn btn-outline-luxury btn-sm px-3 fw-bold w-100 py-2">
                                         <i class="bi bi-graph-up-arrow me-1"></i> SUIVRE MES GAINS
@@ -368,7 +450,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
                             </div>
                             <div class="col-md-6">
                                 <div class="bg-black p-3 rounded border border-secondary h-100">
-                                    <span class="text-secondary small d-block mb-2 text-uppercase" style="font-size: 0.6rem;">Diplôme ou Attestation :</span>
+                                    <span class="text-secondary small d-block mb-2" style="font-size: 0.6rem;">Diplôme ou Attestation :</span>
                                     <?php if (!empty($user['diplome'])): ?>
                                         <?php if (pathinfo($user['diplome'], PATHINFO_EXTENSION) === 'pdf'): ?>
                                             <a href="<?php echo htmlspecialchars($user['diplome']); ?>" target="_blank" class="btn btn-sm btn-outline-warning w-100 py-2" style="font-size:0.65rem;">
@@ -420,9 +502,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
     </div>
 </section>
 
-<?php if ($user['role'] === 'coiffeur'): ?>
+<div class="modal fade" id="modalRechargeClient" tabindex="-1" aria-labelledby="rechargeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-black border border-warning" style="border-radius: 15px;">
+            <div class="modal-header border-bottom border-secondary">
+                <h5 class="modal-title text-warning fw-bold shadow-sm" id="rechargeModalLabel" style="font-size: 0.95rem; letter-spacing: 0.5px;">
+                    <i class="bi bi-wallet2 me-2"></i>RECHARGER MON COMPTE
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/coiffons/client/traiter_recharge.php" method="POST">
+                <div class="modal-body p-4">
+                    <p class="text-secondary small mb-3" style="font-size: 0.75rem; line-height: 1.4;">Créditez votre compte instantanément pour payer vos prochaines coiffures en un clic.</p>
+                    <div class="mb-4">
+                        <label for="montant_recharge" class="form-label text-warning small fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 0.3px;">MONTANT À RECHARGER (FCFA)</label>
+                        <div class="input-group">
+                            <input type="number" name="montant" id="montant_recharge" class="form-control bg-dark text-white border-secondary small" placeholder="Ex: 5000" min="500" required style="font-size: 0.85rem;">
+                            <span class="input-group-text bg-secondary text-white border-secondary small" style="font-size: 0.8rem; font-weight: 600;">FCFA</span>
+                        </div>
+                    </div>
+                    <div class="p-2 rounded bg-dark border border-secondary text-muted" style="font-size: 0.65rem;">
+                        <i class="bi bi-shield-check text-success me-1"></i> Paiement 100% sécurisé via Mobile Money et carte bancaire.
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary">
+                    <button type="button" class="btn btn-outline-secondary btn-sm small px-3" data-bs-dismiss="modal" style="font-size: 0.7rem; font-weight: 600;">Annuler</button>
+                    <button type="submit" class="btn btn-warning btn-sm fw-bold text-dark px-3" style="font-size: 0.7rem;">Passer au paiement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="commentsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-dark text-white border border-secondary" style="border-radius:12px;">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-warning h6 fw-bold text-uppercase tracking-wider">
+                    <?php echo $user['role'] === 'coiffeur' ? 'Avis Récents Reçus (Max 10)' : 'Mes Derniers Avis Laissés (Max 10)'; ?>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body bg-black p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-striped align-middle mb-0 small">
+                        <thead>
+                            <tr class="text-muted" style="border-bottom: 2px solid #222;">
+                                <th class="ps-3 py-3"><?php echo $user['role'] === 'coiffeur' ? 'Client' : 'Coiffeur'; ?></th>
+                                <th class="py-3">Note</th>
+                                <th class="py-3">Commentaire</th>
+                                <th class="pe-3 py-3 text-end">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if(!empty($commentaires)): ?>
+                                <?php foreach($commentaires as $com): ?>
+                                    <tr style="border-bottom: 1px solid #111;">
+                                        <td class="ps-3 py-3 fw-bold text-white"><?php echo htmlspecialchars($com['prenom']) . ' ' . htmlspecialchars($com['nom']); ?></td>
+                                        <td class="text-warning">
+                                            <?php for($i=1; $i<=5; $i++) echo $i <= $com['note'] ? '★' : '☆'; ?>
+                                        </td>
+                                        <td class="text-muted italic">"<?php echo htmlspecialchars($com['commentaire']); ?>"</td>
+                                        <td class="pe-3 py-3 text-end text-muted font-monospace" style="font-size:0.75rem;"><?php echo htmlspecialchars($com['date_creation']); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted">Aucun historique d'avis disponible.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php if ($user['role'] === 'coiffeur' && !empty($user['diplome']) && pathinfo($user['diplome'], PATHINFO_EXTENSION) !== 'pdf'): ?>
+<div class="modal fade" id="diplomeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content bg-dark text-white border border-secondary" style="border-radius:12px;">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-warning h6 fw-bold">DOCUMENT DE CERTIFICATION</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center bg-black p-3">
+                <img src="<?php echo htmlspecialchars($user['diplome']); ?>" class="img-fluid rounded border border-dark" alt="Diplôme grand format">
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
-    // 1. Graphe en Anneau (Statuts Rendez-vous)
+    // 1. Graphe en Anneau (Partagé : Statuts de rendez-vous Coiffeur ET Client)
     const ctxRdv = document.getElementById('chartRdv').getContext('2d');
     new Chart(ctxRdv, {
         type: 'doughnut',
@@ -446,47 +620,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
         }
     });
 
-    // 2. Graphe en Barres (Zones d'intervention par Ville)
-    const ctxZones = document.getElementById('chartZones').getContext('2d');
-    new Chart(ctxZones, {
-        type: 'bar',
-        data: {
-            labels: [<?php echo '"' . implode('","', array_column($stats_villes, 'nom_ville')) . '"'; ?>],
-            datasets: [{
-                label: 'Quartiers',
-                data: [<?php echo implode(',', array_column($stats_villes, 'total')); ?>],
-                backgroundColor: '#f39c12',
-                borderRadius: 4
-            }]
-        },
-        options: {
-            scales: {
-                y: { beginAtZero: true, grid: { color: '#222' }, ticks: { color: '#888', font: { size: 9 } } },
-                x: { grid: { display: false }, ticks: { color: '#888', font: { size: 9 } } }
+    // 2. Traitement Conditionnel du Deuxième Graphique pour Éviter les Erreurs JavaScript
+    const ctxDyna = document.getElementById('chartDynamiqueRole').getContext('2d');
+    
+    <?php if ($user['role'] === 'coiffeur'): ?>
+        // Configuration Coiffeur : Barres verticales des quartiers par ville
+        new Chart(ctxDyna, {
+            type: 'bar',
+            data: {
+                labels: [<?php echo '"' . implode('","', array_column($stats_villes, 'nom_ville')) . '"'; ?>],
+                datasets: [{
+                    label: 'Quartiers',
+                    data: [<?php echo implode(',', array_column($stats_villes, 'total')); ?>],
+                    backgroundColor: '#f39c12',
+                    borderRadius: 4
+                }]
             },
-            plugins: { legend: { display: false } },
-            responsive: true,
-            maintainAspectRatio: false
-        }
-    });
+            options: {
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#222' }, ticks: { color: '#888', font: { size: 9 } } },
+                    x: { grid: { display: false }, ticks: { color: '#888', font: { size: 9 } } }
+                },
+                plugins: { legend: { display: false } },
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    <?php else: ?>
+        // Configuration Client : Courbe de fréquence mensuelle d'achats / coiffures sur l'année
+        new Chart(ctxDyna, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
+                datasets: [{
+                    label: 'Séances',
+                    data: [<?php echo implode(',', $stats_mensuelles); ?>],
+                    borderColor: '#f39c12',
+                    backgroundColor: 'rgba(243, 156, 18, 0.05)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true,
+                    pointBackgroundColor: '#f39c12'
+                }]
+            },
+            options: {
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#222' }, ticks: { stepSize: 1, color: '#888', font: { size: 9 } } },
+                    x: { grid: { display: false }, ticks: { color: '#888', font: { size: 9 } } }
+                },
+                plugins: { legend: { display: false } },
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    <?php endif; ?>
 </script>
-<?php endif; ?>
-
-<?php if ($user['role'] === 'coiffeur' && !empty($user['diplome']) && pathinfo($user['diplome'], PATHINFO_EXTENSION) !== 'pdf'): ?>
-<div class="modal fade" id="diplomeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-md">
-        <div class="modal-content bg-dark text-white border border-secondary" style="border-radius:12px;">
-            <div class="modal-header border-secondary">
-                <h5 class="modal-title text-warning h6 fw-bold">DOCUMENT DE CERTIFICATION</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center bg-black p-3">
-                <img src="<?php echo htmlspecialchars($user['diplome']); ?>" class="img-fluid rounded border border-dark" alt="Diplôme grand format">
-            </div>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
 
 <style>
     /* Structure Métallique Sombre */
