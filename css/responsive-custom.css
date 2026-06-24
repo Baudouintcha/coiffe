@@ -1,64 +1,38 @@
 /* Fichier : coiffons/assets/css/responsive-custom.css */
 
 /* --- SYSTÈME DE GRILLE ET COMPACITÉ POUR PETITS ÉCRANS --- */
-.style-badge-mini {
-    padding: 3px 6px;
-    font-size: 0.65rem !important;
-    display: inline-block;
-    border-radius: 4px;
-}
+/* --- RESPONSIVE-CUSTOM.CSS (Uniquement les ajustements) --- */
 
-.style-custom-scrollbar::-webkit-scrollbar {
-    height: 3px;
-    width: 3px;
-}
-.style-custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #333;
-    border-radius: 10px;
-}
-
-.animate-pulse { 
-    animation: pulse 1.5s infinite; 
-}
-@keyframes pulse { 
-    0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } 
-}
-
-/* --- SUPPORT ULTRA-SMARTWATCH & ÉCRANS RONDS (Moins de 320px) --- */
+/* 1. Support Ultra-Smartwatch (< 320px) */
 @media (max-width: 320px) {
     .style-smartwatch-container { 
-        padding-left: 4px !important; 
-        padding-right: 4px !important; 
+        padding-left: 4px; 
+        padding-right: 4px; 
     }
-    .style-table-compact th, .style-table-compact td { 
-        padding: 4px 2px !important; 
-        font-size: 0.7rem !important;
+    
+    .style-table-compact th, 
+    .style-table-compact td { 
+        padding: 4px 2px; 
+        font-size: 0.7rem;
     }
-    .style-max-width-name { 
-        max-width: 45px !important; 
-    }
-    .style-max-width-style { 
-        max-width: 40px !important; 
-    }
+    
+    .style-max-width-name { max-width: 45px; }
+    .style-max-width-style { max-width: 40px; }
+    
     .style-btn-responsive { 
-        width: 100% !important; 
-        display: block !important; 
-        text-align: center; 
-        padding: 2px 4px !important;
-        font-size: 0.6rem !important;
+        width: 100%; 
+        display: block; 
+        padding: 2px 4px;
+        font-size: 0.6rem;
     }
-    .style-flex-smartwatch { 
-        flex-direction: column !important; 
-    }
-    /* Ajustements pour les cartes d'accueil sur montre */
+    
+    .style-flex-smartwatch { flex-direction: column; }
+    
     .smartwatch-menu-btn {
-        padding: 8px !important;
-        font-size: 0.75rem !important;
+        padding: 8px;
+        font-size: 0.75rem;
     }
 }
 
-/* Support additionnel Bootstrap pour très petits layouts */
-@media (max-width: 575.98px) {
-    .d-xs-table-cell { display: table-cell !important; }
-    .flex-xs-row { flex-direction: row !important; }
-}
+/* Note: Pour le reste (ex: flex-xs-row), utilisez les classes 
+   natives Bootstrap comme 'd-flex flex-row' pour éviter le code inutile. *

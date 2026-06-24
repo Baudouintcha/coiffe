@@ -31,9 +31,6 @@ if ($est_connecte) {
     if ($role_utilisateur === 'coiffeur' && isset($_SESSION['alerte_abo_cloche'])) {
         $nb_notifs++;
     }
-    
-    // 💡 ASTUCE EXPERT : Si vous ajoutez une autre notification basée sur les SESSIONS plus bas, 
-    // n'oubliez pas de faire un "$nb_notifs++;" pour que la pastille rouge s'allume !
 }
 
 // Action : Marquer tout comme lu
@@ -105,7 +102,7 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#act">
-                        <i class="bi bi-calendar-event me-2"></i> Mon Activity
+                        <i class="bi bi-calendar-event me-2"></i> Mon Activité
                     </button>
                 </h2>
                 <div id="act" class="accordion-collapse collapse" data-bs-parent="#accordionSidebar">
@@ -147,6 +144,7 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
     <?php elseif ($role_utilisateur == 'client'): ?>
         <a href="/coiffons/filter/annuaire_coiffeurs.php"><i class="bi bi-search-heart me-2"></i> Trouver un coiffeur</a>
         <a href="/coiffons/client/mes_rendezvous.php"><i class="bi bi-calendar-check me-2"></i> Mes RDV</a>
+        <a href="/coiffons/client/catalogue.php"><i class="bi bi-scissors me-2"></i> Catalogue des styles</a>
         <a href="/coiffons/profil.php"><i class="bi bi-person-circle me-2"></i> Mon Profil</a>
     <?php endif; ?>
 
@@ -203,12 +201,7 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
                             </div>
 
                             <?php
-                            // =================================================================
-                            // CENTRALISATION DES NOTIFICATIONS DANS UN TABLEAU UNIQUE
-                            // =================================================================
                             $toutes_les_notifs = [];
-
-                            // 1. Notification Prioritaire : Échéance Abonnement Coiffeur
                             if ($role_utilisateur === 'coiffeur' && isset($_SESSION['alerte_abo_cloche'])) {
                                 $toutes_les_notifs[] = [
                                     'type'   => 'danger',
@@ -219,21 +212,6 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
                                 ];
                             }
 
-                            // 🛠️ ZONE DE RAJOUT : COMMENT AJOUTER UNE NOUVELLE NOTIFICATION ?
-                            // Il vous suffit de copier/coller le modèle ci-dessous et d'adapter vos conditions :
-                            /*
-                            if (VOTRE_CONDITION_ICI) {
-                                $toutes_les_notifs[] = [
-                                    'type'   => 'warning',          // Choix : 'danger', 'warning', 'info' ou 'standard'
-                                    'message'=> "Votre message",    // Le texte qui sera écrit dans la cloche
-                                    'icone'  => 'bi-chat-left-text',// L'icône Bootstrap de votre choix
-                                    'lien'   => '/votre_lien.php',  // Où va le coiffeur quand il clique dessus
-                                    'date'   => 'Maintenant'        // Le petit texte affiché en bas à droite
-                                ];
-                            }
-                            */
-
-                            // 2. Intégration des notifications standards provenant de la Base de Données
                             foreach ($liste_notifs as $n) {
                                 $toutes_les_notifs[] = [
                                     'type'   => ($n['statut_lecture'] == 'non_lu') ? 'info' : 'standard',
@@ -250,10 +228,8 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
                             <?php else: ?>
                                 <?php foreach ($toutes_les_notifs as $notif): ?>
                                     <?php 
-                                    // Gestion des designs selon le niveau d'importance ('type')
                                     $bg_style = '';
                                     $text_class = 'text-light';
-                                    
                                     if ($notif['type'] === 'danger') {
                                         $bg_style = 'background-color: #1a0505; border: 1px solid #4a1414;';
                                         $text_class = 'text-danger fw-bold';
@@ -303,4 +279,5 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
     function closeNav() { document.getElementById("mySidebar").style.width = "0"; document.getElementById("mainOverlay").style.display = "none"; }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<main>
+</body>
+</html>

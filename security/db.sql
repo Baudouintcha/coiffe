@@ -1,358 +1,659 @@
--- Désactivation des vérifications pour une installation propre
-SET FOREIGN_KEY_CHECKS = 0;
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Hôte : 127.0.0.1
+-- Généré le : mer. 24 juin 2026 à 13:18
+-- Version du serveur : 10.4.32-MariaDB
+-- Version de PHP : 8.2.12
 
--- 1. UTILISATEURS (Clients, Coiffeurs, Admins)
-CREATE TABLE IF NOT EXISTS users (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    nom VARCHAR(100),
-    prenom VARCHAR(100),
-    email VARCHAR(150) UNIQUE,
-    password VARCHAR(255),
-    telephone VARCHAR(20),
-    role ENUM('client', 'coiffeur', 'admin') DEFAULT 'client',
-    ville VARCHAR(100),
-    quartier VARCHAR(100),
-    gps_lat DECIMAL(10, 8), -- Pour la Map
-    gps_lng DECIMAL(11, 8), -- Pour la Map
-    bio TEXT,
-    abonnement_status ENUM('actif', 'inactif') DEFAULT 'inactif',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
 
--- 2. CATALOGUE (Les coiffures de chaque coiffeur)
-CREATE TABLE IF NOT EXISTS catalogue (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    coiffeur_id INT UNSIGNED,
-    nom_coiffure VARCHAR(100),
-    description TEXT,
-    prix INT,
-    temps_estime INT,
-    image_url VARCHAR(255),
-    note_moyenne DECIMAL(3, 2) DEFAULT 0.00,
-    FOREIGN KEY (coiffeur_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+--
+-- Base de données : `cft`
+--
 
--- 3. DISPONIBILITÉS (Heures de travail des coiffeurs)
-CREATE TABLE IF NOT EXISTS disponibilites (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    coiffeur_id INT UNSIGNED,
-    jour_semaine ENUM('Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'),
-    heure_debut TIME,
-    heure_fin TIME,
-    FOREIGN KEY (coiffeur_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+-- --------------------------------------------------------
 
--- 4. RENDEZ-VOUS (Avec Mobile Money & Localisation)
-CREATE TABLE IF NOT EXISTS rendez_vous (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    client_id INT UNSIGNED,
-    coiffeur_id INT UNSIGNED,
-    coiffure_id INT UNSIGNED,
-    date_rdv DATE,
-    heure_rdv TIME,
-    statut_paiement ENUM('en_attente', 'paye', 'echoue') DEFAULT 'en_attente',
-    transaction_id VARCHAR(100),
-    statut_rdv ENUM('confirme', 'annule', 'termine') DEFAULT 'confirme',
-    adresse_prestation TEXT, -- Adresse saisie ou détectée par GPS
-    FOREIGN KEY (client_id) REFERENCES users(id),
-    FOREIGN KEY (coiffeur_id) REFERENCES users(id),
-    FOREIGN KEY (coiffure_id) REFERENCES catalogue(id)
-) ENGINE=InnoDB;
+--
+-- Structure de la table `abonnements_paiements`
+--
 
--- 5. BOUTIQUE (Peignes, serviettes, etc.)
-CREATE TABLE IF NOT EXISTS boutique (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    nom_produit VARCHAR(100),
-    prix INT,
-    stock INT,
-    image_url VARCHAR(255)
-) ENGINE=InnoDB;
+CREATE TABLE `abonnements_paiements` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `coiffeur_id` int(10) UNSIGNED DEFAULT NULL,
+  `date_paiement` timestamp NOT NULL DEFAULT current_timestamp(),
+  `montant` int(11) DEFAULT NULL,
+  `expire_le` date DEFAULT NULL,
+  `statut` enum('valide','expire') DEFAULT 'valide'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- 6. AVIS (Notation sur 10)
-CREATE TABLE IF NOT EXISTS avis (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    rdv_id INT UNSIGNED,
-    client_id INT UNSIGNED,
-    note TINYINT UNSIGNED,
-    commentaire TEXT,
-    FOREIGN KEY (rdv_id) REFERENCES rendez_vous(id) ON DELETE CASCADE,
-    FOREIGN KEY (client_id) REFERENCES users(id)
-) ENGINE=InnoDB;
+-- --------------------------------------------------------
 
--- 7. ABONNEMENTS COIFFEURS (Nouveau : pour ton business model)
-CREATE TABLE IF NOT EXISTS abonnements_paiements (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    coiffeur_id INT UNSIGNED,
-    date_paiement TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    montant INT,
-    expire_le DATE,
-    statut ENUM('valide', 'expire') DEFAULT 'valide',
-    FOREIGN KEY (coiffeur_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+--
+-- Structure de la table `avis`
+--
 
--- 8. LOGS IA (Nouveau : pour que l'IA se souvienne de la discussion)
-CREATE TABLE IF NOT EXISTS ia_sessions (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NULL, -- NULL si visiteur non connecté
-    session_id VARCHAR(255), -- Pour identifier le visiteur anonyme
-    dernier_message TEXT,
-    contexte_json TEXT, -- Stocke les préférences (style choisi, ville...)
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+CREATE TABLE `avis` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `rdv_id` int(10) UNSIGNED DEFAULT NULL,
+  `client_id` int(10) UNSIGNED DEFAULT NULL,
+  `note` tinyint(3) UNSIGNED DEFAULT NULL,
+  `commentaire` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-SET FOREIGN_KEY_CHECKS = 1;
+-- --------------------------------------------------------
 
--- Ajout des colonnes pour la gestion des teintes et colorations
-ALTER TABLE catalogue 
-ADD COLUMN prix_teinte_supp INT DEFAULT 0 AFTER prix,
-ADD COLUMN temps_teinte_supp INT DEFAULT 0 AFTER temps_estime;
+--
+-- Structure de la table `boutique`
+--
 
+CREATE TABLE `boutique` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `nom_produit` varchar(100) DEFAULT NULL,
+  `prix` int(11) DEFAULT NULL,
+  `stock` int(11) DEFAULT NULL,
+  `image_url` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Table des villes du Bénin (répertoire de base)
-CREATE TABLE villes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nom_ville VARCHAR(100) NOT NULL UNIQUE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- --------------------------------------------------------
 
--- Insertion des principales villes du Bénin
-INSERT INTO villes (nom_ville) VALUES 
-('Cotonou'), ('Abomey-Calavi'), ('Porto-Novo'), ('Parakou'), 
-('Djougou'), ('Bohicon'), ('Abomey'), ('Natitingou'), 
-('Kandi'), ('Lokossa'), ('Ouidah'), ('Allada');
+--
+-- Structure de la table `catalogue`
+--
 
+CREATE TABLE `catalogue` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `coiffeur_id` int(10) UNSIGNED DEFAULT NULL,
+  `nom_coiffure` varchar(100) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `prix` int(11) DEFAULT NULL,
+  `prix_teinte_supp` int(11) DEFAULT 0,
+  `temps_estime` int(11) DEFAULT NULL,
+  `temps_teinte_supp` int(11) DEFAULT 0,
+  `image_url` varchar(255) DEFAULT NULL,
+  `note_moyenne` decimal(3,2) DEFAULT 0.00
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE prestations (
-    id_prestation INT AUTO_INCREMENT PRIMARY KEY,
-    id_coiffeur INT NOT NULL,
-    nom_style VARCHAR(100) NOT NULL,
-    prix DECIMAL(10, 2) NOT NULL,
-    photo_style VARCHAR(255),
-    description TEXT,
-    FOREIGN KEY (id_coiffeur) REFERENCES utilisateurs(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- --------------------------------------------------------
 
+--
+-- Structure de la table `commentaires`
+--
 
-CREATE TABLE IF NOT EXISTS coiffeur_disponibilites (
-    id_dispo INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    id_coiffeur INT UNSIGNED NOT NULL,
-    jour_semaine VARCHAR(20) NOT NULL,
-    heure_debut TIME NOT NULL,
-    heure_fin TIME NOT NULL,
-    FOREIGN KEY (id_coiffeur) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE `commentaires` (
+  `id_commentaire` int(11) NOT NULL,
+  `id_rdv` int(10) UNSIGNED DEFAULT NULL,
+  `id_client` int(11) NOT NULL,
+  `id_coiffeur` int(11) DEFAULT NULL,
+  `message` text NOT NULL,
+  `note` int(11) DEFAULT 5,
+  `type_commentaire` enum('public','plainte') NOT NULL DEFAULT 'public',
+  `statut_admin` enum('en_attente','traite') NOT NULL DEFAULT 'en_attente',
+  `statut_moderation` enum('en_attente','approuve','rejete') NOT NULL DEFAULT 'en_attente',
+  `date_creation` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS rendezvous (
-    id_rdv INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    id_client INT UNSIGNED NOT NULL,
-    id_coiffeur INT UNSIGNED NOT NULL,
-    id_prestation INT UNSIGNED NOT NULL,
-    date_rdv DATE NOT NULL,
-    heure_rdv TIME NOT NULL,
-    lieu VARCHAR(255) NOT NULL,
-    statut VARCHAR(50) DEFAULT 'en_attente',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_coiffeur) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+--
+-- Structure de la table `disponibilites`
+--
 
-CREATE TABLE IF NOT EXISTS transactions_site (
-    id_transaction INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    id_coiffeur INT UNSIGNED NOT NULL,
-    montant_commission DECIMAL(10, 2) NOT NULL,
-    montant_abonnement DECIMAL(10, 2) NOT NULL,
-    type_transaction VARCHAR(50) DEFAULT 'commission_et_abonnement',
-    date_transaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_coiffeur) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE `disponibilites` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `coiffeur_id` int(10) UNSIGNED DEFAULT NULL,
+  `jour_semaine` enum('Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche') DEFAULT NULL,
+  `heure_debut` time DEFAULT NULL,
+  `heure_fin` time DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
+--
+-- Structure de la table `ia_sessions`
+--
 
-///// clé api google gemini AIzaSyDMsHNIu_0QGlT7i7t1L4_zJb9qCMnNkLg
+CREATE TABLE `ia_sessions` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED DEFAULT NULL,
+  `session_id` varchar(255) DEFAULT NULL,
+  `dernier_message` text DEFAULT NULL,
+  `contexte_json` text DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
+--
+-- Structure de la table `notifications`
+--
 
-
--- =========================================================================
--- 5. AJOUT DE LA CLÉ ÉTRANGÈRE SUR LA TABLE USERS
--- =========================================================================
--- Cela force l'application à n'accepter que des quartiers qui existent vraiment dans notre liste
-ALTER TABLE `users` ADD CONSTRAINT `fk_users_quartier` 
-FOREIGN KEY (`id_quartier`) REFERENCES `quartiers`(`id`) ON DELETE SET NULL;
-
-ALTER TABLE rendez_vous CHANGE heure_rdv heure_debut TIME NOT NULL;
-ALTER TABLE rendez_vous ADD heure_fin TIME NOT NULL AFTER heure_debut;
-
--- Vider proprement les tables pour éviter les conflits avant l'insertion complète
-SET FOREIGN_KEY_CHECKS = 0;
-TRUNCATE TABLE quartiers;
-TRUNCATE TABLE villes;
-SET FOREIGN_KEY_CHECKS = 1;
-
--- ==========================================================
--- 1. INSERTION DE TOUTES LES VILLES (COMMUNES) DU BÉNIN
--- ==========================================================
-INSERT INTO villes (nom_ville) VALUES 
--- Atlantique & Littoral
-('Cotonou'), ('Abomey-Calavi'), ('Allada'), ('Ouidah'), ('Kpomasse'), ('Toffo'), ('Tori-Bossito'), ('Zè'), ('Sô-Ava'),
--- Ouémé & Plateau
-('Porto-Novo'), ('Adjarra'), ('Ajohoun'), ('Avrankou'), ('Bonou'), ('Dangbo'), ('Sèmè-Podji'), ('Akpro-Missérété'), ('Pobè'), ('Adja-Ouère'), ('Ifangni'), ('Kétou'), ('Sakété'),
--- Zou & Collines
-('Abomey'), ('Bohicon'), ('Dassa-Zoumé'), ('Glazoué'), ('Savè'), ('Savalou'), ('Bantè'), ('Ouèssè'), ('Agbangnizoun'), ('Djidja'), ('Covè'), ('Zagnanado'), ('Za-Kpota'), ('Zogbodomey'), ('Ouinhi'),
--- Mono & Couffo
-('Lokossa'), ('Athiémé'), ('Bopa'), ('Comè'), ('Grand-Popo'), ('Houéyogbé'), ('Aplahoué'), ('Djakotomey'), ('Dogbo'), ('Klouékanmè'), ('Lalo'), ('Toviklin'),
--- Borgou & Alibori
-('Parakou'), ('Bembéréké'), ('N''Dali'), ('Nikki'), ('Pèrèrè'), ('Sinendé'), ('Tchaourou'), ('Kandi'), ('Banikoara'), ('Gogounou'), ('Karimama'), ('Malanville'), ('Segbana'),
--- Atacora & Donga
-('Natitingou'), ('Boukoumbé'), ('Cobly'), ('Kérou'), ('Kouandé'), ('Matéri'), ('Pehunco'), ('Tanguiéta'), ('Toucountouna'), ('Djougou'), ('Bassila'), ('Copargo'), ('Ouaké');
-
--- ==========================================================
--- 2. INSERTION DES QUARTIERS / ARRONDISSEMENTS CORRESPONDANTS
--- ==========================================================
-
--- --- LITTORAL & ATLANTIQUE ---
-INSERT INTO quartiers (nom_quartier, id_ville) VALUES
-('Cadjèhoun', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
-('Fidjrossè', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
-('Haie Vive', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
-('Akpakpa', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
-('Gbégamey', (SELECT id FROM villes WHERE nom_ville = 'Cotonou')),
-('Godomey', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
-('Calavi Centre', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
-('Zogbadjè', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
-('Akassato', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
-('Kpota', (SELECT id FROM villes WHERE nom_ville = 'Abomey-Calavi')),
-('Allada Centre', (SELECT id FROM villes WHERE nom_ville = 'Allada')),
-('Hinvi', (SELECT id FROM villes WHERE nom_ville = 'Allada')),
-('Ahouandjigo', (SELECT id FROM villes WHERE nom_ville = 'Ouidah')),
-('Pahou', (SELECT id FROM villes WHERE nom_ville = 'Ouidah')),
-('Agonmè', (SELECT id FROM villes WHERE nom_ville = 'Kpomasse')),
-('Toffo Centre', (SELECT id FROM villes WHERE nom_ville = 'Toffo')),
-('Tori Centre', (SELECT id FROM villes WHERE nom_ville = 'Tori-Bossito')),
-('Zè Centre', (SELECT id FROM villes WHERE nom_ville = 'Zè')),
-('Sô-Ava Centre', (SELECT id FROM villes WHERE nom_ville = 'Sô-Ava'));
-
--- --- OUÉMÉ & PLATEAU ---
-INSERT INTO quartiers (nom_quartier, id_ville) VALUES
-('Ouando', (SELECT id FROM villes WHERE nom_ville = 'Porto-Novo')),
-('Avakpa', (SELECT id FROM villes WHERE nom_ville = 'Porto-Novo')),
-('Tokpota', (SELECT id FROM villes WHERE nom_ville = 'Porto-Novo')),
-('Adjarra Centre', (SELECT id FROM villes WHERE nom_ville = 'Adjarra')),
-('Adjohoun Centre', (SELECT id FROM villes WHERE nom_ville = 'Ajohoun')),
-('Avrankou Centre', (SELECT id FROM villes WHERE nom_ville = 'Avrankou')),
-('Bonou Centre', (SELECT id FROM villes WHERE nom_ville = 'Bonou')),
-('Dangbo Centre', (SELECT id FROM villes WHERE nom_ville = 'Dangbo')),
-('Agblangandan', (SELECT id FROM villes WHERE nom_ville = 'Sèmè-Podji')),
-('Ekpè', (SELECT id FROM villes WHERE nom_ville = 'Sèmè-Podji')),
-('Missérété Centre', (SELECT id FROM villes WHERE nom_ville = 'Akpro-Missérété')),
-('Pobè Centre', (SELECT id FROM villes WHERE nom_ville = 'Pobè')),
-('Adja-Ouère Centre', (SELECT id FROM villes WHERE nom_ville = 'Adja-Ouère')),
-('Ifangni Centre', (SELECT id FROM villes WHERE nom_ville = 'Ifangni')),
-('Kétou Centre', (SELECT id FROM villes WHERE nom_ville = 'Kétou')),
-('Sakété Centre', (SELECT id FROM villes WHERE nom_ville = 'Sakété'));
-
--- --- ZOU & COLLINES ---
-INSERT INTO quartiers (nom_quartier, id_ville) VALUES
-('Hounli', (SELECT id FROM villes WHERE nom_ville = 'Abomey')),
-('Vidolé', (SELECT id FROM villes WHERE nom_ville = 'Abomey')),
-('Agongointo', (SELECT id FROM villes WHERE nom_ville = 'Bohicon')),
-('Sodohomè', (SELECT id FROM villes WHERE nom_ville = 'Bohicon')),
-('Dassa Centre', (SELECT id FROM villes WHERE nom_ville = 'Dassa-Zoumé')),
-('Glazoué Centre', (SELECT id FROM villes WHERE nom_ville = 'Glazoué')),
-('Savè Centre', (SELECT id FROM villes WHERE nom_ville = 'Savè')),
-('Savalou Centre', (SELECT id FROM villes WHERE nom_ville = 'Savalou')),
-('Bantè Centre', (SELECT id FROM villes WHERE nom_ville = 'Bantè')),
-('Ouèssè Centre', (SELECT id FROM villes WHERE nom_ville = 'Ouèssè')),
-('Agbangnizoun Centre', (SELECT id FROM villes WHERE nom_ville = 'Agbangnizoun')),
-('Djidja Centre', (SELECT id FROM villes WHERE nom_ville = 'Djidja')),
-('Covè Centre', (SELECT id FROM villes WHERE nom_ville = 'Covè')),
-('Zagnanado Centre', (SELECT id FROM villes WHERE nom_ville = 'Zagnanado')),
-('Za-Kpota Centre', (SELECT id FROM villes WHERE nom_ville = 'Za-Kpota')),
-('Zogbodomey Centre', (SELECT id FROM villes WHERE nom_ville = 'Zogbodomey')),
-('Ouinhi Centre', (SELECT id FROM villes WHERE nom_ville = 'Ouinhi'));
-
--- --- MONO & COUFFO ---
-INSERT INTO quartiers (nom_quartier, id_ville) VALUES
-('Lokossa Centre', (SELECT id FROM villes WHERE nom_ville = 'Lokossa')),
-('Athiémé Centre', (SELECT id FROM villes WHERE nom_ville = 'Athiémé')),
-('Bopa Centre', (SELECT id FROM villes WHERE nom_ville = 'Bopa')),
-('Comè Centre', (SELECT id FROM villes WHERE nom_ville = 'Comè')),
-('Grand-Popo Centre', (SELECT id FROM villes WHERE nom_ville = 'Grand-Popo')),
-('Houéyogbé Centre', (SELECT id FROM villes WHERE nom_ville = 'Houéyogbé')),
-('Aplahoué Centre', (SELECT id FROM villes WHERE nom_ville = 'Aplahoué')),
-('Djakotomey Centre', (SELECT id FROM villes WHERE nom_ville = 'Djakotomey')),
-('Dogbo Centre', (SELECT id FROM villes WHERE nom_ville = 'Dogbo')),
-('Klouékanmè Centre', (SELECT id FROM villes WHERE nom_ville = 'Klouékanmè')),
-('Lalo Centre', (SELECT id FROM villes WHERE nom_ville = 'Lalo')),
-('Toviklin Centre', (SELECT id FROM villes WHERE nom_ville = 'Toviklin'));
-
--- --- BORGOU & ALIBORI ---
-INSERT INTO quartiers (nom_quartier, id_ville) VALUES
-('Albarika', (SELECT id FROM villes WHERE nom_ville = 'Parakou')),
-('Banikanni', (SELECT id FROM villes WHERE nom_ville = 'Parakou')),
-('Zongo', (SELECT id FROM villes WHERE nom_ville = 'Parakou')),
-('Bembéréké Centre', (SELECT id FROM villes WHERE nom_ville = 'Bembéréké')),
-('N''Dali Centre', (SELECT id FROM villes WHERE nom_ville = 'N''Dali')),
-('Nikki Centre', (SELECT id FROM villes WHERE nom_ville = 'Nikki')),
-('Pèrèrè Centre', (SELECT id FROM villes WHERE nom_ville = 'Pèrèrè')),
-('Sinendé Centre', (SELECT id FROM villes WHERE nom_ville = 'Sinendé')),
-('Tchaourou Centre', (SELECT id FROM villes WHERE nom_ville = 'Tchaourou')),
-('Kandi Centre', (SELECT id FROM villes WHERE nom_ville = 'Kandi')),
-('Banikoara Centre', (SELECT id FROM villes WHERE nom_ville = 'Banikoara')),
-('Gogounou Centre', (SELECT id FROM villes WHERE nom_ville = 'Gogounou')),
-('Karimama Centre', (SELECT id FROM villes WHERE nom_ville = 'Karimama')),
-('Malanville Centre', (SELECT id FROM villes WHERE nom_ville = 'Malanville')),
-('Segbana Centre', (SELECT id FROM villes WHERE nom_ville = 'Segbana'));
-
--- --- ATACORA & DONGA ---
-INSERT INTO quartiers (nom_quartier, id_ville) VALUES
-('Natitingou Centre', (SELECT id FROM villes WHERE nom_ville = 'Natitingou')),
-('Boukoumbé Centre', (SELECT id FROM villes WHERE nom_ville = 'Boukoumbé')),
-('Cobly Centre', (SELECT id FROM villes WHERE nom_ville = 'Cobly')),
-('Kérou Centre', (SELECT id FROM villes WHERE nom_ville = 'Kérou')),
-('Kouandé Centre', (SELECT id FROM villes WHERE nom_ville = 'Kouandé')),
-('Matéri Centre', (SELECT id FROM villes WHERE nom_ville = 'Matéri')),
-('Pehunco Centre', (SELECT id FROM villes WHERE nom_ville = 'Pehunco')),
-('Tanguiéta Centre', (SELECT id FROM villes WHERE nom_ville = 'Tanguiéta')),
-('Toucountouna Centre', (SELECT id FROM villes WHERE nom_ville = 'Toucountouna')),
-('Djougou Centre', (SELECT id FROM villes WHERE nom_ville = 'Djougou')),
-('Bassila Centre', (SELECT id FROM villes WHERE nom_ville = 'Bassila')),
-('Copargo Centre', (SELECT id FROM villes WHERE nom_ville = 'Copargo')),
-('Ouaké Centre', (SELECT id FROM villes WHERE nom_ville = 'Ouaké'));
-
-
-ALTER TABLE users 
-ADD COLUMN date_expiration_abo DATE DEFAULT NULL AFTER abonnement_status,
-ADD COLUMN renouvellement_auto TINYINT(1) DEFAULT 1 AFTER date_expiration_abo;
-
-
-ALTER TABLE commentaires 
-ADD COLUMN id_rdv INT NULL AFTER id_commentaire,
-ADD COLUMN id_coiffeur INT NULL AFTER id_client,
-ADD COLUMN type_commentaire ENUM('public', 'plainte') NOT NULL DEFAULT 'public' AFTER note,
-ADD COLUMN statut_admin ENUM('en_attente', 'traite') NOT NULL DEFAULT 'en_attente' AFTER type_commentaire;
-
-ALTER TABLE commentaires MODIFY id_rdv INT UNSIGNED NULL;
-
-ALTER TABLE commentaires 
-ADD CONSTRAINT fk_commentaires_rdv 
-FOREIGN KEY (id_rdv) REFERENCES rendez_vous(id) 
-ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE commentaires 
-ADD COLUMN statut_moderation ENUM('en_attente', 'approuve', 'rejete') NOT NULL DEFAULT 'en_attente' AFTER statut_admin;
-
-
-CREATE TABLE notifications (
-    id_notification INT AUTO_INCREMENT PRIMARY KEY,
-    id_user INT NOT NULL,
-    id_rdv INT UNSIGNED NULL,
-    message TEXT NOT NULL,
-    statut_lecture ENUM('non_lu', 'lu') NOT NULL DEFAULT 'non_lu',
-    date_notification DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE `notifications` (
+  `id_notification` int(11) NOT NULL,
+  `id_user` int(11) NOT NULL,
+  `id_rdv` int(10) UNSIGNED DEFAULT NULL,
+  `message` text NOT NULL,
+  `statut_lecture` enum('non_lu','lu') NOT NULL DEFAULT 'non_lu',
+  `date_notification` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------------------------------------
 
-ALTER TABLE notifications 
-ADD CONSTRAINT fk_notifications_rdv 
-FOREIGN KEY (id_rdv) REFERENCES rendez_vous(id) 
-ON DELETE CASCADE ON UPDATE CASCADE;
+--
+-- Structure de la table `plaintes`
+--
+
+CREATE TABLE `plaintes` (
+  `id_plainte` int(10) UNSIGNED NOT NULL,
+  `id_rendez_vous` int(10) UNSIGNED NOT NULL,
+  `id_coiffeur` int(10) UNSIGNED NOT NULL,
+  `id_client` int(10) UNSIGNED NOT NULL,
+  `motif` text NOT NULL,
+  `statut` enum('active','resolue') DEFAULT 'active',
+  `date_plainte` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `portefeuilles`
+--
+
+CREATE TABLE `portefeuilles` (
+  `id_portefeuille` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `solde` int(11) DEFAULT 0,
+  `argent_gele` int(11) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `prestations`
+--
+
+CREATE TABLE `prestations` (
+  `id_prestation` int(10) UNSIGNED NOT NULL,
+  `id_coiffeur` int(10) UNSIGNED NOT NULL,
+  `nom_style` varchar(100) NOT NULL,
+  `prix` decimal(10,2) NOT NULL,
+  `photo_style` varchar(255) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `duree` int(11) DEFAULT 60
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `quartiers`
+--
+
+CREATE TABLE `quartiers` (
+  `id` int(11) NOT NULL,
+  `nom_quartier` varchar(100) NOT NULL,
+  `id_ville` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `rendez_vous`
+--
+
+CREATE TABLE `rendez_vous` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `client_id` int(10) UNSIGNED DEFAULT NULL,
+  `coiffeur_id` int(10) UNSIGNED DEFAULT NULL,
+  `coiffure_id` int(10) UNSIGNED DEFAULT NULL,
+  `date_rdv` date DEFAULT NULL,
+  `heure_debut` time NOT NULL,
+  `heure_fin` time NOT NULL,
+  `statut_paiement` enum('en_attente','paye','echoue') DEFAULT 'en_attente',
+  `transaction_id` varchar(100) DEFAULT NULL,
+  `statut_rdv` enum('confirme','annule','termine') DEFAULT 'confirme',
+  `adresse_prestation` text DEFAULT NULL,
+  `date_demande` timestamp NOT NULL DEFAULT current_timestamp(),
+  `paiement_statut` enum('non_paye','gele','paye') DEFAULT 'non_paye',
+  `whatsapp_envoye` tinyint(1) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `suppressions_comptes`
+--
+
+CREATE TABLE `suppressions_comptes` (
+  `id` int(11) NOT NULL,
+  `id_user_supprime` int(11) NOT NULL,
+  `nom` varchar(100) NOT NULL,
+  `prenom` varchar(100) NOT NULL,
+  `email` varchar(150) NOT NULL,
+  `role` varchar(50) NOT NULL,
+  `motif` text DEFAULT NULL,
+  `supprime_par` int(11) DEFAULT NULL,
+  `date_demande` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `transactions_portefeuille`
+--
+
+CREATE TABLE `transactions_portefeuille` (
+  `id_transaction` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `type_transaction` enum('depot','retrait','blocage_rdv','deblocage_rdv','gain_prestation','commission') NOT NULL,
+  `montant` int(11) NOT NULL,
+  `motif` varchar(255) NOT NULL,
+  `date_creation` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `transactions_site`
+--
+
+CREATE TABLE `transactions_site` (
+  `id_transaction` int(10) UNSIGNED NOT NULL,
+  `id_coiffeur` int(10) UNSIGNED NOT NULL,
+  `montant_commission` decimal(10,2) NOT NULL,
+  `montant_abonnement` decimal(10,2) NOT NULL,
+  `type_transaction` varchar(50) DEFAULT 'commission_et_abonnement',
+  `date_transaction` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `users`
+--
+
+CREATE TABLE `users` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `nom` varchar(100) DEFAULT NULL,
+  `prenom` varchar(100) DEFAULT NULL,
+  `sexe` enum('homme','femme') NOT NULL DEFAULT 'homme',
+  `email` varchar(150) DEFAULT NULL,
+  `password` varchar(255) DEFAULT NULL,
+  `telephone` varchar(20) DEFAULT NULL,
+  `role` enum('client','coiffeur','admin') DEFAULT 'client',
+  `valide` int(11) DEFAULT 0,
+  `ville` varchar(100) DEFAULT NULL,
+  `id_quartier` int(11) DEFAULT NULL,
+  `tarif_base` int(11) DEFAULT 0,
+  `diplome` varchar(255) DEFAULT NULL,
+  `photo_profil` varchar(255) DEFAULT 'uploads/profil/default.png',
+  `gps_lat` decimal(10,8) DEFAULT NULL,
+  `gps_lng` decimal(11,8) DEFAULT NULL,
+  `bio` text DEFAULT NULL,
+  `abonnement_status` enum('actif','inactif') DEFAULT 'inactif',
+  `date_expiration_abo` date DEFAULT NULL,
+  `renouvellement_auto` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `telephone_verifie` tinyint(1) DEFAULT 0,
+  `code_verification` varchar(10) DEFAULT NULL,
+  `portefeuille` int(11) DEFAULT 0,
+  `zone` varchar(100) DEFAULT NULL,
+  `solde` int(11) DEFAULT 0,
+  `statut` enum('actif','banni') DEFAULT 'actif',
+  `is_approved` tinyint(1) DEFAULT 0,
+  `raison_ban` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `villes`
+--
+
+CREATE TABLE `villes` (
+  `id` int(11) NOT NULL,
+  `nom_ville` varchar(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `zones_coiffeur`
+--
+
+CREATE TABLE `zones_coiffeur` (
+  `id_coiffeur` int(11) NOT NULL,
+  `id_quartier` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Index pour les tables déchargées
+--
+
+--
+-- Index pour la table `abonnements_paiements`
+--
+ALTER TABLE `abonnements_paiements`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `coiffeur_id` (`coiffeur_id`);
+
+--
+-- Index pour la table `avis`
+--
+ALTER TABLE `avis`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `rdv_id` (`rdv_id`),
+  ADD KEY `client_id` (`client_id`);
+
+--
+-- Index pour la table `boutique`
+--
+ALTER TABLE `boutique`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Index pour la table `catalogue`
+--
+ALTER TABLE `catalogue`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `coiffeur_id` (`coiffeur_id`);
+
+--
+-- Index pour la table `commentaires`
+--
+ALTER TABLE `commentaires`
+  ADD PRIMARY KEY (`id_commentaire`),
+  ADD KEY `fk_commentaires_rdv` (`id_rdv`);
+
+--
+-- Index pour la table `disponibilites`
+--
+ALTER TABLE `disponibilites`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `coiffeur_id` (`coiffeur_id`);
+
+--
+-- Index pour la table `ia_sessions`
+--
+ALTER TABLE `ia_sessions`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Index pour la table `notifications`
+--
+ALTER TABLE `notifications`
+  ADD PRIMARY KEY (`id_notification`),
+  ADD KEY `fk_notifications_rdv` (`id_rdv`);
+
+--
+-- Index pour la table `plaintes`
+--
+ALTER TABLE `plaintes`
+  ADD PRIMARY KEY (`id_plainte`),
+  ADD KEY `fk_plainte_rdv` (`id_rendez_vous`),
+  ADD KEY `fk_plainte_coiffeur` (`id_coiffeur`),
+  ADD KEY `fk_plainte_client` (`id_client`);
+
+--
+-- Index pour la table `portefeuilles`
+--
+ALTER TABLE `portefeuilles`
+  ADD PRIMARY KEY (`id_portefeuille`),
+  ADD UNIQUE KEY `user_id` (`user_id`);
+
+--
+-- Index pour la table `prestations`
+--
+ALTER TABLE `prestations`
+  ADD PRIMARY KEY (`id_prestation`),
+  ADD KEY `id_coiffeur` (`id_coiffeur`);
+
+--
+-- Index pour la table `quartiers`
+--
+ALTER TABLE `quartiers`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `id_ville` (`id_ville`);
+
+--
+-- Index pour la table `rendez_vous`
+--
+ALTER TABLE `rendez_vous`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `client_id` (`client_id`),
+  ADD KEY `coiffeur_id` (`coiffeur_id`);
+
+--
+-- Index pour la table `suppressions_comptes`
+--
+ALTER TABLE `suppressions_comptes`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Index pour la table `transactions_portefeuille`
+--
+ALTER TABLE `transactions_portefeuille`
+  ADD PRIMARY KEY (`id_transaction`);
+
+--
+-- Index pour la table `transactions_site`
+--
+ALTER TABLE `transactions_site`
+  ADD PRIMARY KEY (`id_transaction`),
+  ADD KEY `id_coiffeur` (`id_coiffeur`);
+
+--
+-- Index pour la table `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `email` (`email`),
+  ADD KEY `fk_users_quartier` (`id_quartier`);
+
+--
+-- Index pour la table `villes`
+--
+ALTER TABLE `villes`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `nom_ville` (`nom_ville`);
+
+--
+-- Index pour la table `zones_coiffeur`
+--
+ALTER TABLE `zones_coiffeur`
+  ADD PRIMARY KEY (`id_coiffeur`,`id_quartier`);
+
+--
+-- AUTO_INCREMENT pour les tables déchargées
+--
+
+--
+-- AUTO_INCREMENT pour la table `abonnements_paiements`
+--
+ALTER TABLE `abonnements_paiements`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `avis`
+--
+ALTER TABLE `avis`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `boutique`
+--
+ALTER TABLE `boutique`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `catalogue`
+--
+ALTER TABLE `catalogue`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `commentaires`
+--
+ALTER TABLE `commentaires`
+  MODIFY `id_commentaire` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `disponibilites`
+--
+ALTER TABLE `disponibilites`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `ia_sessions`
+--
+ALTER TABLE `ia_sessions`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `notifications`
+--
+ALTER TABLE `notifications`
+  MODIFY `id_notification` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `plaintes`
+--
+ALTER TABLE `plaintes`
+  MODIFY `id_plainte` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `portefeuilles`
+--
+ALTER TABLE `portefeuilles`
+  MODIFY `id_portefeuille` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `prestations`
+--
+ALTER TABLE `prestations`
+  MODIFY `id_prestation` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `quartiers`
+--
+ALTER TABLE `quartiers`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `rendez_vous`
+--
+ALTER TABLE `rendez_vous`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `suppressions_comptes`
+--
+ALTER TABLE `suppressions_comptes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `transactions_portefeuille`
+--
+ALTER TABLE `transactions_portefeuille`
+  MODIFY `id_transaction` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `transactions_site`
+--
+ALTER TABLE `transactions_site`
+  MODIFY `id_transaction` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `users`
+--
+ALTER TABLE `users`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT pour la table `villes`
+--
+ALTER TABLE `villes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- Contraintes pour les tables déchargées
+--
+
+--
+-- Contraintes pour la table `abonnements_paiements`
+--
+ALTER TABLE `abonnements_paiements`
+  ADD CONSTRAINT `abonnements_paiements_ibfk_1` FOREIGN KEY (`coiffeur_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Contraintes pour la table `avis`
+--
+ALTER TABLE `avis`
+  ADD CONSTRAINT `avis_ibfk_1` FOREIGN KEY (`rdv_id`) REFERENCES `rendez_vous` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `avis_ibfk_2` FOREIGN KEY (`client_id`) REFERENCES `users` (`id`);
+
+--
+-- Contraintes pour la table `catalogue`
+--
+ALTER TABLE `catalogue`
+  ADD CONSTRAINT `catalogue_ibfk_1` FOREIGN KEY (`coiffeur_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Contraintes pour la table `commentaires`
+--
+ALTER TABLE `commentaires`
+  ADD CONSTRAINT `fk_commentaires_rdv` FOREIGN KEY (`id_rdv`) REFERENCES `rendez_vous` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Contraintes pour la table `disponibilites`
+--
+ALTER TABLE `disponibilites`
+  ADD CONSTRAINT `disponibilites_ibfk_1` FOREIGN KEY (`coiffeur_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Contraintes pour la table `notifications`
+--
+ALTER TABLE `notifications`
+  ADD CONSTRAINT `fk_notifications_rdv` FOREIGN KEY (`id_rdv`) REFERENCES `rendez_vous` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Contraintes pour la table `plaintes`
+--
+ALTER TABLE `plaintes`
+  ADD CONSTRAINT `fk_plainte_client` FOREIGN KEY (`id_client`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_plainte_coiffeur` FOREIGN KEY (`id_coiffeur`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_plainte_rdv` FOREIGN KEY (`id_rendez_vous`) REFERENCES `rendez_vous` (`id`) ON DELETE CASCADE;
+
+--
+-- Contraintes pour la table `prestations`
+--
+ALTER TABLE `prestations`
+  ADD CONSTRAINT `prestations_ibfk_1` FOREIGN KEY (`id_coiffeur`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Contraintes pour la table `quartiers`
+--
+ALTER TABLE `quartiers`
+  ADD CONSTRAINT `quartiers_ibfk_1` FOREIGN KEY (`id_ville`) REFERENCES `villes` (`id`) ON DELETE CASCADE;
+
+--
+-- Contraintes pour la table `rendez_vous`
+--
+ALTER TABLE `rendez_vous`
+  ADD CONSTRAINT `rendez_vous_ibfk_1` FOREIGN KEY (`client_id`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `rendez_vous_ibfk_2` FOREIGN KEY (`coiffeur_id`) REFERENCES `users` (`id`);
+
+--
+-- Contraintes pour la table `transactions_site`
+--
+ALTER TABLE `transactions_site`
+  ADD CONSTRAINT `transactions_site_ibfk_1` FOREIGN KEY (`id_coiffeur`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Contraintes pour la table `users`
+--
+ALTER TABLE `users`
+  ADD CONSTRAINT `fk_users_quartier` FOREIGN KEY (`id_quartier`) REFERENCES `quartiers` (`id`) ON DELETE SET NULL;
+COMMIT;
