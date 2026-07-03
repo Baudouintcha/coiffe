@@ -71,14 +71,6 @@ body {
     background-color: #000; /* Fond noir pour le luxe */
 }
 
-/* Appliqué à toutes les pages (inscription, connexion) */
-.content-wrapper {
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    min-height: 100vh;
-}
 
 /*affichage page d'acceuillle ecriture*/ 
 

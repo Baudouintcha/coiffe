@@ -1,160 +1,324 @@
-                                 nouvelle dynamique
-
-
-#######REFONTE DU DESIGN#######
-
-
-1. Checklist Technique : L'Architecture des fichiers
-Pour garantir une maintenance facile et une logique implacable, nous allons restructurer votre projet autour de composants réutilisables.
-
-assets/ : Stockage local (vitesse et fiabilité).
-
-/css/style.css : Vos variables de couleurs (or, noir, gris) et typographies.
-
-/images/ : Logo, textures de fond, icônes.
-
-/js/main.js : Animations, gestion du blur, interactions au clic.
-
-includes/ : Le cerveau de votre site (les parties communes).
-
-header.php : Repensé pour être transparent/fixe en haut de page.
-
-footer.php : Épuré, avec liens minimalistes.
-
-db.php : Connexion unique à la base de données.
-
-templates/ : La structure des pages.
-
-layout.php : Le "contenant" principal qui appelle header et footer.
-
-modal.php : Votre fenêtre de connexion/inscription (le cœur de votre "DA").
-
-pages/ : Vos fichiers spécifiques.
-
-index.php : L'accueil immersif.
-
-dashboard.php : La page personnalisée (votre capture d'écran).
-
-booking.php : Le moteur de réservation.
-
-2. Stratégie : Repenser Header et Footer (Le concept "Invisible")
-Le problème des en-têtes classiques, c'est qu'ils "écrasent" le design de luxe.
-
-Le Header devient "Ghost" (Fantôme) : Sur la page d'accueil, il est transparent et se fond dans l'image. Au scroll, il devient opaque (noir mat) avec un effet de flou arrière pour ne pas distraire l'utilisateur.
-
-Le Footer devient "Espace de respiration" : On retire les colonnes de liens inutiles. On ne garde que l'essentiel : contact, réseaux sociaux, et une note de copyright très discrète en doré.
-
-3. La Vision Client : Qu'est-ce qui sera "Frais" ?
-Visuellement, voici ce que le client va percevoir et pourquoi il va vous choisir :
-
-L'expérience "Ouverture" : Le passage de la page d'accueil (l'émotion, l'art) au Dashboard (l'efficacité, le service) est perçu comme une montée en gamme.
-
-La fluidité sans rechargement : En utilisant des modaux pour l'inscription, le site semble "vivant". Le client n'a pas l'impression de changer de page à chaque clic, ce qui augmente le sentiment de confort.
-
-La cohérence totale : Le fait de retrouver la même signature dorée sur l'accueil, dans le header, et dans les graphiques du calendrier (Dashboard) crée une autorité de marque. Le client se sent chez un expert.
-
-4. Logic et Logique : La chronologie
-C'est ici que je vous donne mon avis d'expert : ne multipliez pas les designs.
-
-Mon conseil : Gardons une seule DA (Direction Artistique).
-
-L'accueil = La Promesse (Images grand format).
-
-Le Dashboard = La Preuve (Votre interface de réservation).
-
-La transition entre les deux = Le même header flottant. C'est ce header qui servira de "fil conducteur". Il est présent partout, il a le même style, c'est lui qui dit à l'utilisateur : "Tu es toujours chez Luxe Locks".
-
-
-
-
-
-
-                      #####ENSEMBLE DES FONCTIONNALITés à implimenter##########
-
-
-
-
-****Moteur de recherche et Profil Public : Interface permettant au client de voir les horaires saisis par le coiffeur et de cliquer sur un créneau.( deja fait )***
-
-....................................................................
-****Système de Réservation (Backend) : Logique de blocage d'un créneau horaire lorsqu'un client réserve, pour éviter les doublons.****(deja aussi)
-
-.............................................................
-
-1*
-
-Notifications / Alertes : Système pour informer le coiffeur qu'un nouveau rendez-vous a été enregistré. et vice versa 
-
-.....................................................................................
-Module de Double Sécurité (OTP Email) : Génération et envoi d'un code de vérification à 6 chiffres par email lors de la connexion ou d'actions sensibles, bloquant l'accès tant que le jeton (token) n'est pas validé en base de données.
-............................................................................................
-
-Passerelle de Paiement Mobile Money / Carte via kkiapay : Finalisation de l'intégration des webhooks et scripts de callback pour valider l'activation automatique de l'abonnement du coiffeur et sécuriser les dépôts.
-
-.........................................................................................
-Module de Notification & Facturation WhatsApp : Connexion à une API de messagerie pour pousser automatiquement le reçu financier et le récapitulatif du rendez-vous directement sur le numéro WhatsApp du client dès la confirmation de la prestation.
-......................................................................
-
-Système de Relance Automatique à J+14 (Rétention Client) :
-Mise en place d'un script automatisé sur le serveur (Tâche Cron) s'exécutant quotidiennement.
-Détection automatique des rendez-vous terminés depuis exactement 2 semaines en base de données.
-Envoi automatisé d'un message de courtoisie personnalisé via l'API WhatsApp pour inciter le client à rafraîchir sa coupe et générer des rendez-vous récurrents sans action manuelle du coiffeur.
-......................
-mettre en place un systeme de notation en etoile apres la prestation  le client reçois une notif du site par W si il n'est ps connecté fin qu'il laisse une note . si $note > 3 un champs s'ouvre avec un message : votre coiffeur a été mal noté avez vous des plaintes ? " si oui il enregistre et seul l'admin peut voir si cela en vaut la peine il va gerer le client en indé.
-
-    ###priorité actuelle 
-.................................................................
-    ***1️⃣ Étape 1 : Analyser tes tables de Disponibilités (Base de Données)
-Avant d'écrire la moindre ligne de code, je dois savoir comment tu as structuré les horaires du coiffeur en BDD.**** deja fait 
-.........................................................................
-As-tu une table disponibilites ou horaires_travail ? * Comment sont stockés les jours (lundi, mardi...) et les heures (heure_debut, heure_fin) ?
-...................................................
-****2️⃣ Étape 2 : Coder profil_public.php (La Vitrine + L'agenda visuel)
-On crée ou modifie ce fichier pour récupérer l'ID du coiffeur, afficher ses prestations et implémenter le système de choix de jour/heure en blanc/gris/rouge.**** deja fait
-.............................................................................
-***3️⃣ Étape 3 : Ajuster reserver.php (Le Réceptionnaire)
-On modifie légèrement le fichier reserver.php qu'on a vu ensemble pour qu'il soit capable de :
-
-Réceptionner la date et l'heure automatiquement si elles viennent du profil public.
-
-Faire la double vérification de sécurité en PHP au moment du clic sur "Confirmer".**** deja fait 
-......................................................................................
-******4️⃣ Étape 4 : Coder mes_rendezvous.php (Le Suivi)
-Le client doit pouvoir voir sa réservation fraîchement créée dans son tableau de bord avec le statut "En attente".****** deja fait  
-...............................................................
-
-            ici c le parcours client 
-
-
-            [Index / Annuaire / Catalogue] 
-       │
-       ▼ (Envoie l'ID du coiffeur dans l'URL : ?id_coiffeur=5)
-[Profil Public du Coiffeur] 
-       │
-       ▼ (Envoie l'ID du coiffeur ET de la prestation : ?coiffeur_id=5&presta_id=12)
-[reserver.php] (Ta page de réservation finale avec calendrier et options)
-
-...............................................................................
-
-
-Dès que le script reçoit la demande, il récupère la date et l'heure du rendez-vous dans la base de données et les compare avec l'instant présent ($2026$).Nous utilisons la formule de différence absolue :$$\Delta t = t_{\text{rendez-vous}} - t_{\text{actuel}}$$Le robot PHP applique alors une structure conditionnelle stricte :Temps restant (Δt)Règle appliquéeImpact Financier$\Delta t \geq 24$ heuresCas A : Annulation large100% remboursé au Client / 0% pour le Coiffeur$2 \text{h} \leq \Delta t < 24$ heuresCas B : Annulation tardive50% remboursé au Client / 50% de dédommagement au Coiffeur$\Delta t < 2$ heuresCas C : Abus / Dernière minute0% remboursé au Client / 100% conservé par le Coiffeur
-
-...........................................................................................
-1* 📋 ###LISTING OFFICIEL DES COMPOSANTS À METTRE EN PLACE
-
-***********1. Architecture Base de Données (SQL)Ajustement de la table rendez_vous : S'assurer que la colonne statut_rdv gère bien l'état 'annule'.Création de la table avis_plaintes : * id, rendez_vous_id, client_id, coiffeur_id, note (1 à 5), commentaire (text), type ('avis' ou 'plainte'), statut_admin ('en_attente', 'traite'), date_creation.*******
-
-
-********2. Interface Client (Fichiers existants à mettre à jour & Nouveaux)mes_rendezvous.php (Mise à jour finale) : * Affichage du badge gris "Annulé" (déjà prêt).Dès que le statut passe à 'termine', le bouton "Gérer" devient "Noter la prestation".formulaire_notation.php (Nouvelle Modale ou Nouvelle Page) :Interface d'étoiles dynamiques (JavaScript).Champ texte qui s'adapte : si note < 3, le titre devient "Déposer une plainte (confidentiel)", sinon "Laisser un commentaire public".***************
-
-***********3. Interface Artisan / Coiffeurdashboard_coiffeur.php & mes_avis.php (Nouveaux composants) :Section "Avis clients" : Liste des notes $\ge$ 3 avec les commentaires.Calcul de sa note moyenne générale.Cadre Flottant de Signalement (Alerte Rouge) : Si une ligne dans avis_plaintes a le type 'plainte' pour son ID, le bloc s'affiche automatiquement en haut de son tableau de bord sans lui montrer le texte de la plainte.**********
-
-
-    si haut ont tous étét implimentés déja 
-
-
-    
-4. Interface Administration (Statistiques & Modération)admin/plaintes.php (Nouvelle page) :Listing de toutes les plaintes des clients avec le détail textuel, le nom du coiffeur visé et un bouton "Marquer comme traité / Contacter l'artisan".admin/stats_coiffeurs.php (Mise à jour) :Intégration de la moyenne des notes dans les algorithmes de classement des coiffeurs.
-
-
-5. Affichage Public (Catalogue & Profils)index.php / catalogue.php / annuaire.php (Mise à jour) :Calcul en direct de la moyenne des coiffeurs (AVG(note)) pour l'afficher sous forme d'étoiles sur leurs cartes publiques (Profil public).
+# 🗺️ DOMIZI — ROADMAP OFFICIELLE v2.0
+> Plateforme de services à domicile — Bénin & Sous-région Ouest-Africaine
+> Projet de soutenance + vision long terme
+> Dernière mise à jour : Juillet 2026
+
+---
+
+## 🎯 VISION DU PROJET
+
+**Domizi** est une marketplace de services à domicile pensée pour l'Afrique de l'Ouest.
+Chaque domaine métier a sa propre "branche" :
+
+| Branche | Domaine | Statut |
+|---|---|---|
+| **Coiffe Chez Toi** | Beauté & Coiffure | 🚧 En cours |
+| Glam Chez Toi | Maquillage & Ongles | 🔜 Après soutenance |
+| Fix Chez Toi | Plomberie & Électricité | 🔜 Futur |
+| Clean Chez Toi | Ménage & Nettoyage | 🔜 Futur |
+
+**Stack technique :**
+- PHP natif — Architecture MVC (Structure 2 — Composer + PSR-4)
+- MySQL (MariaDB)
+- Bootstrap 5.3 + CSS Premium (Dark/Gold)
+- XAMPP en local → VPS en production
+
+---
+
+## 📐 ARCHITECTURE CIBLE (Structure 2 — MVC Moderne)
+
+```
+domizi/
+├── public/                    ← Point d'entrée unique (VPS-ready)
+│   ├── index.php              ← Front controller
+│   ├── css/
+│   ├── js/
+│   └── uploads/
+├── src/
+│   ├── Core/
+│   │   ├── Database.php       ← Singleton PDO
+│   │   ├── Router.php         ← Dispatch des routes
+│   │   ├── Request.php        ← Encapsule $_GET, $_POST, $_FILES
+│   │   ├── Response.php       ← Redirections, JSON responses
+│   │   ├── Session.php        ← Gestion session centralisée
+│   │   └── View.php           ← Rendu des vues
+│   ├── Controllers/
+│   │   ├── BaseController.php
+│   │   ├── Auth/
+│   │   │   ├── LoginController.php
+│   │   │   └── RegisterController.php
+│   │   ├── Prestataire/
+│   │   │   ├── CatalogueController.php
+│   │   │   ├── AgendaController.php
+│   │   │   └── ProfilController.php
+│   │   ├── Client/
+│   │   │   ├── ReservationController.php
+│   │   │   └── RendezVousController.php
+│   │   └── Admin/
+│   │       ├── DashboardController.php
+│   │       ├── ValidationController.php
+│   │       └── ModerationController.php
+│   ├── Models/
+│   │   ├── User.php
+│   │   ├── Service.php
+│   │   ├── RendezVous.php
+│   │   ├── Notification.php
+│   │   ├── Avis.php
+│   │   └── Transaction.php
+│   ├── Middlewares/
+│   │   ├── AuthMiddleware.php
+│   │   ├── RoleMiddleware.php
+│   │   └── CsrfMiddleware.php
+│   ├── Services/
+│   │   ├── PaymentService.php       ← Kkiapay
+│   │   ├── WhatsAppService.php      ← API WhatsApp
+│   │   ├── NotificationService.php
+│   │   ├── ReservationService.php
+│   │   └── UploadService.php
+│   └── Validators/
+│       ├── AuthValidator.php
+│       └── ReservationValidator.php
+├── views/
+│   ├── layouts/
+│   │   ├── main.php           ← Layout principal (header + footer)
+│   │   ├── admin.php          ← Layout admin
+│   │   └── guest.php          ← Layout visiteur
+│   ├── home.php
+│   ├── auth/
+│   ├── prestataire/
+│   ├── client/
+│   └── admin/
+├── routes/
+│   └── web.php                ← Toutes les routes centralisées
+├── config/
+│   ├── app.php                ← Config globale
+│   ├── database.php           ← Paramètres BDD
+│   └── services.php           ← Clés API (Kkiapay, WhatsApp...)
+├── .env                       ← Variables sensibles (ne jamais committer)
+├── .env.example               ← Template .env
+├── composer.json              ← Autoloading PSR-4
+└── .htaccess                  ← Redirection tout vers public/index.php
+```
+
+---
+
+## 🗄️ BASE DE DONNÉES v2.0
+
+### Tables validées et finales
+
+| Table | Rôle | Statut |
+|---|---|---|
+| `pays` | Gestion multi-pays sous-région | ✅ Validée |
+| `villes` | Villes par pays | ✅ Validée |
+| `quartiers` | Quartiers par ville | ✅ Validée |
+| `domaines` | Domaines métiers (Beauté, Maison...) | ✅ Validée |
+| `metiers` | Métiers par domaine (Coiffure, Massage...) | ✅ Validée |
+| `users` | Tous les utilisateurs (client/prestataire/admin) | ✅ Validée |
+| `profils_prestataires` | Données spécifiques prestataire | ✅ Validée |
+| `zones_prestataire` | Zones d'intervention | ✅ Validée |
+| `services` | Catalogue de prestations | ✅ Validée |
+| `disponibilites` | Agenda hebdomadaire | ✅ Validée |
+| `rendez_vous` | Réservations | ✅ Validée |
+| `avis` | Notes + plaintes | ✅ Validée |
+| `transactions` | Historique financier complet | ✅ Validée |
+| `paiements_kkiapay` | Webhooks Kkiapay | ✅ Validée |
+| `notifications` | Alertes in-app | ✅ Validée |
+| `ia_sessions` | Contexte chatbot IA | ✅ Validée |
+
+### Tables supprimées (obsolètes)
+- ~~`catalogue`~~ → remplacée par `services`
+- ~~`commentaires`~~ → remplacée par `avis`
+- ~~`prestations`~~ → remplacée par `services`
+- ~~`portefeuilles`~~ → fusionnée dans `users.solde`
+- ~~`transactions_portefeuille`~~ → remplacée par `transactions`
+- ~~`transactions_site`~~ → fusionnée dans `transactions`
+- ~~`plaintes`~~ → fusionnée dans `avis.type = 'plainte'`
+- ~~`abonnements_paiements`~~ → remplacée par `paiements_kkiapay`
+- ~~`boutique`~~ → hors scope
+
+---
+
+## 🚀 PHASES DE DÉVELOPPEMENT
+
+---
+
+### ✅ PHASE 0 — Fondations (TERMINÉE)
+**Objectif : Poser les bases solides avant de coder**
+
+- [x] Analyse complète du projet existant
+- [x] Choix de l'architecture (MVC Structure 2)
+- [x] Nom du projet validé : **Domizi**
+- [x] Vision multi-métiers définie
+- [x] Nouvelle BDD v2.0 conçue et validée
+- [x] ROADMAP créée
+- [x] Créer la nouvelle BDD `domizi` dans phpMyAdmin
+- [x] Installer Composer
+- [ ] Créer le squelette MVC vide
+
+---
+
+### 🚧 PHASE 1 — Socle MVC
+**Objectif : Le squelette qui fait tourner tout le reste**
+
+- [ ] `composer.json` + autoloading PSR-4
+- [ ] `.env` + `.env.example`
+- [ ] `Core/Database.php` — Singleton PDO
+- [ ] `Core/Router.php` — Dispatch des routes
+- [ ] `Core/Request.php` — Encapsulation des entrées
+- [ ] `Core/Response.php` — Redirections propres
+- [ ] `Core/Session.php` — Gestion session
+- [ ] `Core/View.php` — Rendu des vues
+- [ ] `routes/web.php` — Définition des routes
+- [ ] `.htaccess` — Redirection vers `public/index.php`
+- [ ] Layout de base (header ghost + footer minimal)
+
+---
+
+### 🚧 PHASE 2 — Authentification
+**Objectif : Inscription, connexion, sécurité**
+
+- [ ] `LoginController.php`
+- [ ] `RegisterController.php` (client + prestataire)
+- [ ] `AuthMiddleware.php`
+- [ ] `RoleMiddleware.php`
+- [ ] `CsrfMiddleware.php`
+- [ ] `AuthValidator.php`
+- [ ] Suppression rôle Admin du formulaire public
+- [ ] `UploadService.php` — Upload sécurisé
+- [ ] Design connexion/inscription premium
+
+---
+
+### 🚧 PHASE 3 — Module Prestataire
+**Objectif : Gérer profil, services et agenda**
+
+- [ ] `ProfilController.php`
+- [ ] `CatalogueController.php` — CRUD services
+- [ ] `AgendaController.php` — Disponibilités
+- [ ] Profil public du prestataire
+- [ ] Calendrier interactif des créneaux
+- [ ] Vues redesignées
+
+---
+
+### 🚧 PHASE 4 — Module Client
+**Objectif : Trouver, réserver, gérer ses RDV**
+
+- [ ] Annuaire des prestataires
+- [ ] `ReservationController.php`
+- [ ] `RendezVousController.php`
+- [ ] `ReservationService.php` (règles 24h/2h/0h)
+- [ ] Portefeuille réel (plus de mode test)
+- [ ] Vues redesignées
+
+---
+
+### 🚧 PHASE 5 — Module Admin
+**Objectif : Contrôle total de la plateforme**
+
+- [ ] `DashboardController.php` — KPIs
+- [ ] `ValidationController.php` — Approuver prestataires
+- [ ] `ModerationController.php` — Plaintes et avis
+- [ ] Vérification `is_approved` dans l'annuaire
+- [ ] Bannissement de compte
+- [ ] Statistiques financières
+- [ ] Layout admin dédié
+
+---
+
+### 🚧 PHASE 6 — Paiement Kkiapay
+**Objectif : Paiement Mobile Money réel**
+
+- [ ] Compte Kkiapay + clés API
+- [ ] `PaymentService.php`
+- [ ] Webhook de confirmation
+- [ ] Activation abonnement prestataire
+- [ ] Dépôt portefeuille client
+- [ ] Tests sandbox
+
+---
+
+### 🚧 PHASE 7 — Notifications & WhatsApp
+**Objectif : Communication automatique**
+
+- [ ] Choisir API WhatsApp
+- [ ] `WhatsAppService.php`
+- [ ] `NotificationService.php`
+- [ ] Notifs RDV (prestataire + client)
+- [ ] Reçu WhatsApp post-prestation
+- [ ] Cron J+14 relance client
+
+---
+
+### 🚧 PHASE 8 — Avis & Notation
+**Objectif : Système de confiance**
+
+- [ ] Notation étoiles post-prestation
+- [ ] Plainte confidentielle si note < 3
+- [ ] Alerte admin sur plainte
+- [ ] Note moyenne dans l'annuaire
+- [ ] Dashboard prestataire — ses avis
+
+---
+
+### 🚧 PHASE 9 — Design Premium
+**Objectif : Impact visuel fort**
+
+- [ ] Charte graphique Dark/Gold
+- [ ] Header "Ghost" scroll
+- [ ] Hero section full-screen
+- [ ] Glassmorphism sur les cartes
+- [ ] Animations cubic-bezier
+- [ ] Responsive Mobile-First parfait
+- [ ] Page d'accueil immersive
+
+---
+
+### 🔜 PHASE 10 — Soutenance
+**Objectif : Présentation professionnelle**
+
+- [ ] Demo data complète
+- [ ] Documentation technique
+- [ ] Slides de présentation
+- [ ] Déploiement accessible
+
+---
+
+### 🔜 PHASE 11 — Post-Soutenance
+**Objectif : Lancement réel**
+
+- [ ] VPS + domaine `domizi.bj`
+- [ ] SSL / HTTPS
+- [ ] Optimisation performances
+- [ ] Extension sous-région (TG, CI, SN...)
+- [ ] PWA mobile
+
+---
+
+## 🐛 BUGS HÉRITÉS (ne pas corriger — ils disparaissent avec la refonte)
+
+| Bug | Fichier | Gravité |
+|---|---|---|
+| Code en double | `reserver.php` | 🔴 Critique |
+| `$nom_clean` non défini | `inscription.php` | 🔴 Critique |
+| URL `?id=` vs `?id_coiffeur=` | `annuaire → profil_public` | 🔴 Critique |
+| `views/home.php` inexistant | `index.php` | 🔴 Critique |
+| `SET FOREIGN_KEY_CHECKS=0` | `reserver.php` | 🔴 Sécurité |
+| Rôle Admin dans inscription publique | `inscription.php` | 🔴 Sécurité |
+| `quartier` vs `quartiers` | Plusieurs fichiers | 🟠 Important |
+
+---
+
+## 📏 RÈGLES D'OR DU PROJET
+
+1. Un fichier = une responsabilité
+2. Jamais de SQL dans les vues
+3. Toujours valider les entrées côté serveur
+4. CSRF sur tous les formulaires POST
+5. Expliquer chaque concept avant de coder
+6. Tester chaque module avant de passer au suivant
+
+---
+
+*Ce fichier est le point d'ancrage du projet Domizi.*
+*Il sera mis à jour à chaque phase validée.*
