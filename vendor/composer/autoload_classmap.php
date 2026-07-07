@@ -6,6 +6,12 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
+    'App\\Controllers\\BaseController' => $baseDir . '/src/Controllers/BaseController.php',
+    'App\\Controllers\\DomiziController' => $baseDir . '/src/Controllers/DomiziController.php',
     'App\\Core\\Database' => $baseDir . '/src/Core/Database.php',
+    'App\\Core\\Lang' => $baseDir . '/src/Core/Lang.php',
+    'App\\Core\\Router' => $baseDir . '/src/Core/Router.php',
+    'App\\Core\\Session' => $baseDir . '/src/Core/Session.php',
+    'App\\Core\\View' => $baseDir . '/src/Core/View.php',
     'Composer\\InstalledVersions' => $vendorDir . '/composer/InstalledVersions.php',
 );

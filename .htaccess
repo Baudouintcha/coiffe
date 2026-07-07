@@ -1,12 +1,15 @@
 # DOMIZI - Redirection Apache
 # Redirige toutes les requêtes vers public/index.php
-# sauf les fichiers et dossiers qui existent réellement (CSS, JS, images...)
 
+Options -Indexes
 RewriteEngine On
 
-# Si la requête est pour un fichier ou dossier qui existe → le servir directement
+# Base du projet (sous-dossier XAMPP)
+RewriteBase /coiffons/
+
+# Si la requête est pour un fichier réel (CSS, JS, images) → servir directement
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 
-# Sinon → tout passer à public/index.php
+# Tout le reste → public/index.php
 RewriteRule ^(.*)$ public/index.php [QSA,L]

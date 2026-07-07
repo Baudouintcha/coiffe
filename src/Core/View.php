@@ -20,7 +20,27 @@ namespace App\Core;
  */
 class View
 {
-    private static string $viewsPath = __DIR__ . '/../../views/';
+    private static string $viewsPath = '';
+
+    /**
+     * Retourne le chemin vers les vues (auto-détecté)
+     */
+    private static function getViewsPath(): string
+    {
+        if (empty(self::$viewsPath)) {
+            // Remonte jusqu'à la racine du projet
+            // Fonctionne que le script soit dans public/ ou à la racine
+            $root = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_FILENAME'])), '/');
+
+            // Si on est dans public/, remonter d'un niveau
+            if (str_ends_with($root, '/public')) {
+                $root = dirname($root);
+            }
+
+            self::$viewsPath = $root . '/views/';
+        }
+        return self::$viewsPath;
+    }
 
     /**
      * Rend une vue avec des données optionnelles.
@@ -38,22 +58,20 @@ class View
         // ['user' => $user] devient $user dans la vue
         extract($data);
 
-        $viewFile = self::$viewsPath . $view . '.php';
+        $viewFile = self::getViewsPath() . $view . '.php';
 
         if (!file_exists($viewFile)) {
             http_response_code(404);
-            echo "<h1>Vue introuvable : {$view}</h1>";
+            echo "<h1 style='font-family:sans-serif;color:#D4AF37;background:#0a0a0a;padding:40px'>Vue introuvable : {$view}</h1>";
             return;
         }
 
         if ($layout !== null) {
-            // Capture le contenu de la vue
             ob_start();
             require $viewFile;
             $content = ob_get_clean();
 
-            // Injecte le contenu dans le layout
-            $layoutFile = self::$viewsPath . 'layouts/' . $layout . '.php';
+            $layoutFile = self::getViewsPath() . 'layouts/' . $layout . '.php';
             if (file_exists($layoutFile)) {
                 require $layoutFile;
             } else {
@@ -71,7 +89,7 @@ class View
     public static function make(string $view, array $data = []): string
     {
         extract($data);
-        $viewFile = self::$viewsPath . $view . '.php';
+        $viewFile = self::getViewsPath() . $view . '.php';
 
         if (!file_exists($viewFile)) {
             return '';

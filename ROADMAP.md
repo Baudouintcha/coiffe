@@ -135,7 +135,7 @@ domizi/
 - ~~`plaintes`~~ → fusionnée dans `avis.type = 'plainte'`
 - ~~`abonnements_paiements`~~ → remplacée par `paiements_kkiapay`
 - ~~`boutique`~~ → hors scope
-
+c:\xampp\htdocs\coiffons\images\domizi-scene.jpg   c'rest le chemin du background image
 ---
 
 ## 🚀 PHASES DE DÉVELOPPEMENT
@@ -153,39 +153,61 @@ domizi/
 - [x] ROADMAP créée
 - [x] Créer la nouvelle BDD `domizi` dans phpMyAdmin
 - [x] Installer Composer
-- [ ] Créer le squelette MVC vide
+- [x] Créer le squelette MVC vide
 
 ---
 
-### 🚧 PHASE 1 — Socle MVC
+### ✅ PHASE 1 — Socle MVC (TERMINÉE)
 **Objectif : Le squelette qui fait tourner tout le reste**
 
-- [ ] `composer.json` + autoloading PSR-4
-- [ ] `.env` + `.env.example`
-- [ ] `Core/Database.php` — Singleton PDO
-- [ ] `Core/Router.php` — Dispatch des routes
-- [ ] `Core/Request.php` — Encapsulation des entrées
-- [ ] `Core/Response.php` — Redirections propres
-- [ ] `Core/Session.php` — Gestion session
-- [ ] `Core/View.php` — Rendu des vues
-- [ ] `routes/web.php` — Définition des routes
-- [ ] `.htaccess` — Redirection vers `public/index.php`
-- [ ] Layout de base (header ghost + footer minimal)
+- [x] `composer.json` + autoloading PSR-4
+- [x] `.env` + `.env.example`
+- [x] `src/Core/Database.php` — Singleton PDO
+- [x] `src/Core/Router.php` — Dispatch des routes
+- [x] `src/Core/Session.php` — Gestion session
+- [x] `src/Core/View.php` — Rendu des vues
+- [x] `src/Core/Lang.php` — Gestionnaire multilingue FR/EN/ES/AR
+- [x] `routes/web.php` — Définition des routes
+- [x] `app.php` — Point d'entrée XAMPP
+- [x] `public/index.php` — Point d'entrée VPS
+- [x] `.htaccess` — Redirection
+- [x] `views/errors/404.php`
 
 ---
 
-### 🚧 PHASE 2 — Authentification
-**Objectif : Inscription, connexion, sécurité**
+### ✅ PHASE 1b — Portail DOMIZI (TERMINÉE)
+- [x] `src/Controllers/BaseController.php`
+- [x] `src/Controllers/DomiziController.php`
+- [x] `views/domizi/home.php` — Page portail avec domaines
+- [x] API AJAX métiers
+- [x] Dropdown langue (icône globe)
+- [x] Traductions FR/EN/ES/AR
 
-- [ ] `LoginController.php`
-- [ ] `RegisterController.php` (client + prestataire)
-- [ ] `AuthMiddleware.php`
-- [ ] `RoleMiddleware.php`
-- [ ] `CsrfMiddleware.php`
-- [ ] `AuthValidator.php`
-- [ ] Suppression rôle Admin du formulaire public
-- [ ] `UploadService.php` — Upload sécurisé
-- [ ] Design connexion/inscription premium
+---
+
+### 🚧 PHASE 2 — Page d'accueil "Coiffe Chez Toi" + Auth (EN COURS)
+**Objectif : Le cœur fonctionnel pour la soutenance**
+
+**Flux validé :**
+```
+app.php (DOMIZI) → clic Beauté → métiers → clic Coiffure
+→ a__index.php (Coiffe Chez Toi — page d'accueil coiffure)
+    ↓ bouton "S'inscrire client"       → inscription.php?role=client
+    ↓ bouton "S'inscrire prestataire"  → inscription.php?role=prestataire
+    ↓ bouton "Se connecter"            → connexion.php
+```
+
+- [ ] Brancher `?metier=coiffure` → `a__index.php` dans `app.php`
+- [ ] Refonte hero section `a__index.php` (carousel images + blur)
+- [ ] Refonte `access/inscription.php` :
+  - [ ] Effet dépliage depuis le bouton (animation)
+  - [ ] Background carousel figé + blur YouTube
+  - [ ] Champs selon rôle pré-défini (plus de choix de rôle dans le formulaire)
+  - [ ] Fix bug `$nom_clean` non défini
+  - [ ] Suppression rôle Admin du formulaire public
+  - [ ] Dropdown ville/quartier AJAX → BDD `domizi`
+- [ ] Refonte `access/connexion.php` (style premium)
+- [ ] Fix redirection post-connexion → `app.php`
 
 ---
 

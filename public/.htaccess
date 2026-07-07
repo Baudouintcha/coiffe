@@ -1,0 +1,13 @@
+# DOMIZI - public/.htaccess
+# Ce fichier gère les requêtes à l'intérieur du dossier public/
+
+Options -Indexes
+RewriteEngine On
+RewriteBase /coiffons/public/
+
+# Fichiers et dossiers réels → servis directement
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Tout le reste → index.php
+RewriteRule ^(.*)$ index.php [QSA,L]

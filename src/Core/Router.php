@@ -89,21 +89,36 @@ class Router
 
     /**
      * Nettoie l'URI : retire la base du projet et le query string
+     * Fonctionne que l'entrée soit via public/index.php ou app.php
      */
     private function parseUri(): string
     {
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
 
-        // Retire le query string (?page=home&...)
+        // Retire le query string
         $uri = strtok($uri, '?');
 
-        // Retire le sous-dossier si le projet est dans /coiffons/
-        $base = dirname($_SERVER['SCRIPT_NAME']);
-        if ($base !== '/' && str_starts_with($uri, $base)) {
-            $uri = substr($uri, strlen($base));
+        // Cas 1 : accès via /coiffons/public/index.php ou /coiffons/public/xxx
+        // → retire tout jusqu'à /public inclus
+        if (str_contains($uri, '/public/') || str_ends_with($uri, '/public')) {
+            $uri = preg_replace('#^.*/public#', '', $uri);
+            if (empty($uri)) $uri = '/';
+        }
+        // Cas 2 : accès via /coiffons/app.php ou /coiffons/xxx (via .htaccess)
+        else {
+            // Retire le préfixe /coiffons
+            $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
+            if ($scriptDir !== '' && str_starts_with($uri, $scriptDir)) {
+                $uri = substr($uri, strlen($scriptDir));
+            }
+
+            // Si l'URI commence encore par /app.php → c'est la racine
+            $uri = preg_replace('#^/app\.php#', '', $uri);
+            if (empty($uri)) $uri = '/';
         }
 
-        return '/' . trim($uri, '/');
+        $result = '/' . trim($uri, '/');
+        return $result === '//' ? '/' : $result;
     }
 
     /**

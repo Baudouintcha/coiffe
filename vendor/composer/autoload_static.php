@@ -21,7 +21,13 @@ class ComposerStaticInit30b2d99ce40bec5c657ec0d344e0ad13
     );
 
     public static $classMap = array (
+        'App\\Controllers\\BaseController' => __DIR__ . '/../..' . '/src/Controllers/BaseController.php',
+        'App\\Controllers\\DomiziController' => __DIR__ . '/../..' . '/src/Controllers/DomiziController.php',
         'App\\Core\\Database' => __DIR__ . '/../..' . '/src/Core/Database.php',
+        'App\\Core\\Lang' => __DIR__ . '/../..' . '/src/Core/Lang.php',
+        'App\\Core\\Router' => __DIR__ . '/../..' . '/src/Core/Router.php',
+        'App\\Core\\Session' => __DIR__ . '/../..' . '/src/Core/Session.php',
+        'App\\Core\\View' => __DIR__ . '/../..' . '/src/Core/View.php',
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
     );
 

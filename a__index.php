@@ -301,6 +301,10 @@ try {
                 </p>
                 <p class="text-secondary small mb-4">Découvrez les meilleurs talents de la coiffure à domicile près de chez vous avant de planifier vos bails.</p>
                 <a href="/coiffons/access/connexion.php" class="btn btn-warning text-black fw-bold px-4 py-2.5 shadow-lg small">REJOINDRE LA PLATEFORME / SE CONNECTER</a>
+                <div class="d-flex gap-3 justify-content-center mt-3">
+                    <a href="/coiffons/access/inscription.php?role=client" class="btn btn-outline-warning text-warning fw-bold px-4 py-2 small">JE SUIS CLIENT</a>
+                    <a href="/coiffons/access/inscription.php?role=prestataire" class="btn btn-outline-light text-white fw-bold px-4 py-2 small">JE SUIS COIFFEUR</a>
+                </div>
             </div>
         </section>
 
