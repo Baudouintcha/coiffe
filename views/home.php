@@ -19,9 +19,6 @@
         <div class="overlay"></div>
 
         <div class="hero-content">
-    <div class="lang-selector" style="position: absolute; top: 20px; right: 20px; cursor: pointer;">
-        🌐 FR
-    </div>
 
     <h1 class="typing-effect">COIFFE CHEZ TOI</h1>
     <p>Des coupes modernes, un style unique et une expérience premium.</p>
