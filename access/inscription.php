@@ -4,8 +4,6 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../security/config.php';
 
-// ── Rôle pré-défini depuis l'URL (/index.php?page=register&role=client)
-// On n'affiche plus le choix de rôle dans le formulaire
 $role_predefini = isset($_GET['role']) ? trim($_GET['role']) : 'client';
 if (!in_array($role_predefini, ['client', 'coiffeur'])) {
     $role_predefini = 'client';
@@ -19,22 +17,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         empty($_POST['email']) || empty($_POST['telephone']) || empty($_POST['password']) ||
         empty($_POST['role']) || empty($_POST['ville']) || empty($_POST['id_quartier'])
     ) {
-        $message = "<div class='alert alert-danger text-center'>Champs obligatoires manquants. Veuillez remplir tout le formulaire.</div>";
+        $message = "<div class='alert-msg alert-msg-danger'>Champs obligatoires manquants.</div>";
     } else {
-        $nom      = trim($_POST['nom']);
-        $prenom   = trim($_POST['prenom']);
-        $sexe     = $_POST['sexe'];
-        $email    = trim($_POST['email']);
-        $telephone= trim($_POST['telephone']);
-        $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
-        $role     = $_POST['role'];
-        $id_ville = intval($_POST['ville']);
+        $nom         = trim($_POST['nom']);
+        $prenom      = trim($_POST['prenom']);
+        $sexe        = $_POST['sexe'];
+        $email       = trim($_POST['email']);
+        $telephone   = trim($_POST['telephone']);
+        $password    = password_hash($_POST['password'], PASSWORD_BCRYPT);
+        $role        = $_POST['role'];
+        $id_ville    = intval($_POST['ville']);
         $id_quartier = intval($_POST['id_quartier']);
 
         if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $nom) || !preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $prenom)) {
-            $message = "<div class='alert alert-danger text-center'>Nom et prénom : lettres uniquement.</div>";
+            $message = "<div class='alert-msg alert-msg-danger'>Nom et prénom : lettres uniquement.</div>";
         } elseif ($role == 'coiffeur' && (!isset($_FILES['diplome']) || $_FILES['diplome']['error'] !== 0)) {
-            $message = "<div class='alert alert-danger text-center'>Le diplôme est obligatoire pour les coiffeurs.</div>";
+            $message = "<div class='alert-msg alert-msg-danger'>Le diplôme est obligatoire pour les coiffeurs.</div>";
         } else {
             $diplome_path = NULL;
             if ($role == 'coiffeur') {
@@ -46,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     if (!is_dir($target)) mkdir($target, 0777, true);
                     move_uploaded_file($_FILES['diplome']['tmp_name'], $target . basename($diplome_path));
                 } else {
-                    $message = "<div class='alert alert-danger text-center'>Format diplôme invalide (JPG, PNG, PDF).</div>";
+                    $message = "<div class='alert-msg alert-msg-danger'>Format diplôme invalide (JPG, PNG, PDF).</div>";
                 }
             }
 
@@ -61,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         if (!is_dir($target2)) mkdir($target2, 0777, true);
                         move_uploaded_file($_FILES['photo_profil']['tmp_name'], $target2 . basename($photo_profil_path));
                     } else {
-                        $message = "<div class='alert alert-danger text-center'>Format photo invalide (JPG, PNG).</div>";
+                        $message = "<div class='alert-msg alert-msg-danger'>Format photo invalide (JPG, PNG).</div>";
                     }
                 }
             }
@@ -70,28 +68,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $check = $pdo->prepare("SELECT id FROM users WHERE email = ?");
                 $check->execute([$email]);
                 if ($check->rowCount() > 0) {
-                    $message = "<div class='alert alert-danger text-center'>Cet email est déjà utilisé.</div>";
+                    $message = "<div class='alert-msg alert-msg-danger'>Cet email est déjà utilisé.</div>";
                 } else {
                     $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     if ($ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password, $role, $id_ville, $id_quartier, $diplome_path, $photo_profil_path])) {
-                        $id_nouvel_user = $pdo->lastInsertId();
-
-                        // Session après inscription — utilise $nom et $prenom (pas $nom_clean)
-                        $_SESSION['id_user'] = $id_nouvel_user;
-                        $_SESSION['nom']     = $nom;
-                        $_SESSION['prenom']  = $prenom;
-                        $_SESSION['role']    = $role;
-                        $_SESSION['ville']   = $id_ville;
-
+                        $_SESSION['id_user']  = $pdo->lastInsertId();
+                        $_SESSION['nom']      = $nom;
+                        $_SESSION['prenom']   = $prenom;
+                        $_SESSION['role']     = $role;
+                        $_SESSION['ville']    = $id_ville;
                         $vn = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");
                         $vn->execute([$id_ville]);
                         $vd = $vn->fetch();
                         $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
-
                         header("Location: /coiffons/index.php");
                         exit();
                     } else {
-                        $message = "<div class='alert alert-danger text-center'>Une erreur est survenue lors de l'enregistrement.</div>";
+                        $message = "<div class='alert-msg alert-msg-danger'>Erreur lors de l'enregistrement.</div>";
                     }
                 }
             }
@@ -99,9 +92,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Chargement des villes
 $villes_stmt = $pdo->query("SELECT id, nom_ville FROM villes ORDER BY nom_ville ASC");
 $villes_list = $villes_stmt->fetchAll();
+
+// Récupère la première image du slider pour le fond
+$images_bg = glob(__DIR__ . '/../imgid/*.{jpg,jpeg,png,webp}', GLOB_BRACE);
+$bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) : '/coiffons/images/burst.jpg';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -113,40 +109,28 @@ $villes_list = $villes_stmt->fetchAll();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         :root { --gold: #D4AF37; }
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { min-height: 100vh; font-family: 'Segoe UI', sans-serif; }
 
-        body {
-            min-height: 100vh;
-            font-family: 'Segoe UI', sans-serif;
-            overflow-x: hidden;
-        }
-
-        /* ── FOND FIGÉ ET FLOU (même image que home.php) ── */
+        /* Fond figé flou — même image que home.php slider */
         .auth-bg {
             position: fixed;
             inset: 0;
             z-index: 0;
-            /* On prend la première image du slider comme fond fixe */
-            background-image: url('/coiffons/imgid/pexels-cottonbro-3993134.webp');
+            background-image: url('<?= $bg_image ?>');
             background-size: cover;
             background-position: center;
-            background-repeat: no-repeat;
-            /* Flou prononcé style YouTube */
-            filter: blur(18px) brightness(0.55) saturate(0.8);
-            /* Légèrement agrandi pour éviter les bords blancs du blur */
-            transform: scale(1.08);
+            filter: blur(20px) brightness(0.5);
+            transform: scale(1.1);
         }
-
-        /* Overlay sombre léger pour améliorer la lisibilité */
         .auth-overlay {
             position: fixed;
             inset: 0;
             z-index: 1;
-            background: rgba(0, 0, 0, 0.35);
+            background: rgba(0,0,0,0.3);
         }
 
-        /* ── CONTENEUR CENTRÉ ── */
+        /* Wrapper centré */
         .auth-wrapper {
             position: relative;
             z-index: 10;
@@ -155,82 +139,70 @@ $villes_list = $villes_stmt->fetchAll();
             align-items: center;
             justify-content: center;
             padding: 2rem 1rem;
+            overflow-y: auto;
         }
 
-        /* ── CARTE GLASSMORPHISM ── */
+        /* Carte glassmorphism */
         .glass-card {
-            background: rgba(255, 255, 255, 0.10);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
+            border: 1px solid rgba(255,255,255,0.15);
             border-radius: 20px;
-            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.40),
-                        0 2px 8px rgba(0, 0, 0, 0.20);
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
             padding: 2.5rem 2rem;
             width: 100%;
             max-width: 620px;
             color: #fff;
         }
-
         .glass-card h2 {
             color: var(--gold);
-            letter-spacing: 2px;
             font-size: 1.4rem;
-            margin-bottom: 0.25rem;
+            letter-spacing: 2px;
         }
 
-        /* ── LABELS ── */
+        /* Labels */
         .glass-card label {
-            color: rgba(255, 255, 255, 0.75);
-            font-size: 0.78rem;
+            display: block;
+            color: rgba(255,255,255,0.65);
+            font-size: 0.75rem;
             font-weight: 600;
             letter-spacing: 0.5px;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
 
-        /* ── CHAMPS DE SAISIE — Semi-transparents, texte clair ── */
+        /* Champs semi-transparents */
         .glass-card .form-control,
         .glass-card .form-select {
-            background: rgba(255, 255, 255, 0.12) !important;
-            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            background: rgba(255,255,255,0.10) !important;
+            border: 1px solid rgba(255,255,255,0.20) !important;
             color: #fff !important;
             border-radius: 10px !important;
-            padding: 10px 14px !important;
-            backdrop-filter: blur(4px);
-            transition: border-color 0.2s, background 0.2s;
         }
         .glass-card .form-control:focus,
         .glass-card .form-select:focus {
-            background: rgba(255, 255, 255, 0.20) !important;
+            background: rgba(255,255,255,0.18) !important;
             border-color: var(--gold) !important;
-            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15) !important;
+            box-shadow: 0 0 0 3px rgba(212,175,55,0.15) !important;
             color: #fff !important;
+            outline: none;
         }
-        .glass-card .form-control::placeholder {
-            color: rgba(255, 255, 255, 0.40) !important;
-        }
-        /* Options du select */
-        .glass-card .form-select option {
-            background: #1a1a1a;
-            color: #fff;
-        }
+        .glass-card .form-control::placeholder { color: rgba(255,255,255,0.30) !important; }
+        .glass-card .form-select option { background: #1a1a1a; color: #fff; }
+        .glass-card .form-control[type="file"] { color: rgba(255,255,255,0.6) !important; }
 
-        /* ── BOUTON INPUT FILE ── */
-        .glass-card .form-control[type="file"] {
-            color: rgba(255,255,255,0.7) !important;
+        /* Toggle password */
+        .glass-card .btn-pw {
+            background: rgba(255,255,255,0.10) !important;
+            border: 1px solid rgba(255,255,255,0.20) !important;
+            border-left: none !important;
+            color: rgba(255,255,255,0.5) !important;
+            border-radius: 0 10px 10px 0 !important;
         }
+        .glass-card .btn-pw:hover { background: rgba(212,175,55,0.15) !important; color: var(--gold) !important; }
+        .glass-card .input-group .form-control { border-right: none !important; border-radius: 10px 0 0 10px !important; }
 
-        /* ── BOUTON TOGGLE MOT DE PASSE ── */
-        .glass-card .btn-outline-warning {
-            border-color: rgba(212,175,55,0.5) !important;
-            color: var(--gold) !important;
-            background: rgba(212,175,55,0.08) !important;
-        }
-        .glass-card .btn-outline-warning:hover {
-            background: rgba(212,175,55,0.2) !important;
-        }
-
-        /* ── BOUTON PRINCIPAL ── */
+        /* Bouton submit */
         .btn-gold {
             background: var(--gold);
             color: #000;
@@ -238,84 +210,62 @@ $villes_list = $villes_stmt->fetchAll();
             border: none;
             border-radius: 10px;
             padding: 12px;
-            letter-spacing: 0.5px;
             transition: all 0.25s;
+            width: 100%;
         }
-        .btn-gold:hover {
-            background: #c9a227;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(212,175,55,0.3);
-        }
+        .btn-gold:hover { background: #c9a227; transform: translateY(-1px); }
 
-        /* ── LIEN RETOUR ── */
-        .back-link {
-            position: fixed;
-            top: 20px;
-            left: 24px;
-            z-index: 20;
-            color: rgba(255,255,255,0.7);
-            text-decoration: none;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: color 0.2s;
-        }
-        .back-link:hover { color: var(--gold); }
-
-        /* ── ALERTE ERREUR ADAPTÉE ── */
-        .glass-card .alert-danger {
-            background: rgba(220,53,69,0.25);
-            border: 1px solid rgba(220,53,69,0.4);
-            color: #ffb3b3;
+        /* Messages d'erreur */
+        .alert-msg {
             border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        .alert-msg-danger {
+            background: rgba(220,53,69,0.20);
+            border: 1px solid rgba(220,53,69,0.35);
+            color: #ffb3b3;
         }
 
-        /* ── SCROLLBAR ── */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 10px; }
+        small { color: rgba(255,255,255,0.30); font-size: 0.70rem; }
     </style>
 </head>
 <body>
 
-<!-- Fond flou fixe -->
 <div class="auth-bg"></div>
 <div class="auth-overlay"></div>
 
-<!-- Lien retour -->
-<a href="/coiffons/index.php" class="back-link">
-    <i class="bi bi-arrow-left"></i> Coiffe Chez Toi
-</a>
-
-<!-- Formulaire centré -->
 <div class="auth-wrapper">
     <div class="glass-card">
 
-        <h2 class="text-center">REJOINDRE L'AVENTURE</h2>
-        <p class="text-center mb-4" style="color:rgba(255,255,255,0.45); font-size:0.82rem;">
-            Compte <strong style="color:var(--gold)"><?= $role_predefini === 'coiffeur' ? 'Coiffeur / Prestataire' : 'Client' ?></strong>
-            &nbsp;·&nbsp;
+        <h2 class="text-center mb-1">REJOINDRE L'AVENTURE</h2>
+        <p class="text-center mb-4" style="color:rgba(255,255,255,0.40);font-size:0.8rem;">
+            Compte
+            <strong style="color:var(--gold)"><?= $role_predefini === 'coiffeur' ? 'Coiffeur / Prestataire' : 'Client' ?></strong>
+            &nbsp;&middot;&nbsp;
             <a href="/coiffons/index.php?page=register&role=<?= $role_predefini === 'coiffeur' ? 'client' : 'coiffeur' ?>"
-               style="color:rgba(255,255,255,0.45); text-decoration:none; font-size:0.8rem;">
-                Je suis <?= $role_predefini === 'coiffeur' ? 'un client' : 'un coiffeur' ?> →
+               style="color:rgba(255,255,255,0.40);text-decoration:none;">
+                Je suis <?= $role_predefini === 'coiffeur' ? 'un client' : 'un coiffeur' ?> &rarr;
             </a>
         </p>
 
-        <?php echo $message; ?>
+        <?= $message ?>
 
         <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="role" value="<?= htmlspecialchars($role_predefini) ?>">
 
             <div class="row g-3 mb-2">
-                <div class="col-md-4">
+                <div class="col-4">
                     <label>Nom</label>
                     <input type="text" name="nom" class="form-control" placeholder="Dossou" required>
                 </div>
-                <div class="col-md-4">
+                <div class="col-4">
                     <label>Prénom</label>
                     <input type="text" name="prenom" class="form-control" placeholder="Jean" required>
                 </div>
-                <div class="col-md-4">
+                <div class="col-4">
                     <label>Sexe</label>
                     <select name="sexe" class="form-select" required>
                         <option value="">—</option>
@@ -326,36 +276,36 @@ $villes_list = $villes_stmt->fetchAll();
             </div>
 
             <div class="row g-3 mb-2">
-                <div class="col-md-6">
+                <div class="col-6">
                     <label>Email</label>
                     <input type="email" name="email" class="form-control" placeholder="exemple@mail.com" required>
                 </div>
-                <div class="col-md-6">
-                    <label>Téléphone (WhatsApp)</label>
+                <div class="col-6">
+                    <label>Téléphone</label>
                     <input type="text" name="telephone" class="form-control" placeholder="+229..." required>
                 </div>
             </div>
 
             <div class="row g-3 mb-2">
-                <div class="col-md-6">
+                <div class="col-6">
                     <label>Ville</label>
                     <select name="ville" id="villeSelect" class="form-select" required>
-                        <option value="">Sélectionnez votre ville</option>
+                        <option value="">Sélectionnez</option>
                         <?php foreach ($villes_list as $v): ?>
                             <option value="<?= $v['id'] ?>"><?= htmlspecialchars($v['nom_ville']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-md-6">
+                <div class="col-6">
                     <label>Quartier</label>
                     <select name="id_quartier" id="quartierSelect" class="form-select" required disabled>
-                        <option value="">Choisissez d'abord une ville</option>
+                        <option value="">Choisissez la ville d'abord</option>
                     </select>
                 </div>
             </div>
 
             <div class="mb-2">
-                <label>Photo de profil <span style="color:rgba(255,255,255,0.35); font-size:0.75rem;">(Optionnel)</span></label>
+                <label>Photo de profil <small>(Optionnel)</small></label>
                 <input type="file" name="photo_profil" class="form-control" accept="image/*">
             </div>
 
@@ -363,26 +313,27 @@ $villes_list = $villes_stmt->fetchAll();
             <div class="mb-2">
                 <label>Diplôme / Certification <span style="color:#ff6b6b;">*</span></label>
                 <input type="file" name="diplome" class="form-control" accept="image/*,application/pdf" required>
-                <small style="color:rgba(255,255,255,0.35); font-size:0.72rem;">JPG, PNG ou PDF — vérifié par notre équipe</small>
+                <small>JPG, PNG ou PDF — vérifié par notre équipe avant activation</small>
             </div>
             <?php endif; ?>
 
             <div class="mb-3">
                 <label>Mot de passe</label>
                 <div class="input-group">
-                    <input type="password" name="password" id="passwordField" class="form-control" placeholder="••••••••" required>
-                    <button class="btn btn-outline-warning" type="button" onclick="togglePw()">
+                    <input type="password" name="password" id="pwField" class="form-control" placeholder="••••••••" required>
+                    <button type="button" class="btn-pw btn" onclick="togglePw()">
                         <i class="bi bi-eye" id="pwIcon"></i>
                     </button>
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-gold w-100 py-3 mt-1">CRÉER MON COMPTE</button>
+            <button type="submit" class="btn-gold">CRÉER MON COMPTE</button>
         </form>
 
-        <p class="text-center mt-3" style="font-size:0.82rem; color:rgba(255,255,255,0.4);">
+        <p class="text-center mt-3" style="font-size:0.80rem;color:rgba(255,255,255,0.35);">
             Déjà inscrit ?
-            <a href="/coiffons/access/connexion.php" style="color:var(--gold); text-decoration:none; font-weight:600;">Se connecter</a>
+            <a href="/coiffons/access/connexion.php"
+               style="color:var(--gold);text-decoration:none;font-weight:700;">Se connecter</a>
         </p>
     </div>
 </div>
@@ -392,7 +343,7 @@ document.getElementById('villeSelect').addEventListener('change', function() {
     const idVille = this.value;
     const qs = document.getElementById('quartierSelect');
     if (!idVille) {
-        qs.innerHTML = '<option value="">Choisissez d\'abord une ville</option>';
+        qs.innerHTML = '<option value="">Choisissez la ville d\'abord</option>';
         qs.disabled = true;
         return;
     }
@@ -412,10 +363,10 @@ document.getElementById('villeSelect').addEventListener('change', function() {
 });
 
 function togglePw() {
-    const f = document.getElementById('passwordField');
+    const f = document.getElementById('pwField');
     const i = document.getElementById('pwIcon');
-    if (f.type === 'password') { f.type = 'text'; i.className = 'bi bi-eye-slash'; }
-    else { f.type = 'password'; i.className = 'bi bi-eye'; }
+    f.type = f.type === 'password' ? 'text' : 'password';
+    i.className = f.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
 }
 </script>
 

@@ -52,6 +52,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
         $error = "Veuillez remplir tous les champs.";
     }
 }
+
+// Récupère la première image du slider pour le fond
+$images_bg = glob(__DIR__ . '/../imgid/*.{jpg,jpeg,png,webp}', GLOB_BRACE);
+$bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) : '/coiffons/images/burst.jpg';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -72,17 +76,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
             overflow: hidden;
         }
 
-        /* ── FOND FIGÉ ET FLOU ── */
+        /* Fond figé flou */
         .auth-bg {
             position: fixed;
             inset: 0;
             z-index: 0;
-            background-image: url('/coiffons/imgid/pexels-cottonbro-3993134.webp');
+            background-image: url('<?= $bg_image ?>');
             background-size: cover;
             background-position: center;
-            background-repeat: no-repeat;
-            filter: blur(18px) brightness(0.55) saturate(0.8);
-            transform: scale(1.08);
+            filter: blur(20px) brightness(0.5);
+            transform: scale(1.1);
         }
 
         .auth-overlay {
@@ -203,22 +206,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
             border-radius: 8px;
             font-size: 0.85rem;
         }
-
-        /* ── LIEN RETOUR ── */
-        .back-link {
-            position: fixed;
-            top: 20px;
-            left: 24px;
-            z-index: 20;
-            color: rgba(255,255,255,0.6);
-            text-decoration: none;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: color 0.2s;
-        }
-        .back-link:hover { color: var(--gold); }
     </style>
 </head>
 <body>
@@ -226,11 +213,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
 <!-- Fond flou fixe -->
 <div class="auth-bg"></div>
 <div class="auth-overlay"></div>
-
-<!-- Lien retour -->
-<a href="/coiffons/index.php" class="back-link">
-    <i class="bi bi-arrow-left"></i> Coiffe Chez Toi
-</a>
 
 <!-- Formulaire centré -->
 <div class="auth-wrapper">
