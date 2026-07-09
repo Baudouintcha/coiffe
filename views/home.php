@@ -25,14 +25,14 @@
             <div class="role-selection">
                 <h3>Qui êtes-vous ?</h3>
                 <div class="cta-buttons">
-                    <a href="?page=register&role=client" class="btn-gold">Je suis Client</a>
-                    <a href="?page=register&role=coiffeur" class="btn-gold">Je suis Coiffeur</a>
+                    <a href="/coiffons/index.php?page=register&role=client" class="btn-gold">Je suis Client</a>
+                    <a href="/coiffons/index.php?page=register&role=coiffeur" class="btn-gold">Je suis Coiffeur</a>
                 </div>
             </div>
 
             <div class="login-section" style="margin-top: 30px;">
                 <p style="font-size: 0.9rem; margin-bottom: 10px; opacity: 0.8;">Vous avez déjà un compte ?</p>
-                <a href="?page=login" class="btn-transparent">Se connecter</a>
+                <a href="/coiffons/index.php?page=login" class="btn-transparent">Se connecter</a>
             </div>
         </div>
     </div>
