@@ -79,78 +79,78 @@ try {
 } catch (PDOException $e) {
     $villes = [];
 }
+
+// Images pour le fond du hero annuaire
+$hero_images = glob(__DIR__ . '/../imgid/*.{jpg,jpeg,png,webp}', GLOB_BRACE);
+if (empty($hero_images)) {
+    $hero_images = [__DIR__ . '/../images/burst.jpg'];
+}
 ?>
 
-<section class="py-5 positions-relative" style="background: linear-gradient(135deg, #0a0a0a 0%, #161616 100%); min-height: 95vh;">
-    <div class="container mt-2">
-        
-        <div class="text-center mb-5">
-            <h2 class="text-warning fw-bold display-5" style="letter-spacing: 3px; font-family: 'Playfair Display', serif;">
-                TROUVEZ VOTRE ARTISTE CAPILLAIRE
-            </h2>
-            <p class="text-secondary tracking-widest">Le raffinement de la coiffure privée, directement chez vous.</p>
-        </div>
+<section class="annuaire-hero">
+    <div class="container">
+        <div class="annuaire-hero-content glass-card-annuaire">
+            <h1 class="annuaire-title">Trouvez votre artiste capillaire</h1>
+            <p class="annuaire-sub">Le raffinement de la coiffure privée, directement chez vous.</p>
 
-        <div class="row justify-content-center mb-5">
-            <div class="col-lg-11">
-                <form method="GET" class="p-4 shadow-lg rounded-4" style="background-color: #121212; border: 1px solid rgba(212, 175, 55, 0.25);">
-                    <div class="row g-3 align-items-end">
-                        
-                        <div class="col-md-3">
-                            <label class="text-secondary small fw-bold mb-2 text-uppercase tracking-wider">Ville</label>
-                            <select name="ville" id="villeSelectAnnuaire" class="form-select custom-input py-2">
-                                <option value="">Toutes les villes</option>
-                                <?php foreach ($villes as $v): ?>
-                                    <option value="<?php echo $v['id']; ?>" <?php echo ($ville_filtre == $v['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($v['nom_ville']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-3">
-                            <label class="text-secondary small fw-bold mb-2 text-uppercase tracking-wider">Quartier (Optionnel)</label>
-                            <select name="id_quartier" id="quartierSelectAnnuaire" class="form-select custom-input py-2" <?php echo ($ville_filtre > 0) ? '' : 'disabled'; ?>>
-                                <option value="">Tous les quartiers</option>
-                                <?php 
-                                if ($ville_filtre > 0) {
-                                    $q_stmt = $pdo->prepare("SELECT id, nom_quartier FROM quartier WHERE id_ville = ? ORDER BY nom_quartier ASC");
-                                    $q_stmt->execute([$ville_filtre]);
-                                    while ($q = $q_stmt->fetch()) {
-                                        $selected = ($quartier_filtre == $q['id']) ? 'selected' : '';
-                                        echo "<option value='".$q['id']."' $selected>".htmlspecialchars($q['nom_quartier'])."</option>";
-                                    }
-                                }
-                                ?>
-                            </select>
-                        </div>
-
-                        <div class="col-md-3">
-                            <label class="text-secondary small fw-bold mb-2 text-uppercase tracking-wider">Par Catégorie</label>
-                            <select name="prix_max" class="form-select custom-input py-2">
-                                <option value="">Tous les tarifs</option>
-                                <option value="eco" <?php echo ($prix_filtre === 'eco') ? 'selected' : ''; ?>>Économique (≤ 1 500 F)</option>
-                                <option value="moyen" <?php echo ($prix_filtre === 'moyen') ? 'selected' : ''; ?>>Standard (1 500 - 3 000 F)</option>
-                                <option value="premium" <?php echo ($prix_filtre === 'premium') ? 'selected' : ''; ?>>Premium (> 3 000 F)</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-2">
-                            <label class="text-secondary small fw-bold mb-2 text-uppercase tracking-wider">Budget Max (FCFA)</label>
-                            <input type="number" name="prix_saisie" class="form-control custom-input py-2" placeholder="Ex: 2500" value="<?php echo $prix_saisie > 0 ? $prix_saisie : ''; ?>">
-                        </div>
-                        
-                        <div class="col-md-1">
-                            <button type="submit" class="btn btn-luxury-gold w-100 py-2 rounded-3">
-                                <i class="bi bi-search fs-5"></i>
-                            </button>
-                        </div>
+            <form method="GET" class="annuaire-search-form">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="annuaire-label">Ville</label>
+                        <select name="ville" id="villeSelectAnnuaire" class="form-select custom-input py-2">
+                            <option value="">Toutes les villes</option>
+                            <?php foreach ($villes as $v): ?>
+                                <option value="<?= $v['id'] ?>" <?= ($ville_filtre == $v['id']) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($v['nom_ville']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
-                </form>
-            </div>
+                    <div class="col-md-3">
+                        <label class="annuaire-label">Quartier (Optionnel)</label>
+                        <select name="id_quartier" id="quartierSelectAnnuaire" class="form-select custom-input py-2" <?= ($ville_filtre > 0) ? '' : 'disabled' ?>>
+                            <option value="">Tous les quartiers</option>
+                            <?php
+                            if ($ville_filtre > 0) {
+                                $q_stmt = $pdo->prepare("SELECT id, nom_quartier FROM quartiers WHERE id_ville = ? ORDER BY nom_quartier ASC");
+                                $q_stmt->execute([$ville_filtre]);
+                                while ($q = $q_stmt->fetch()) {
+                                    $selected = ($quartier_filtre == $q['id']) ? 'selected' : '';
+                                    echo "<option value='".$q['id']."' $selected>".htmlspecialchars($q['nom_quartier'])."</option>";
+                                }
+                            }
+                            ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="annuaire-label">Catégorie</label>
+                        <select name="prix_max" class="form-select custom-input py-2">
+                            <option value="">Tous les tarifs</option>
+                            <option value="eco" <?= ($prix_filtre === 'eco') ? 'selected' : '' ?>>Économique (≤ 1 500 F)</option>
+                            <option value="moyen" <?= ($prix_filtre === 'moyen') ? 'selected' : '' ?>>Standard (1 500–3 000 F)</option>
+                            <option value="premium" <?= ($prix_filtre === 'premium') ? 'selected' : '' ?>>Premium (> 3 000 F)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="annuaire-label">Budget max (FCFA)</label>
+                        <input type="number" name="prix_saisie" class="form-control custom-input py-2"
+                               placeholder="Ex: 2500" value="<?= $prix_saisie > 0 ? $prix_saisie : '' ?>">
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" class="btn btn-luxury-gold w-100 py-2 rounded-3">
+                            <i class="bi bi-search fs-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
+    </div>
+</section>
 
+<section class="py-5" style="background:#0a0a0a; min-height: 60vh;">
+    <div class="container">
         <div class="row g-4 justify-content-center">
+            <?php if (!$a_recherche): ?>
             
             <?php if (!$a_recherche): ?>
                 <div class="col-md-10 text-center py-5 fade-in">
@@ -386,6 +386,64 @@ try {
     .style-paragraph {
         line-height: 1.7;
     }
-</style>
+
+    /* ── HERO ANNUAIRE — 35vh compact ── */
+    .annuaire-hero {
+        width: 100%;
+        min-height: 35vh;
+        background: linear-gradient(135deg, #0a0a0a 0%, #141414 100%);
+        display: flex;
+        align-items: flex-end;
+        padding: 0 0 2rem;
+        position: relative;
+        overflow: hidden;
+        border-bottom: 1px solid rgba(212,175,55,0.1);
+    }
+    .annuaire-hero::before {
+        content: '';
+        position: absolute; inset: 0;
+        background: url('/coiffons/imgid/<?= basename($hero_images[0] ?? '') ?>') center/cover no-repeat;
+        filter: blur(4px) brightness(0.18);
+        transform: scale(1.05);
+    }
+    .glass-card-annuaire {
+        position: relative;
+        background: rgba(255,255,255,0.05);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255,255,255,0.09);
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+        padding: 24px;
+        width: 100%;
+    }
+    .annuaire-title {
+        font-family: 'Playfair Display', serif;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 4px;
+    }
+    .annuaire-sub {
+        color: rgba(255,255,255,0.4);
+        font-size: 0.82rem;
+        margin-bottom: 1.2rem;
+    }
+    .annuaire-label {
+        color: rgba(255,255,255,0.5);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 6px;
+    }
+    .search-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: 400px;
+        margin: 0 auto;
+    }</style>
 
 <?php include __DIR__ . '/../layout/footer.php'; ?>

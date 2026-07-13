@@ -20,16 +20,71 @@ switch ($page) {
         exit();
 
     case 'register':
-        // Rôle transmis en paramètre depuis les boutons d'inscription
         $role_valide = in_array($role, ['client', 'prestataire', 'coiffeur']) ? $role : 'client';
         $_GET['role'] = $role_valide;
         include __DIR__ . '/access/inscription.php';
         exit();
 
+    case 'dashboard_coiffeur':
+        // Dashboard coiffeur — uniquement pour les coiffeurs connectés
+        if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'coiffeur') {
+            header("Location: /coiffons/index.php?page=login");
+            exit();
+        }
+        include __DIR__ . '/views/coiffeur/dashboard.php';
+        exit();
+
+    case 'dashboard':
+        // Dashboard client — uniquement pour les clients connectés
+        if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'client') {
+            header("Location: /coiffons/index.php?page=login");
+            exit();
+        }
+        // Prépare les données de matching pour la vue
+        $coiffeurs_matching = [];
+        $id_ville_client    = $_SESSION['ville'] ?? 0;
+        $id_quartier_client = $_SESSION['id_quartier'] ?? 0;
+        try {
+            $stmt = $pdo->prepare("
+                SELECT DISTINCT p.*, u.nom as nom_coiffeur,
+                    q.nom_quartier as quartier, v.nom_ville as ville,
+                    u.is_approved, u.photo_profil as photo_profil_coiffeur
+                FROM prestations p
+                JOIN users u ON p.id_coiffeur = u.id
+                JOIN villes v ON u.ville = v.id
+                LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+                LEFT JOIN quartiers q ON u.id_quartier = q.id
+                WHERE u.role = 'coiffeur' AND u.abonnement_status = 1
+                AND u.ville = ? AND z.id_quartier = ?
+                ORDER BY RAND() LIMIT 9
+            ");
+            $stmt->execute([$id_ville_client, $id_quartier_client]);
+            $coiffeurs_matching = $stmt->fetchAll();
+            if (empty($coiffeurs_matching)) {
+                $stmt2 = $pdo->prepare("
+                    SELECT DISTINCT p.*, u.nom as nom_coiffeur,
+                        q.nom_quartier as quartier, v.nom_ville as ville,
+                        u.is_approved, u.photo_profil as photo_profil_coiffeur
+                    FROM prestations p
+                    JOIN users u ON p.id_coiffeur = u.id
+                    JOIN villes v ON u.ville = v.id
+                    LEFT JOIN quartiers q ON u.id_quartier = q.id
+                    WHERE u.role = 'coiffeur' AND u.abonnement_status = 1 AND u.ville = ?
+                    ORDER BY RAND() LIMIT 9
+                ");
+                $stmt2->execute([$id_ville_client]);
+                $coiffeurs_matching = $stmt2->fetchAll();
+            }
+        } catch (Exception $e) {
+            $coiffeurs_matching = [];
+        }
+        include __DIR__ . '/views/client/dashboard.php';
+        exit();
+
     case 'home':
     default:
-        // Charge toutes les données nécessaires à la vue home
-        include __DIR__ . '/layout/header.php';
+        // La vue home.php est autonome (slider + header intégré)
+        // Elle ne nécessite pas le layout/header.php
 
         $role_actuel  = $_SESSION['role'] ?? 'invite';
         $coiffeur_id  = $_SESSION['id_user'] ?? null;
@@ -143,8 +198,7 @@ switch ($page) {
             ")->fetchAll();
         } catch (Exception $e) { $all_comments = []; }
 
-        // Affiche la vue
+        // Affiche la vue — elle gère son propre HTML complet
         include __DIR__ . '/views/home.php';
-        include __DIR__ . '/layout/footer.php';
         break;
 }

@@ -185,109 +185,267 @@ c:\xampp\htdocs\coiffons\images\domizi-scene.jpg   c'rest le chemin du backgroun
 
 ---
 
-### 🚧 PHASE 2 — Page d'accueil "Coiffe Chez Toi" + Auth (EN COURS)
+### ✅ PHASE 2 — Page d'accueil "Coiffe Chez Toi" + Auth (TERMINÉE)
 **Objectif : Le cœur fonctionnel pour la soutenance**
+
+**Flux implémenté :**
+```
+app.php (DOMIZI) → clic Beauté → métiers → clic Coiffure
+→ index.php (routeur CCT) → views/home.php (slider + boutons)
+    ↓ bouton "Je suis Client"      → inscription.php?role=client
+    ↓ bouton "Je suis Coiffeur"    → inscription.php?role=coiffeur
+    ↓ bouton "Se connecter"        → connexion.php
+    ↓ après connexion client       → ?page=dashboard (views/client/dashboard.php)
+```
+
+- [x] `app.php` branché → `index.php` pour le métier coiffure
+- [x] `views/home.php` — slider carousel imgid/ + boutons rôles
+- [x] Header supprimé de la page d'accueil CCT (vue autonome)
+- [x] `access/inscription.php` — refonte complète :
+  - [x] Fond flou glassmorphism (même image que slider)
+  - [x] Rôle pré-défini via URL (plus de sélection dans le formulaire)
+  - [x] Champs pré-remplis après erreur PHP
+  - [x] Compression automatique photos côté client (Canvas JS)
+  - [x] Fix bug `$nom_clean` → corrigé (`$nom` et `$prenom`)
+  - [x] Admin supprimé du formulaire public
+  - [x] Dropdown ville/quartier AJAX
+  - [x] CSRF token sur tous les formulaires POST
+  - [x] Validation stricte (MIME réel, strip_tags, filter_var)
+  - [x] Protection retour arrière post-inscription
+  - [x] Redirection client → dashboard après inscription
+- [x] `access/connexion.php` — refonte complète :
+  - [x] Fond flou glassmorphism
+  - [x] Sans header/footer
+  - [x] CSRF protection
+  - [x] Protection brute force (5 tentatives / 15 min)
+  - [x] Vérification compte banni
+  - [x] Redirection client → dashboard après connexion
+- [x] `security/csrf.php` — helper CSRF centralisé
+- [x] `views/client/dashboard.php` — homepage client premium :
+  - [x] Hero carousel images imgid/
+  - [x] Carte profil glassmorphism (desktop)
+  - [x] Barre de recherche coiffeur
+  - [x] Cartes coiffeurs avec skeleton si BDD vide
+  - [x] Section "Pourquoi Coiffe Chez Toi"
+  - [x] Footer premium
+- [x] Route `?page=dashboard` dans `index.php` avec matching géo
+
+---
+
+### 🚧 PHASE 2b — Correctifs & Améliorations UI (EN COURS)
+
+- [x] Hero annuaire réduit (35vh glassmorphism)
+- [x] Commentaires logo dans dashboard + navbar
+- [ ] Fix : redirection post-inscription pointe encore `/coiffons/index.php` au lieu de `?page=dashboard` → à vérifier selon config BDD active
+- [ ] Annuaire — support paramètre `?q=` pour la recherche par nom
+
+---
+
+### 🚧 PHASE 3 — Module Prestataire/Coiffeur (EN COURS)
+**Objectif : Dashboard premium + gestion activité quotidienne**
 
 **Flux validé :**
 ```
-app.php (DOMIZI) → clic Beauté → métiers → clic Coiffure
-→ a__index.php (Coiffe Chez Toi — page d'accueil coiffure)
-    ↓ bouton "S'inscrire client"       → inscription.php?role=client
-    ↓ bouton "S'inscrire prestataire"  → inscription.php?role=prestataire
-    ↓ bouton "Se connecter"            → connexion.php
+Inscription coiffeur → Dashboard coiffeur
+    ↓ Bannière rouge si abonnement non payé
+    ↓ Bannière jaune si diplôme non approuvé
+    ↓ Pages existantes conservées (catalogue, agenda, RDV)
+    ↓ Refonte visuelle Dark/Gold cohérente
 ```
 
-- [ ] Brancher `?metier=coiffure` → `a__index.php` dans `app.php`
-- [ ] Refonte hero section `a__index.php` (carousel images + blur)
-- [ ] Refonte `access/inscription.php` :
-  - [ ] Effet dépliage depuis le bouton (animation)
-  - [ ] Background carousel figé + blur YouTube
-  - [ ] Champs selon rôle pré-défini (plus de choix de rôle dans le formulaire)
-  - [ ] Fix bug `$nom_clean` non défini
-  - [ ] Suppression rôle Admin du formulaire public
-  - [ ] Dropdown ville/quartier AJAX → BDD `domizi`
-- [ ] Refonte `access/connexion.php` (style premium)
-- [ ] Fix redirection post-connexion → `app.php`
+**Données adaptées BDD `domizi` (migration future) :**
+```
+cft (actuelle)          domizi (future)
+──────────────          ──────────────
+prestations          →  services
+users.abonnement_status → users.abonnement_status
+rendez_vous          →  rendez_vous (même structure)
+```
+
+**Phase 3A — Dashboard coiffeur (UI premium)**
+- [x] `views/coiffeur/dashboard.php` — Dashboard premium :
+  - [x] Navbar sidebar desktop / bottom nav mobile
+  - [x] Hero glassmorphism : stats du jour (RDV, gains, demandes)
+  - [x] Bannière abonnement (rouge si inactif)
+  - [x] Bannière approbation (jaune si diplôme en attente)
+  - [x] Prochain RDV (carte avec adresse client + lien Maps)
+  - [x] Planning du jour (liste chronologique)
+  - [x] Demandes en attente (accepter/refuser)
+  - [x] Complétude du profil (% calculé dynamiquement)
+  - [x] Portefeuille solde disponible
+  - [x] Actions rapides (catalogue, agenda, zones)
+- [x] Route `?page=dashboard_coiffeur` dans `index.php`
+- [x] Redirection post-connexion coiffeur → dashboard_coiffeur
+- [x] Redirection post-inscription coiffeur → dashboard_coiffeur
+
+**Phase 3B — Refactoring pages existantes**
+- [ ] `coiffeurs/gestion_catalogue.php` — rebrand Dark/Gold (logique conservée)
+- [ ] `coiffeurs/agenda_coiffeurs.php` — rebrand (logique conservée)
+- [ ] `coiffeurs/valider_rendezvous.php` — rebrand (logique conservée)
+- [ ] `coiffeurs/mes_zones.php` — rebrand (logique conservée)
+- [ ] `coiffeurs/portefeuille.php` — intégré dans dashboard
+- [ ] Navbar coiffeur commune (header partagé)
+
+**Phase 3C — Profil public coiffeur**
+- [ ] `coiffeurs/profil_public.php` — fix URL `?id_coiffeur=` vs `?id=`
+- [ ] Calendrier interactif des créneaux (existant amélioré)
+- [ ] Note moyenne + avis affichés
+
+**🔜 Reporté après soutenance :**
+- Statistiques complexes (graphiques, courbes)
+- Messagerie client-coiffeur
+- "Mes déplacements du jour" (carte interactive Google Maps)
+- Navigation GPS temps réel
 
 ---
 
-### 🚧 PHASE 3 — Module Prestataire
-**Objectif : Gérer profil, services et agenda**
+### 🚧 PHASE 4 — Module Client (EN COURS)
+**Objectif : Réservation complète avec localisation**
 
-- [ ] `ProfilController.php`
-- [ ] `CatalogueController.php` — CRUD services
-- [ ] `AgendaController.php` — Disponibilités
-- [ ] Profil public du prestataire
-- [ ] Calendrier interactif des créneaux
-- [ ] Vues redesignées
+- [x] `views/client/dashboard.php` — Homepage client premium ✔
+- [ ] Page réservation `client/reserver.php` refactorisée :
+  - [ ] Saisie localisation client (GPS + adresse manuelle)
+  - [ ] Stockage dans `rendez_vous.client_gps_lat/lng`
+  - [ ] Fix code en double
+  - [ ] Suppression `SET FOREIGN_KEY_CHECKS=0`
+- [ ] `client/mes_rendezvous.php` — rebrand Dark/Gold
+- [ ] `filter/annuaire_coiffeurs.php` — support `?q=` recherche par nom
+- [ ] Portefeuille client (solde + dépôt Kkiapay)
 
----
-
-### 🚧 PHASE 4 — Module Client
-**Objectif : Trouver, réserver, gérer ses RDV**
-
-- [ ] Annuaire des prestataires
-- [ ] `ReservationController.php`
-- [ ] `RendezVousController.php`
-- [ ] `ReservationService.php` (règles 24h/2h/0h)
-- [ ] Portefeuille réel (plus de mode test)
-- [ ] Vues redesignées
+**🔜 Reporté après soutenance :**
+- Système de favoris coiffeurs
+- Filtres avancés dans l'annuaire
 
 ---
 
 ### 🚧 PHASE 5 — Module Admin
 **Objectif : Contrôle total de la plateforme**
 
-- [ ] `DashboardController.php` — KPIs
-- [ ] `ValidationController.php` — Approuver prestataires
-- [ ] `ModerationController.php` — Plaintes et avis
+- [ ] Dashboard admin — KPIs globaux
+- [ ] Validation diplômes prestataires
+- [ ] Gestion plaintes et avis
 - [ ] Vérification `is_approved` dans l'annuaire
 - [ ] Bannissement de compte
-- [ ] Statistiques financières
-- [ ] Layout admin dédié
+- [ ] Statistiques financières (commissions)
+- [ ] Layout admin dédié (sidebar pro)
 
 ---
 
 ### 🚧 PHASE 6 — Paiement Kkiapay
 **Objectif : Paiement Mobile Money réel**
 
-- [ ] Compte Kkiapay + clés API
-- [ ] `PaymentService.php`
-- [ ] Webhook de confirmation
-- [ ] Activation abonnement prestataire
+**Flux abonnement coiffeur :**
+```
+Coiffeur clique "Souscrire" → Kkiapay popup
+→ Paiement Mobile Money
+→ Webhook reçu → abonnement_status = 'actif'
+→ Notification in-app "Abonnement activé"
+```
+
+**Flux portefeuille client :**
+```
+Client clique "Recharger" → Kkiapay popup
+→ Paiement → users.solde += montant
+→ Réservation → users.solde_gele += prix_rdv
+→ RDV terminé → coiffeur reçoit paiement
+```
+
+- [ ] Compte Kkiapay + clés API dans `.env`
+- [ ] `PaymentService.php` — SDK Kkiapay
+- [ ] Webhook endpoint `payment/kkiapay_callback.php`
+- [ ] Activation auto abonnement coiffeur
 - [ ] Dépôt portefeuille client
-- [ ] Tests sandbox
+- [ ] Tests sandbox Kkiapay
 
 ---
 
-### 🚧 PHASE 7 — Notifications & WhatsApp
-**Objectif : Communication automatique**
+### 🚧 PHASE 7 — Notifications (Push Web + In-app)
+**Objectif : Interpeller les utilisateurs même hors du site**
 
-- [ ] Choisir API WhatsApp
-- [ ] `WhatsAppService.php`
-- [ ] `NotificationService.php`
-- [ ] Notifs RDV (prestataire + client)
-- [ ] Reçu WhatsApp post-prestation
-- [ ] Cron J+14 relance client
+**Réponse à la question "est-on sûr que ça peut interpeller les users ?"**
+
+Oui, avec deux niveaux :
+
+**Niveau 1 — In-app (sûr à 100%)** :
+- Cloche dans la navbar (déjà en place)
+- Badge rouge sur l'icône
+- Liste des 5 dernières notifs en dropdown
+- Fonctionne si l'utilisateur est sur le site
+
+**Niveau 2 — Push Notifications (Web Service Workers)** :
+- Le navigateur demande la permission une fois
+- Les notifications arrivent même si le site est fermé
+- Fonctionne sur Android Chrome/Firefox
+- Fonctionne sur desktop (Chrome, Edge, Firefox)
+- **Limitation iOS** : Safari iOS < 16.4 ne supporte pas les Push Web
+  → Solution palliative iOS : email de notification en fallback
+
+**Table `push_subscriptions`** déjà dans la BDD `domizi`.
+
+**Événements notifiés :**
+```
+ÉVÉNEMENT                   COIFFEUR  CLIENT   CANAL
+Nouveau RDV créé            ✅ Push   ─        Push + in-app
+RDV accepté                 ─         ✅ Push  Push + in-app
+RDV annulé                  ✅        ✅       Push + in-app
+Diplôme approuvé            ✅        ─        in-app
+Abonnement expiré           ✅        ─        in-app (bannière)
+Nouvel avis reçu            ✅        ─        in-app
+Paiement reçu               ✅        ─        in-app
+```
+
+- [ ] `security/push_service_worker.js` — Service Worker
+- [ ] `security/push_subscribe.php` — Endpoint souscription
+- [ ] `security/push_send.php` — Envoi notifications
+- [ ] VAPID keys dans `.env`
+- [ ] Intégration dans pages dashboard (demande permission)
+- [ ] Fallback email pour iOS
 
 ---
 
 ### 🚧 PHASE 8 — Avis & Notation
 **Objectif : Système de confiance**
 
-- [ ] Notation étoiles post-prestation
+- [ ] Formulaire notation étoiles post-prestation (client)
 - [ ] Plainte confidentielle si note < 3
-- [ ] Alerte admin sur plainte
-- [ ] Note moyenne dans l'annuaire
-- [ ] Dashboard prestataire — ses avis
+- [ ] Alerte admin si plainte déposée
+- [ ] Note moyenne affichée dans l'annuaire
+- [ ] Dashboard coiffeur — section ses avis
 
 ---
 
-### 🚧 PHASE 9 — Design Premium
-**Objectif : Impact visuel fort**
+### 🔜 PHASE 9 — Post-Soutenance
+**Objectif : Fonctionnalités avancées**
 
-- [ ] Charte graphique Dark/Gold
-- [ ] Header "Ghost" scroll
+- [ ] Statistiques complexes (graphiques revenus)
+- [ ] Messagerie client-coiffeur
+- [ ] "Mes déplacements du jour" (carte Google Maps)
+- [ ] Navigation GPS temps réel
+- [ ] Cron J+14 relance client (WhatsApp/Email)
+- [ ] Module WhatsApp API
+- [ ] Favoris coiffeurs
+- [ ] Système de parrainage
+
+---
+
+### 🔜 PHASE 10 — Soutenance
+**Objectif : Présentation professionnelle**
+
+- [ ] Demo data complète (comptes test, prestations, RDV)
+- [ ] Documentation technique
+- [ ] Déploiement accessible (hébergement ou VPS)
+
+---
+
+### 🔜 PHASE 11 — Post-Soutenance (Lancement)
+**Objectif : Mise en production**
+
+- [ ] VPS + domaine `domizi.bj`
+- [ ] SSL / HTTPS
+- [ ] Migration BDD `cft` → `domizi`
+- [ ] Extension sous-région (TG, CI, SN...)
+- [ ] PWA mobile
+- [ ] Application native (React Native ou Flutter)
 - [ ] Hero section full-screen
 - [ ] Glassmorphism sur les cartes
 - [ ] Animations cubic-bezier
@@ -317,17 +475,17 @@ app.php (DOMIZI) → clic Beauté → métiers → clic Coiffure
 
 ---
 
-## 🐛 BUGS HÉRITÉS (ne pas corriger — ils disparaissent avec la refonte)
+## 🐛 BUGS HÉRITÉS
 
-| Bug | Fichier | Gravité |
-|---|---|---|
-| Code en double | `reserver.php` | 🔴 Critique |
-| `$nom_clean` non défini | `inscription.php` | 🔴 Critique |
-| URL `?id=` vs `?id_coiffeur=` | `annuaire → profil_public` | 🔴 Critique |
-| `views/home.php` inexistant | `index.php` | 🔴 Critique |
-| `SET FOREIGN_KEY_CHECKS=0` | `reserver.php` | 🔴 Sécurité |
-| Rôle Admin dans inscription publique | `inscription.php` | 🔴 Sécurité |
-| `quartier` vs `quartiers` | Plusieurs fichiers | 🟠 Important |
+| Bug | Fichier | Gravité | Statut |
+|---|---|---|---|
+| Code en double | `reserver.php` | 🔴 Critique | ⏳ Sera corrigé Phase 4 |
+| `$nom_clean` non défini | `inscription.php` | 🔴 Critique | ✅ Corrigé |
+| URL `?id=` vs `?id_coiffeur=` | `annuaire → profil_public` | 🔴 Critique | ⏳ Phase 3 |
+| `views/home.php` inexistant | `index.php` | 🔴 Critique | ✅ Créé |
+| `SET FOREIGN_KEY_CHECKS=0` | `reserver.php` | 🔴 Sécurité | ⏳ Phase 4 |
+| Rôle Admin dans inscription publique | `inscription.php` | 🔴 Sécurité | ✅ Corrigé |
+| `quartier` vs `quartiers` | Plusieurs fichiers | 🟠 Important | ⏳ Phase 3 |
 
 ---
 

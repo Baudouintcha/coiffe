@@ -3,53 +3,81 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../security/config.php';
+require_once __DIR__ . '/../security/csrf.php';
 
 $error = "";
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
-    $email    = trim($_POST['email']);
+// ── PROTECTION BRUTE FORCE ──
+// Bloque après 5 tentatives échouées en 15 minutes
+if (!isset($_SESSION['login_attempts'])) {
+    $_SESSION['login_attempts'] = 0;
+    $_SESSION['login_last_attempt'] = 0;
+}
+$now = time();
+$blocked = false;
+if ($_SESSION['login_attempts'] >= 5 && ($now - $_SESSION['login_last_attempt']) < 900) {
+    $blocked = true;
+    $error = "Trop de tentatives. Réessayez dans " . ceil((900 - ($now - $_SESSION['login_last_attempt'])) / 60) . " minutes.";
+}
+// Reset après 15 minutes
+if (($now - $_SESSION['login_last_attempt']) >= 900) {
+    $_SESSION['login_attempts'] = 0;
+}
+
+if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
+
+    // ── VÉRIFICATION CSRF ──
+    csrf_verify();
+
+    $email    = filter_var(trim($_POST['email']), FILTER_SANITIZE_EMAIL);
     $password = $_POST['password'];
 
-    if (!empty($email) && !empty($password)) {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || empty($password)) {
+        $error = "Email ou mot de passe invalide.";
+    } else {
+        $stmt = $pdo->prepare("SELECT id, nom, prenom, role, sexe, ville, password, date_expiration_abo, statut FROM users WHERE email = ? LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        if ($user) {
-            $hash = $user['password'] ?? $user['Password'] ?? $user['mot_de_passe'] ?? null;
+        if ($user && isset($user['statut']) && $user['statut'] === 'banni') {
+            $error = "Ce compte a été suspendu.";
+        } elseif ($user && password_verify($password, $user['password'])) {
+            // ── Connexion réussie → reset tentatives ──
+            $_SESSION['login_attempts'] = 0;
 
-            if ($hash && password_verify($password, $hash)) {
-                $_SESSION['id_user'] = $user['id'];
-                $_SESSION['nom']     = $user['nom'] ?? '';
-                $_SESSION['prenom']  = $user['prenom'] ?? '';
-                $_SESSION['role']    = $user['role'] ?? 'client';
-                $_SESSION['sexe']    = $user['sexe'] ?? '';
+            $_SESSION['id_user'] = $user['id'];
+            $_SESSION['nom']     = $user['nom'];
+            $_SESSION['prenom']  = $user['prenom'];
+            $_SESSION['role']    = $user['role'];
+            $_SESSION['sexe']    = $user['sexe'];
+            $_SESSION['ville']   = $user['ville'];
+            $_SESSION['date_expiration_abo'] = $user['date_expiration_abo'];
 
-                $id_ville = $user['ville'] ?? null;
-                $_SESSION['ville'] = $id_ville;
-                if ($id_ville) {
-                    $vn = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");
-                    $vn->execute([$id_ville]);
-                    $vd = $vn->fetch();
-                    $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
-                }
-
-                $_SESSION['date_expiration_abo'] = $user['date_expiration_abo'] ?? null;
-
-                if ($_SESSION['role'] === 'admin') {
-                    header("Location: /coiffons/first/admin_dashboard.php");
-                } else {
-                    header("Location: /coiffons/index.php");
-                }
-                exit();
-            } else {
-                $error = "Identifiants incorrects.";
+            if ($user['ville']) {
+                $vn = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");
+                $vn->execute([$user['ville']]);
+                $vd = $vn->fetch();
+                $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
             }
+
+            // Redirection selon le rôle
+            if ($user['role'] === 'admin') {
+                header("Location: /coiffons/first/admin_dashboard.php");
+            } elseif ($user['role'] === 'client') {
+                header("Location: /coiffons/index.php?page=dashboard");
+            } elseif ($user['role'] === 'coiffeur') {
+                header("Location: /coiffons/index.php?page=dashboard_coiffeur");
+            } else {
+                header("Location: /coiffons/index.php");
+            }
+            exit();
         } else {
-            $error = "Identifiants incorrects.";
+            // ── Échec → incrémente compteur ──
+            $_SESSION['login_attempts']++;
+            $_SESSION['login_last_attempt'] = $now;
+            // Message générique (ne révèle pas si l'email existe ou non)
+            $error = "Identifiants incorrects. Tentative " . $_SESSION['login_attempts'] . "/5.";
         }
-    } else {
-        $error = "Veuillez remplir tous les champs.";
     }
 }
 
@@ -230,6 +258,7 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
         <?php endif; ?>
 
         <form action="" method="POST">
+            <?= csrf_field() ?>
 
             <div class="mb-3">
                 <label>Adresse email</label>

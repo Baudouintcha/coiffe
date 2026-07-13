@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../security/config.php';
+require_once __DIR__ . '/../security/csrf.php';
 
 // Rôle pré-défini depuis l'URL — plus de sélection dans le formulaire
 $role_predefini = isset($_GET['role']) ? trim($_GET['role']) : 'client';
@@ -13,6 +14,10 @@ if (!in_array($role_predefini, ['client', 'coiffeur'])) {
 $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+
+    // ── VÉRIFICATION CSRF ──
+    csrf_verify();
+
     if (
         empty($_POST['nom']) || empty($_POST['prenom']) || empty($_POST['sexe']) ||
         empty($_POST['email']) || empty($_POST['telephone']) || empty($_POST['password']) ||
@@ -20,59 +25,99 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     ) {
         $message = "<div class='alert-msg alert-msg-danger'>Champs obligatoires manquants.</div>";
     } else {
-        $nom         = trim($_POST['nom']);
-        $prenom      = trim($_POST['prenom']);
+        // ── NETTOYAGE ET VALIDATION STRICTE ──
+        $nom         = strip_tags(trim($_POST['nom']));
+        $prenom      = strip_tags(trim($_POST['prenom']));
         $sexe        = $_POST['sexe'];
-        $email       = trim($_POST['email']);
-        $telephone   = trim($_POST['telephone']);
-        $password    = password_hash($_POST['password'], PASSWORD_BCRYPT);
+        $email       = filter_var(trim($_POST['email']), FILTER_SANITIZE_EMAIL);
+        $telephone   = strip_tags(trim($_POST['telephone']));
+        $password    = $_POST['password'];
         $role        = $_POST['role'];
         $id_ville    = intval($_POST['ville']);
         $id_quartier = intval($_POST['id_quartier']);
 
-        if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $nom) || !preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $prenom)) {
-            $message = "<div class='alert-msg alert-msg-danger'>Nom et prénom : lettres uniquement.</div>";
+        // ── VALIDATIONS ──
+        $errors = [];
+
+        if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $nom)) {
+            $errors[] = "Nom invalide (lettres uniquement).";
+        }
+        if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $prenom)) {
+            $errors[] = "Prénom invalide (lettres uniquement).";
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = "Adresse email invalide.";
+        }
+        if (!in_array($sexe, ['homme', 'femme'])) {
+            $errors[] = "Sexe invalide.";
+        }
+        if (!in_array($role, ['client', 'coiffeur'])) {
+            $errors[] = "Rôle invalide.";
+        }
+        if (strlen($password) < 6) {
+            $errors[] = "Le mot de passe doit faire au moins 6 caractères.";
+        }
+        if ($id_ville <= 0) {
+            $errors[] = "Veuillez sélectionner une ville.";
+        }
+        if (!preg_match('/^\+?[0-9\s\-]{8,20}$/', $telephone)) {
+            $errors[] = "Numéro de téléphone invalide.";
+        }
+
+        if (!empty($errors)) {
+            $message = "<div class='alert-msg alert-msg-danger'>" . implode('<br>', $errors) . "</div>";
         } elseif ($role == 'coiffeur' && (!isset($_FILES['diplome']) || $_FILES['diplome']['error'] !== 0)) {
             $message = "<div class='alert-msg alert-msg-danger'>Le diplôme est obligatoire pour les coiffeurs.</div>";
         } else {
+            $password_hash = password_hash($password, PASSWORD_BCRYPT);
+
             $diplome_path = NULL;
             if ($role == 'coiffeur') {
-                $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
-                $fileExt = strtolower(pathinfo($_FILES['diplome']['name'], PATHINFO_EXTENSION));
-                if (in_array($fileExt, $allowed)) {
-                    $diplome_path = 'uploads/diplomes/' . uniqid('', true) . '.' . $fileExt;
-                    $target = __DIR__ . '/../uploads/diplomes/';
-                    if (!is_dir($target)) mkdir($target, 0777, true);
-                    move_uploaded_file($_FILES['diplome']['tmp_name'], $target . basename($diplome_path));
+                // Traitement diplôme — compressé via Canvas JS (base64) ou PDF brut
+                if (!empty($_POST['diplome_b64'])) {
+                    $b64d = $_POST['diplome_b64'];
+                    if (preg_match('/^data:(image\/(jpeg|png|webp)|application\/pdf);base64,(.+)$/', $b64d, $md)) {
+                        $is_pdf    = $md[1] === 'application/pdf';
+                        $ext_d     = $is_pdf ? 'pdf' : ($md[2] === 'jpeg' ? 'jpg' : $md[2]);
+                        $imgData_d = base64_decode($md[3]);
+                        $diplome_path = 'uploads/diplomes/' . uniqid('', true) . '.' . $ext_d;
+                        $target = __DIR__ . '/../uploads/diplomes/';
+                        if (!is_dir($target)) mkdir($target, 0755, true);
+                        file_put_contents($target . basename($diplome_path), $imgData_d);
+                    } else {
+                        $message = "<div class='alert-msg alert-msg-danger'>Format diplôme invalide (JPG, PNG, PDF).</div>";
+                    }
                 } else {
-                    $message = "<div class='alert-msg alert-msg-danger'>Format diplôme invalide (JPG, PNG, PDF).</div>";
+                    $message = "<div class='alert-msg alert-msg-danger'>Le diplôme est obligatoire pour les coiffeurs.</div>";
                 }
             }
 
             if (empty($message)) {
                 $photo_profil_path = null;
-                if (isset($_FILES['photo_profil']) && $_FILES['photo_profil']['error'] === 0) {
-                    $allowedPhoto = ['jpg', 'jpeg', 'png'];
-                    $photoExt = strtolower(pathinfo($_FILES['photo_profil']['name'], PATHINFO_EXTENSION));
-                    if (in_array($photoExt, $allowedPhoto)) {
-                        $photo_profil_path = 'uploads/profil/' . uniqid('', true) . '.' . $photoExt;
-                        $target2 = __DIR__ . '/../uploads/profil/';
-                        if (!is_dir($target2)) mkdir($target2, 0777, true);
-                        move_uploaded_file($_FILES['photo_profil']['tmp_name'], $target2 . basename($photo_profil_path));
-                    } else {
-                        $message = "<div class='alert-msg alert-msg-danger'>Format photo invalide (JPG, PNG).</div>";
+                // Traitement photo profil — compressée via Canvas JS (base64)
+                if (!empty($_POST['photo_profil_b64'])) {
+                    $b64 = $_POST['photo_profil_b64'];
+                    // Extrait les données base64
+                    if (preg_match('/^data:image\/(jpeg|png|webp);base64,(.+)$/', $b64, $m)) {
+                        $ext       = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+                        $imgData   = base64_decode($m[2]);
+                        $photo_profil_path = 'uploads/profil/' . uniqid('', true) . '.' . $ext;
+                        $target2   = __DIR__ . '/../uploads/profil/';
+                        if (!is_dir($target2)) mkdir($target2, 0755, true);
+                        file_put_contents($target2 . basename($photo_profil_path), $imgData);
                     }
                 }
             }
 
             if (empty($message)) {
+                // Vérifie email unique
                 $check = $pdo->prepare("SELECT id FROM users WHERE email = ?");
                 $check->execute([$email]);
                 if ($check->rowCount() > 0) {
                     $message = "<div class='alert-msg alert-msg-danger'>Cet email est déjà utilisé.</div>";
                 } else {
                     $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    if ($ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password, $role, $id_ville, $id_quartier, $diplome_path, $photo_profil_path])) {
+                    if ($ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, $role, $id_ville, $id_quartier, $diplome_path, $photo_profil_path])) {
                         $_SESSION['id_user']  = $pdo->lastInsertId();
                         $_SESSION['nom']      = $nom;
                         $_SESSION['prenom']   = $prenom;
@@ -82,7 +127,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $vn->execute([$id_ville]);
                         $vd = $vn->fetch();
                         $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
-                        header("Location: /coiffons/index.php");
+
+                        // Redirection selon le rôle — empêche le retour arrière
+                        if ($role === 'client') {
+                            header("Location: /coiffons/index.php?page=dashboard");
+                        } elseif ($role === 'coiffeur') {
+                            header("Location: /coiffons/index.php?page=dashboard_coiffeur");
+                        } else {
+                            header("Location: /coiffons/index.php");
+                        }
+                        // Headers anti-cache pour empêcher le retour arrière vers le formulaire
+                        header("Cache-Control: no-store, no-cache, must-revalidate");
+                        header("Pragma: no-cache");
                         exit();
                     } else {
                         $message = "<div class='alert-msg alert-msg-danger'>Erreur lors de l'enregistrement.</div>";
@@ -255,24 +311,35 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
 
         <?= $message ?>
 
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST" enctype="multipart/form-data" id="inscriptionForm">
+            <?= csrf_field() ?>
             <input type="hidden" name="role" value="<?= htmlspecialchars($role_predefini) ?>">
+            <!-- Champ caché qui recevra la photo compressée en base64 -->
+            <input type="hidden" name="photo_profil_b64" id="photo_profil_b64">
+            <input type="hidden" name="diplome_b64" id="diplome_b64">
 
             <div class="row g-3 mb-2">
                 <div class="col-4">
                     <label>Nom</label>
-                    <input type="text" name="nom" class="form-control" placeholder="Dossou" required>
+                    <!-- value pré-rempli si erreur PHP -->
+                    <input type="text" name="nom" class="form-control"
+                           placeholder="Dossou"
+                           value="<?= htmlspecialchars($_POST['nom'] ?? '') ?>"
+                           required>
                 </div>
                 <div class="col-4">
                     <label>Prénom</label>
-                    <input type="text" name="prenom" class="form-control" placeholder="Jean" required>
+                    <input type="text" name="prenom" class="form-control"
+                           placeholder="Jean"
+                           value="<?= htmlspecialchars($_POST['prenom'] ?? '') ?>"
+                           required>
                 </div>
                 <div class="col-4">
                     <label>Sexe</label>
                     <select name="sexe" class="form-select" required>
                         <option value="">—</option>
-                        <option value="homme">Homme</option>
-                        <option value="femme">Femme</option>
+                        <option value="homme" <?= ($_POST['sexe'] ?? '') === 'homme' ? 'selected' : '' ?>>Homme</option>
+                        <option value="femme" <?= ($_POST['sexe'] ?? '') === 'femme' ? 'selected' : '' ?>>Femme</option>
                     </select>
                 </div>
             </div>
@@ -280,11 +347,17 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
             <div class="row g-3 mb-2">
                 <div class="col-6">
                     <label>Email</label>
-                    <input type="email" name="email" class="form-control" placeholder="exemple@mail.com" required>
+                    <input type="email" name="email" class="form-control"
+                           placeholder="exemple@mail.com"
+                           value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
+                           required>
                 </div>
                 <div class="col-6">
                     <label>Téléphone</label>
-                    <input type="text" name="telephone" class="form-control" placeholder="+229..." required>
+                    <input type="text" name="telephone" class="form-control"
+                           placeholder="+229..."
+                           value="<?= htmlspecialchars($_POST['telephone'] ?? '') ?>"
+                           required>
                 </div>
             </div>
 
@@ -294,42 +367,59 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
                     <select name="ville" id="villeSelect" class="form-select" required>
                         <option value="">Sélectionnez</option>
                         <?php foreach ($villes_list as $v): ?>
-                            <option value="<?= $v['id'] ?>"><?= htmlspecialchars($v['nom_ville']) ?></option>
+                            <option value="<?= $v['id'] ?>"
+                                <?= intval($_POST['ville'] ?? 0) === intval($v['id']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($v['nom_ville']) ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-6">
                     <label>Quartier</label>
-                    <select name="id_quartier" id="quartierSelect" class="form-select" required disabled>
+                    <select name="id_quartier" id="quartierSelect" class="form-select" required
+                            <?= empty($_POST['ville']) ? 'disabled' : '' ?>>
                         <option value="">Choisissez la ville d'abord</option>
                     </select>
                 </div>
             </div>
 
             <div class="mb-2">
-                <label>Photo de profil <small>(Optionnel)</small></label>
-                <input type="file" name="photo_profil" class="form-control" accept="image/*">
+                <label>
+                    Photo de profil
+                    <small>(Optionnel — compressée automatiquement)</small>
+                </label>
+                <!-- L'input file déclenche la compression JS, le fichier réel n'est pas envoyé -->
+                <input type="file" id="photo_profil_input" class="form-control"
+                       accept="image/*" onchange="compresserPhoto(this, 'photo_profil_b64', 'preview_profil')">
+                <div id="preview_profil" style="margin-top:6px;"></div>
             </div>
 
             <?php if ($role_predefini === 'coiffeur'): ?>
             <div class="mb-2">
-                <label>Diplôme / Certification <span style="color:#ff6b6b;">*</span></label>
-                <input type="file" name="diplome" class="form-control" accept="image/*,application/pdf" required>
-                <small>JPG, PNG ou PDF — vérifié par notre équipe avant activation</small>
+                <label>
+                    Diplôme / Certification <span style="color:#ff6b6b;">*</span>
+                    <small>(JPG, PNG, PDF — compressé auto si image)</small>
+                </label>
+                <input type="file" id="diplome_input" class="form-control"
+                       accept="image/*,application/pdf"
+                       onchange="compresserDiplome(this)"
+                       required>
+                <small>Vérifié par notre équipe avant activation</small>
             </div>
             <?php endif; ?>
 
             <div class="mb-3">
                 <label>Mot de passe</label>
                 <div class="input-group">
-                    <input type="password" name="password" id="pwField" class="form-control" placeholder="••••••••" required>
+                    <input type="password" name="password" id="pwField" class="form-control"
+                           placeholder="••••••••" required>
                     <button type="button" class="btn-pw btn" onclick="togglePw()">
                         <i class="bi bi-eye" id="pwIcon"></i>
                     </button>
                 </div>
             </div>
 
-            <button type="submit" class="btn-gold">CRÉER MON COMPTE</button>
+            <button type="submit" class="btn-gold" id="submitBtn">CRÉER MON COMPTE</button>
         </form>
 
         <p class="text-center mt-3" style="font-size:0.80rem;color:rgba(255,255,255,0.35);">
@@ -341,10 +431,30 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
 </div>
 
 <script>
+// ── Protection retour arrière ──
+// Empêche de revenir sur le formulaire après inscription réussie
+history.pushState(null, null, location.href);
+window.addEventListener('popstate', () => {
+    history.pushState(null, null, location.href);
+});
+
+// ── Restauration du quartier si ville pré-remplie (après erreur PHP) ──
+const villePreRemplie = '<?= intval($_POST['ville'] ?? 0) ?>';
+const quartierPreRempli = '<?= intval($_POST['id_quartier'] ?? 0) ?>';
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (villePreRemplie && villePreRemplie !== '0') {
+        chargerQuartiers(villePreRemplie, quartierPreRempli);
+    }
+});
+
 document.getElementById('villeSelect').addEventListener('change', function() {
-    const idVille = this.value;
+    chargerQuartiers(this.value, null);
+});
+
+function chargerQuartiers(idVille, quartierASelectionner) {
     const qs = document.getElementById('quartierSelect');
-    if (!idVille) {
+    if (!idVille || idVille === '0') {
         qs.innerHTML = '<option value="">Choisissez la ville d\'abord</option>';
         qs.disabled = true;
         return;
@@ -358,6 +468,10 @@ document.getElementById('villeSelect').addEventListener('change', function() {
                 const o = document.createElement('option');
                 o.value = q.id;
                 o.textContent = q.nom_quartier;
+                // Re-sélectionne le quartier si erreur PHP
+                if (quartierASelectionner && q.id == quartierASelectionner) {
+                    o.selected = true;
+                }
                 qs.appendChild(o);
             });
         })
@@ -365,13 +479,99 @@ document.getElementById('villeSelect').addEventListener('change', function() {
             qs.innerHTML = '<option value="0">Centre-ville</option>';
             qs.disabled = false;
         });
-});
+}
 
+// ── Toggle mot de passe ──
 function togglePw() {
     const f = document.getElementById('pwField');
     const i = document.getElementById('pwIcon');
     f.type = f.type === 'password' ? 'text' : 'password';
     i.className = f.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+}
+
+// ── Compression automatique des photos côté client ──
+// Utilise le Canvas HTML5 pour réduire le poids avant envoi
+// Transparent pour l'utilisateur, fonctionne sur mobile
+function compresserImageCanvas(file, qualite, maxLargeur, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w = img.width, h = img.height;
+            // Redimensionne si trop grand
+            if (w > maxLargeur) {
+                h = Math.round(h * maxLargeur / w);
+                w = maxLargeur;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            // Convertit en JPEG compressé
+            const b64 = canvas.toDataURL('image/jpeg', qualite);
+            callback(b64);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function compresserPhoto(input, champCible, previewId) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Si c'est déjà petit (<= 800Ko), pas besoin de compresser
+    if (file.size <= 819200) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById(champCible).value = e.target.result;
+            afficherPreview(previewId, e.target.result);
+        };
+        reader.readAsDataURL(file);
+        return;
+    }
+
+    // Compresse : max 800px de large, qualité 0.75
+    compresserImageCanvas(file, 0.75, 800, (b64) => {
+        document.getElementById(champCible).value = b64;
+        afficherPreview(previewId, b64);
+    });
+}
+
+function compresserDiplome(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Si PDF, on ne compresse pas (pas d'image)
+    if (file.type === 'application/pdf') {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('diplome_b64').value = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        return;
+    }
+
+    // Compresse l'image du diplôme : max 1200px, qualité 0.80
+    if (file.size <= 2097152) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('diplome_b64').value = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    } else {
+        compresserImageCanvas(file, 0.80, 1200, (b64) => {
+            document.getElementById('diplome_b64').value = b64;
+        });
+    }
+}
+
+function afficherPreview(previewId, src) {
+    const el = document.getElementById(previewId);
+    if (el) {
+        el.innerHTML = `<img src="${src}" style="height:50px;width:50px;object-fit:cover;border-radius:50%;border:2px solid var(--gold);margin-top:4px;">`;
+    }
 }
 </script>
 
