@@ -11,7 +11,7 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
 }
 
 require_once __DIR__ . '/../security/config.php';
-include __DIR__ . '/../layout/header.php';
+include __DIR__ . '/../layout/header_coiffeur.php';
 
 $coiffeur_id = $_SESSION['id_user']; 
 $message = "";
@@ -162,11 +162,22 @@ $stmt->execute([$coiffeur_id]);
 $prestations = $stmt->fetchAll();
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh;">
-    <div class="container mt-4">
-        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">GÉRER MON CATALOGUE</h2>
-
-        <?php echo $message; ?>
+<section class="py-0">
+<div class="d-flex align-items-center justify-content-between mb-4 pt-2">
+    <div>
+        <h2 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--gold);margin-bottom:2px;">Mon Catalogue</h2>
+        <p style="color:rgba(255,255,255,0.35);font-size:0.78rem;margin:0;">Gérez vos prestations et tarifs</p>
+    </div>
+    <a href="/coiffons/index.php?page=dashboard_coiffeur"
+       style="color:rgba(255,255,255,0.35);text-decoration:none;font-size:0.8rem;display:flex;align-items:center;gap:5px;">
+        <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+</div>
+<?php if (!empty($message)): ?>
+    <div class="<?= str_contains($message,'success') ? 'msg-success' : 'msg-danger' ?> mb-3">
+        <?= strip_tags($message, '<strong><br>') ?>
+    </div>
+<?php endif; ?>
 
         <div class="row g-4">
             <div class="col-md-4">
@@ -208,7 +219,9 @@ $prestations = $stmt->fetchAll();
                             </button>
                         </div>
 
-                        <button type="submit" name="ajouter_prestation" class="btn btn-gold w-100 py-2 fw-bold mt-2">AJOUTER AU CATALOGUE</button>
+                        <button type="submit" name="ajouter_prestation" class="btn btn-gold-cct w-100 py-2 fw-bold mt-2">
+                            <i class="bi bi-plus-circle me-1"></i> AJOUTER AU CATALOGUE
+                        </button>
                     </form>
                 </div>
             </div>
@@ -342,7 +355,6 @@ $prestations = $stmt->fetchAll();
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
-            </div>
         </div>
     </div>
 </section>
@@ -399,9 +411,15 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 <style>
-    .form-control, .form-select { background-color: #fff !important; color: #000 !important; border-radius: 8px; }
-    .btn-gold { background-color: var(--gold); color: black; border: none; border-radius: 8px; }
-    .btn-gold:hover { background-color: #c99b2c; color: black; }
+    .fc-dark { background: rgba(255,255,255,0.06) !important; border: 1px solid rgba(255,255,255,0.12) !important; color: #fff !important; border-radius: 10px !important; }
+    .fc-dark:focus { border-color: var(--gold) !important; box-shadow: none !important; }
+    .fc-dark::placeholder { color: rgba(255,255,255,0.25) !important; }
+    .fc-dark option { background:#111; color:#fff; }
+    .btn-gold-cct { background:var(--gold); color:#000; font-weight:700; border:none; border-radius:10px; }
+    .btn-gold-cct:hover { background:#c9a227; color:#000; }
+    .glass-cct { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; }
+    .msg-success { background:rgba(25,135,84,0.15);border:1px solid rgba(25,135,84,0.3);color:#6ee7b7;border-radius:10px;padding:10px 16px;font-size:0.85rem; }
+    .msg-danger  { background:rgba(220,53,69,0.15);border:1px solid rgba(220,53,69,0.3);color:#ffb3b3;border-radius:10px;padding:10px 16px;font-size:0.85rem; }
 </style>
 
-<?php include __DIR__ . '/../layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer_coiffeur.php'; ?>

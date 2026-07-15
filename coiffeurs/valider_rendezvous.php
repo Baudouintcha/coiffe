@@ -7,7 +7,7 @@ require_once __DIR__ . '/../security/config.php';
 
 // SÉCURITÉ : Seul un coiffeur connecté peut gérer cette page
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'coiffeur') {
-    header("Location: /coiffons/index.php");
+    header("Location: /coiffons/index.php?page=login");
     exit();
 }
 
@@ -140,117 +140,117 @@ $stmt = $pdo->prepare($query);
 $stmt->execute([$coiffeur_id]);
 $mes_rendezvous = $stmt->fetchAll();
 
-include __DIR__ . '/../layout/header.php';
+include __DIR__ . '/../layout/header_coiffeur.php';
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 100vh; color: #fff;">
-    <div class="container py-2">
-        
-        <div class="row mb-5">
-            <div class="col-12 text-center">
-                <h1 class="text-warning fw-bold h3 text-uppercase" style="letter-spacing: 1.5px;">
-                    <i class="bi bi-calendar-check me-2"></i>Gestion des Rendez-vous
-                </h1>
-                <p class="text-muted small mb-0">Visualisez, acceptez ou refusez vos demandes de prestations</p>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-12 col-lg-10 mx-auto">
-                
-                <?php echo $message_action; ?>
-
-                <div class="card p-3 border-0 shadow-lg" style="background-color: #0c0c0c; border-radius: 12px;">
-                    <div class="table-responsive">
-                        <table class="table table-dark table-hover align-middle mb-0" style="--bs-table-bg: #0c0c0c;">
-                            <thead>
-                                <tr class="text-secondary border-bottom border-secondary text-uppercase small" style="font-size: 0.75rem; letter-spacing: 1px;">
-                                    <th class="ps-3 py-3">Client</th>
-                                    <th class="py-3">Ville</th>
-                                    <th class="py-3">Prestation</th>
-                                    <th class="py-3 text-center">Date & Heure</th>
-                                    <th class="py-3 text-center">Statut</th>
-                                    <th class="pe-3 py-3 text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($mes_rendezvous)): ?>
-                                    <tr>
-                                        <td colspan="6" class="text-muted text-center py-5">
-                                            <i class="bi bi-calendar-x d-block fs-3 mb-2 text-secondary"></i>
-                                            Aucun rendez-vous enregistré pour le moment.
-                                        </td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach ($mes_rendezvous as $rdv): ?>
-                                        <tr class="border-bottom border-dark" style="font-size: 0.85rem;">
-                                            
-                                            <td class="ps-3 py-3">
-                                                <span class="text-white fw-bold"><?php echo htmlspecialchars(strtoupper($rdv['nom_client'])); ?></span>
-                                            </td>
-                                            
-                                            <td class="py-3 text-secondary">
-                                                <i class="bi bi-geo-alt text-warning me-1"></i>
-                                                <?php echo htmlspecialchars($rdv['nom_ville']); ?>
-                                            </td>
-                                            
-                                            <td class="py-3">
-                                                <span class="d-block text-light"><?php echo htmlspecialchars($rdv['nom_style']); ?></span>
-                                                <small class="text-success fw-bold"><?php echo number_format($rdv['prix'], 0, ',', ' '); ?> F</small>
-                                            </td>
-                                            
-                                            <td class="py-3 text-center">
-                                                <span class="d-block text-white"><?php echo date('d/m/Y', strtotime($rdv['date_rdv'])); ?></span>
-                                                <span class="badge bg-warning text-black fw-bold mt-1" style="font-size: 0.7rem;"><?php echo substr($rdv['heure_debut'], 0, 5); ?></span>
-                                            </td>
-                                            
-                                            <td class="py-3 text-center">
-                                                <?php if ($rdv['statut_rdv'] === 'confirme'): ?>
-                                                    <span class="badge bg-success-subtle text-success border border-success px-2 py-1">Confirmé</span>
-                                                <?php elseif ($rdv['statut_rdv'] === 'expire'): ?>
-                                                    <span class="badge bg-secondary-subtle text-muted border border-secondary px-2 py-1">Expiré</span>
-                                                <?php elseif ($rdv['statut_rdv'] === 'annule'): ?>
-                                                    <span class="badge bg-danger-subtle text-danger border border-danger px-2 py-1">Annulé</span>
-                                                <?php else: ?>
-                                                    <span class="badge bg-warning-subtle text-warning border border-warning px-2 py-1 text-uppercase animate-pulse" style="font-size: 0.7rem;">En attente</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            
-                                            <td class="pe-3 py-3 text-end">
-                                                <?php if ($rdv['statut_rdv'] === 'en_attente'): ?>
-                                                    <div class="d-inline-flex gap-2">
-                                                        <a href="valider_rendezvous.php?action=accepter&id_rdv=<?php echo $rdv['id']; ?>" class="btn btn-sm btn-success fw-bold px-3">
-                                                            <i class="bi bi-check-lg me-1"></i> Accepter
-                                                        </a>
-                                                        <a href="valider_rendezvous.php?action=refuser&id_rdv=<?php echo $rdv['id']; ?>" class="btn btn-sm btn-outline-danger px-3" onclick="return confirm('Refuser ce rendez-vous ?');">
-                                                            <i class="bi bi-x-lg"></i>
-                                                        </a>
-                                                    </div>
-                                                <?php else: ?>
-                                                    <span class="text-muted small"><i class="bi bi-check2-all"></i> Traité</span>
-                                                <?php endif; ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-            </div>
-        </div>
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--gold);margin-bottom:2px;">
+            <i class="bi bi-calendar-check me-2"></i>Mes Rendez-vous
+        </h2>
+        <p style="color:rgba(255,255,255,0.35);font-size:0.78rem;margin:0;">Gérez vos demandes et confirmations</p>
     </div>
-</section>
+    <a href="/coiffons/index.php?page=dashboard_coiffeur"
+       style="color:rgba(255,255,255,0.35);text-decoration:none;font-size:0.8rem;display:flex;align-items:center;gap:5px;">
+        <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+</div>
+
+<?php if (!empty($message_action)):
+    $is_success = str_contains($message_action, 'success') || str_contains($message_action, 'validé');
+?>
+    <div class="<?= $is_success ? 'msg-success' : 'msg-danger' ?> mb-4">
+        <?= strip_tags($message_action, '<strong>') ?>
+    </div>
+<?php endif; ?>
+
+<div class="glass-cct" style="overflow:hidden;">
+    <div class="table-responsive">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <th style="padding:12px 16px;color:rgba(255,255,255,0.35);font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Client</th>
+                    <th style="padding:12px 16px;color:rgba(255,255,255,0.35);font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Prestation</th>
+                    <th style="padding:12px 16px;color:rgba(255,255,255,0.35);font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;text-align:center;">Date & Heure</th>
+                    <th style="padding:12px 16px;color:rgba(255,255,255,0.35);font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;text-align:center;">Statut</th>
+                    <th style="padding:12px 16px;color:rgba(255,255,255,0.35);font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($mes_rendezvous)): ?>
+                    <tr>
+                        <td colspan="5" style="padding:3rem;text-align:center;color:rgba(255,255,255,0.2);font-size:0.85rem;">
+                            <i class="bi bi-calendar-x" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+                            Aucun rendez-vous enregistré
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($mes_rendezvous as $rdv):
+                        $badge_style = match($rdv['statut_rdv']) {
+                            'confirme','accepte' => 'background:rgba(25,135,84,0.2);color:#6ee7b7;border:1px solid rgba(25,135,84,0.3)',
+                            'annule','expire'    => 'background:rgba(220,53,69,0.15);color:#ffb3b3;border:1px solid rgba(220,53,69,0.25)',
+                            'termine'            => 'background:rgba(99,102,241,0.15);color:#a5b4fc;border:1px solid rgba(99,102,241,0.25)',
+                            default              => 'background:rgba(255,193,7,0.15);color:#ffd60a;border:1px solid rgba(255,193,7,0.25)',
+                        };
+                        $badge_label = match($rdv['statut_rdv']) {
+                            'confirme','accepte' => 'Confirmé',
+                            'annule'             => 'Annulé',
+                            'expire'             => 'Expiré',
+                            'termine'            => 'Terminé',
+                            default              => 'En attente',
+                        };
+                    ?>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                        <td style="padding:14px 16px;">
+                            <div style="font-weight:600;font-size:0.85rem;"><?= htmlspecialchars(strtoupper($rdv['nom_client'])) ?></div>
+                            <div style="color:rgba(255,255,255,0.35);font-size:0.72rem;">
+                                <i class="bi bi-geo-alt" style="color:var(--gold)"></i>
+                                <?= htmlspecialchars($rdv['nom_ville']) ?>
+                            </div>
+                        </td>
+                        <td style="padding:14px 16px;">
+                            <div style="font-size:0.85rem;color:rgba(255,255,255,0.8);"><?= htmlspecialchars($rdv['nom_style']) ?></div>
+                            <div style="color:var(--gold);font-weight:700;font-size:0.78rem;"><?= number_format($rdv['prix'], 0, ',', ' ') ?> FCFA</div>
+                        </td>
+                        <td style="padding:14px 16px;text-align:center;">
+                            <div style="font-size:0.82rem;color:#fff;"><?= date('d/m/Y', strtotime($rdv['date_rdv'])) ?></div>
+                            <span style="background:var(--gold-dim);color:var(--gold);font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:20px;"><?= substr($rdv['heure_debut'], 0, 5) ?></span>
+                        </td>
+                        <td style="padding:14px 16px;text-align:center;">
+                            <span style="<?= $badge_style ?>;font-size:0.68rem;font-weight:700;padding:3px 10px;border-radius:20px;">
+                                <?= $badge_label ?>
+                            </span>
+                        </td>
+                        <td style="padding:14px 16px;text-align:right;">
+                            <?php if ($rdv['statut_rdv'] === 'en_attente'): ?>
+                                <div style="display:flex;gap:6px;justify-content:flex-end;">
+                                    <a href="valider_rendezvous.php?action=accepter&id_rdv=<?= $rdv['id'] ?>"
+                                       style="background:rgba(25,135,84,0.2);color:#6ee7b7;border:1px solid rgba(25,135,84,0.3);font-size:0.72rem;font-weight:700;padding:5px 12px;border-radius:20px;text-decoration:none;">
+                                        <i class="bi bi-check-lg me-1"></i>Accepter
+                                    </a>
+                                    <a href="valider_rendezvous.php?action=refuser&id_rdv=<?= $rdv['id'] ?>"
+                                       style="background:rgba(220,53,69,0.15);color:#ffb3b3;border:1px solid rgba(220,53,69,0.25);font-size:0.72rem;font-weight:700;padding:5px 12px;border-radius:20px;text-decoration:none;"
+                                       onclick="return confirm('Refuser ce rendez-vous ?')">
+                                        <i class="bi bi-x-lg"></i>
+                                    </a>
+                                </div>
+                            <?php else: ?>
+                                <span style="color:rgba(255,255,255,0.2);font-size:0.75rem;"><i class="bi bi-check2-all"></i> Traité</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
 
 <style>
-    /* Effet d'animation discret pour le badge en attente */
-    .animate-pulse { animation: pulse 1.8s infinite; }
-    @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
-    
-    /* Table hover subtile */
-    .table-hover tr:hover { --bs-table-hover-bg: #121212 !important; }
+    .glass-cct { background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px; }
+    .msg-success { background:rgba(25,135,84,0.15);border:1px solid rgba(25,135,84,0.3);color:#6ee7b7;border-radius:10px;padding:10px 16px;font-size:0.85rem; }
+    .msg-danger  { background:rgba(220,53,69,0.15);border:1px solid rgba(220,53,69,0.3);color:#ffb3b3;border-radius:10px;padding:10px 16px;font-size:0.85rem; }
 </style>
 
-<?php include __DIR__ . '/../layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer_coiffeur.php'; ?>
 

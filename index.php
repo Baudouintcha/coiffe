@@ -34,7 +34,14 @@ switch ($page) {
         include __DIR__ . '/views/coiffeur/dashboard.php';
         exit();
 
-    case 'dashboard':
+    case 'dashboard_coiffeur':
+        // Dashboard coiffeur — uniquement pour les coiffeurs connectés
+        if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'coiffeur') {
+            header("Location: /coiffons/index.php?page=login");
+            exit();
+        }
+        include __DIR__ . '/views/coiffeur/dashboard.php';
+        exit();
         // Dashboard client — uniquement pour les clients connectés
         if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'client') {
             header("Location: /coiffons/index.php?page=login");

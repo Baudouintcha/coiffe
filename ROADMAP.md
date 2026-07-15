@@ -279,17 +279,20 @@ rendez_vous          →  rendez_vous (même structure)
 - [x] Redirection post-inscription coiffeur → dashboard_coiffeur
 
 **Phase 3B — Refactoring pages existantes**
-- [ ] `coiffeurs/gestion_catalogue.php` — rebrand Dark/Gold (logique conservée)
-- [ ] `coiffeurs/agenda_coiffeurs.php` — rebrand (logique conservée)
-- [ ] `coiffeurs/valider_rendezvous.php` — rebrand (logique conservée)
-- [ ] `coiffeurs/mes_zones.php` — rebrand (logique conservée)
-- [ ] `coiffeurs/portefeuille.php` — intégré dans dashboard
-- [ ] Navbar coiffeur commune (header partagé)
+- [x] `layout/header_coiffeur.php` — Navbar Dark/Gold partagée créée
+- [x] `layout/footer_coiffeur.php` — Footer minimal créé
+- [x] `coiffeurs/gestion_catalogue.php` — rebrand Dark/Gold ✔
+- [x] `coiffeurs/agenda_coiffeurs.php` — rebrand ✔
+- [x] `coiffeurs/valider_rendezvous.php` — rebrand Dark/Gold ✔
+- [x] `coiffeurs/mes_zones.php` — rebrand Dark/Gold ✔
+- [x] `coiffeurs/portefeuille.php` — rebrand Dark/Gold ✔
 
 **Phase 3C — Profil public coiffeur**
-- [ ] `coiffeurs/profil_public.php` — fix URL `?id_coiffeur=` vs `?id=`
-- [ ] Calendrier interactif des créneaux (existant amélioré)
-- [ ] Note moyenne + avis affichés
+- [x] `coiffeurs/profil_public.php` — fix URL `?id=` + `?id_coiffeur=` acceptés
+- [x] Requêtes SQL optimisées (AVG direct, filtrage par ID coiffeur)
+- [x] Header/footer standalone premium (sans ancien layout)
+- [ ] Note moyenne + avis affichés depuis vraies données BDD
+- [ ] Calendrier créneaux avec intervalles configurables
 
 **🔜 Reporté après soutenance :**
 - Statistiques complexes (graphiques, courbes)

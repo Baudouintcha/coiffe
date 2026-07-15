@@ -11,7 +11,7 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
 }
 
 require_once __DIR__ . '/../security/config.php';
-include __DIR__ . '/../layout/header.php';
+include __DIR__ . '/../layout/header_coiffeur.php';
 
 $id_coiffeur = $_SESSION['id_user'];
 $message = "";
@@ -85,79 +85,72 @@ $raw_zones = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 $mes_zones_actives = array_map('intval', $raw_zones); // <--- Forçage de type strict
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh; color: #fff;">
-    <div class="container mt-4">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                
-                <?php echo $message; ?>
-
-                <div class="card p-4 shadow-lg" style="background-color: #111; border: 1px solid var(--gold, #f39c12); border-radius: 20px;">
-                    
-                    <div class="text-center mb-4">
-                        <h2 class="text-warning fw-bold" style="letter-spacing: 1px;">PÉRIMÈTRE D'INTERVENTION</h2>
-                        <p class="text-secondary small">Cochez les quartiers dans lesquels vous acceptez de vous déplacer pour travailler.</p>
-                    </div>
-
-                    <form method="POST">
-                        
-                        <div class="p-3 mb-4 rounded text-center" style="background-color: #1a1610; border: 1px solid rgba(243, 156, 18, 0.25);">
-                            <span style="color: #f1f1f1; font-size: 0.9rem; font-weight: 500;">
-                                <span style="color: var(--gold);">💡 Conseil :</span> Plus vous couvrez de zones, plus vous apparaîtrez dans les résultats de recherche des clients de votre région élargie !
-                            </span>
-                        </div>
-
-                        <div class="row g-3 px-2 mb-4">
-                            <?php if (!empty($tous_les_quartiers)): ?>
-                                <?php foreach ($tous_les_quartiers as $q): ?>
-                                    <div class="col-md-6 col-lg-4">
-                                        <div class="p-3 rounded zone-card" style="background-color: #1a1a1a; border: 1px solid #222; transition: 0.2s;">
-                                            <div class="form-check d-flex align-items-center gap-2 m-0">
-                                                <input class="form-check-input checkbox-gold" type="checkbox" 
-                                                       name="quartiers_choisis[]" 
-                                                       value="<?php echo $q['id']; ?>" 
-                                                       id="quartier-<?php echo $q['id']; ?>"
-                                                       <?php echo in_array(intval($q['id']), $mes_zones_actives, true) ? 'checked' : ''; ?>>
-                                                <label class="form-check-label text-white small fw-semibold cursor-pointer w-100" for="quartier-<?php echo $q['id']; ?>">
-                                                    <?php echo htmlspecialchars($q['nom_quartier']); ?> 
-                                                    <span class="d-block text-muted style-subcity" style="font-size: 0.75rem;">(<?php echo htmlspecialchars($q['nom_ville']); ?>)</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <div class="col-12 text-center text-muted py-4">
-                                    Aucun quartier disponible pour votre zone géographique actuelle dans la base de données.
-                                </div>
-                            <?php endif; ?>
-                        </div>
-
-                        <div class="col-12 text-center mt-4">
-                            <button type="submit" name="enregistrer_zones" class="btn btn-gold px-5 py-2.5 fw-bold" style="border-radius: 8px; letter-spacing: 0.5px;">
-                                <i class="bi bi-shield-check me-2"></i> ENREGISTRER MON PÉRIMÈTRE
-                            </button>
-                        </div>
-
-                    </form>
-
-                </div>
-
-            </div>
-        </div>
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--gold);margin-bottom:2px;">
+            <i class="bi bi-geo-alt me-2"></i>Mes Zones d'Intervention
+        </h2>
+        <p style="color:rgba(255,255,255,0.35);font-size:0.78rem;margin:0;">Cochez les quartiers où vous acceptez de vous déplacer</p>
     </div>
-</section>
+    <a href="/coiffons/index.php?page=dashboard_coiffeur"
+       style="color:rgba(255,255,255,0.35);text-decoration:none;font-size:0.8rem;display:flex;align-items:center;gap:5px;">
+        <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+</div>
+
+<?php if (!empty($message)): ?>
+    <div class="<?= str_contains($message,'success') ? 'msg-success' : 'msg-danger' ?> mb-4">
+        <?= strip_tags($message) ?>
+    </div>
+<?php endif; ?>
+
+<div class="glass-cct p-4 mb-4" style="background:rgba(212,175,55,0.04);border:1px dashed rgba(212,175,55,0.2);border-radius:12px;">
+    <i class="bi bi-lightbulb" style="color:var(--gold);margin-right:8px;"></i>
+    <span style="color:rgba(255,255,255,0.65);font-size:0.82rem;">
+        Plus vous couvrez de zones, plus vous apparaissez dans les résultats de recherche des clients.
+    </span>
+</div>
+
+<form method="POST">
+    <div class="row g-3 mb-4">
+        <?php if (!empty($tous_les_quartiers)): ?>
+            <?php foreach ($tous_les_quartiers as $q): ?>
+                <div class="col-6 col-md-4 col-lg-3">
+                    <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;cursor:pointer;transition:all 0.2s;"
+                           class="zone-label" for="quartier-<?= $q['id'] ?>">
+                        <input type="checkbox" name="quartiers_choisis[]"
+                               value="<?= $q['id'] ?>"
+                               id="quartier-<?= $q['id'] ?>"
+                               style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;"
+                               <?= in_array(intval($q['id']), $mes_zones_actives, true) ? 'checked' : '' ?>>
+                        <div>
+                            <div style="font-size:0.82rem;font-weight:600;color:#fff;"><?= htmlspecialchars($q['nom_quartier']) ?></div>
+                            <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);"><?= htmlspecialchars($q['nom_ville']) ?></div>
+                        </div>
+                    </label>
+                </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div class="col-12" style="text-align:center;color:rgba(255,255,255,0.3);font-size:0.85rem;padding:2rem;">
+                Aucun quartier disponible pour votre zone géographique.
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <div class="text-center">
+        <button type="submit" name="enregistrer_zones" class="btn-gold-cct" style="padding:12px 40px;border-radius:50px;font-size:0.88rem;">
+            <i class="bi bi-shield-check me-2"></i>Enregistrer mes zones
+        </button>
+    </div>
+</form>
 
 <style>
-    :root { --gold: #f39c12; }
-    .btn-gold { background-color: var(--gold) !important; color: #000 !important; border: none !important; transition: 0.3s ease-in-out; }
-    .btn-gold:hover { background-color: #d35400 !important; transform: translateY(-2px); }
-    .zone-card:hover { border-color: var(--gold) !important; background-color: #222 !important; }
-    .cursor-pointer { cursor: pointer; }
-    .checkbox-gold { cursor: pointer; width: 1.2em; height: 1.2em; }
-    .checkbox-gold:checked { background-color: var(--gold) !important; border-color: var(--gold) !important; }
-    .checkbox-gold:focus { box-shadow: 0 0 0 0.25rem rgba(243, 156, 18, 0.25) !important; border-color: var(--gold) !important; }
-    .style-subcity { opacity: 0.6; font-style: italic; }
+    .zone-label:hover { border-color:rgba(212,175,55,0.3)!important;background:rgba(212,175,55,0.05)!important; }
+    .glass-cct { background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px; }
+    .btn-gold-cct { background:var(--gold);color:#000;font-weight:700;border:none;border-radius:10px;cursor:pointer;transition:all 0.2s; }
+    .btn-gold-cct:hover { background:#c9a227;transform:translateY(-1px); }
+    .msg-success { background:rgba(25,135,84,0.15);border:1px solid rgba(25,135,84,0.3);color:#6ee7b7;border-radius:10px;padding:10px 16px;font-size:0.85rem; }
+    .msg-danger  { background:rgba(220,53,69,0.15);border:1px solid rgba(220,53,69,0.3);color:#ffb3b3;border-radius:10px;padding:10px 16px;font-size:0.85rem; }
 </style>
 
-<?php include __DIR__ . '/../layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer_coiffeur.php'; ?>

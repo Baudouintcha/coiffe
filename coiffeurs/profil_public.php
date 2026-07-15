@@ -7,41 +7,38 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_once __DIR__ . '/../security/config.php'; 
-include __DIR__ . '/../layout/header.php';
+require_once __DIR__ . '/../security/config.php';
 
-// 1. SÉCURITÉ ET INTERCEPTION
+// Redirection si non connecté
 if (!isset($_SESSION['role']) || $_SESSION['role'] === 'invite') {
-    header("Location: /coiffons/access/connexion.php?redirect_reason=booking");
+    header("Location: /coiffons/index.php?page=login");
     exit();
 }
 
-// 2. RÉCUPÉRATION DE L'ID DEPUIS L'URL
-$id_coiffeur = filter_input(INPUT_GET, 'id_coiffeur', FILTER_VALIDATE_INT);
+// Fix URL : accepte ?id= ET ?id_coiffeur= pour compatibilité
+$id_coiffeur = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT)
+            ?? filter_input(INPUT_GET, 'id_coiffeur', FILTER_VALIDATE_INT);
 
 if (!$id_coiffeur) {
-    echo "<div class='container py-5 text-center text-white'><h3>Coiffeur introuvable ou ID invalide.</h3><a href='/coiffons/index.php' class='btn btn-warning mt-3'>Retour à l'accueil</a></div>";
-    include __DIR__ . '/../layout/footer.php';
+    echo "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Erreur</title></head><body style='background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;'><div style='text-align:center'><p style='color:rgba(255,255,255,0.4);'>Coiffeur introuvable.</p><a href='/coiffons/index.php' style='color:#D4AF37;'>Retour à l'accueil</a></div></body></html>";
     exit();
 }
 
 try {
-    // 3. REQUÊTE POUR LES INFOS DU COIFFEUR
+    // Requête coiffeur — compatible cft (abonnement_status=1) et domizi (actif)
     $stmt = $pdo->prepare("
-        SELECT u.*, v.nom_ville as nom_ville, q.nom_quartier as nom_quartier 
-        FROM users u 
-        LEFT JOIN villes v ON u.ville = v.id 
-        LEFT JOIN quartiers q ON u.id_quartier = q.id 
-        WHERE u.id = ? 
-          AND LOWER(u.role) = 'coiffeur' 
-          AND LOWER(u.abonnement_status) = 'actif'
+        SELECT u.*, v.nom_ville, q.nom_quartier
+        FROM users u
+        LEFT JOIN villes v ON u.ville = v.id
+        LEFT JOIN quartiers q ON u.id_quartier = q.id
+        WHERE u.id = ? AND LOWER(u.role) = 'coiffeur'
+        AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')
     ");
     $stmt->execute([$id_coiffeur]);
     $coiffeur = $stmt->fetch();
 
     if (!$coiffeur) {
-        echo "<div class='container py-5 text-center text-white'><h3>Ce coiffeur n'est pas disponible ou son abonnement a expiré.</h3><a href='/coiffons/index.php' class='btn btn-warning mt-3'>Retour à l'accueil</a></div>";
-        include __DIR__ . '/../layout/footer.php';
+        echo "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body style='background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;'><div style='text-align:center'><p style='color:rgba(255,255,255,0.4);'>Ce coiffeur n'est pas disponible.</p><a href='/coiffons/index.php' style='color:#D4AF37;'>Retour</a></div></body></html>";
         exit();
     }
 
@@ -58,63 +55,98 @@ try {
         }
     }
 
-    // 5. REQUÊTE AUTORÉPARATRICE POUR CALCULER LA NOTE MOYENNE
-    $stmt_note = $pdo->prepare("SELECT * FROM commentaires");
-    $stmt_note->execute();
-    $tous_les_commentaires = $stmt_note->fetchAll();
-
-    $total_notes = 0;
-    $compteur_avis = 0;
-    foreach ($tous_les_commentaires as $c) {
-        $cles_c_nettoyees = array_combine(array_map('trim', array_keys($c)), array_values($c));
-        if (isset($cles_c_nettoyees['id_coiffeur']) && $cles_c_nettoyees['id_coiffeur'] == $id_coiffeur) {
-            $total_notes += $cles_c_nettoyees['note'];
-            $compteur_avis++;
-        }
+    // Note moyenne — requête directe, propre et compatible domizi
+    try {
+        $stmt_note = $pdo->prepare("SELECT AVG(note) as moy, COUNT(*) as nb FROM commentaires WHERE id_coiffeur = ?");
+        $stmt_note->execute([$id_coiffeur]);
+        $stats_note   = $stmt_note->fetch();
+        $note_moyenne = $stats_note['nb'] > 0 ? round($stats_note['moy'], 1) : null;
+        $stats_avis   = ['total' => intval($stats_note['nb'])];
+    } catch (Exception $e) {
+        $note_moyenne = null;
+        $stats_avis   = ['total' => 0];
     }
-    $note_moyenne = $compteur_avis > 0 ? round($total_notes / $compteur_avis, 1) : null;
-    $stats_avis = ['total' => $compteur_avis];
 
-    // =========================================================================
-    // ➕ PLAGES HORAIRES & RDV EXISTANTS
-    // =========================================================================
-    $stmt_dispo = $pdo->prepare("SELECT * FROM disponibilites");
-    $stmt_dispo->execute();
+    // Disponibilités — requête directe filtrée
+    $stmt_dispo = $pdo->prepare("SELECT * FROM disponibilites WHERE coiffeur_id = ?");
+    $stmt_dispo->execute([$id_coiffeur]);
     $toutes_les_dispos = $stmt_dispo->fetchAll();
 
     $planning_coiffeur = [];
     foreach ($toutes_les_dispos as $d) {
-        $cles_d_nettoyees = array_combine(array_map('trim', array_keys($d)), array_values($d));
-        if (isset($cles_d_nettoyees['coiffeur_id']) && $cles_d_nettoyees['coiffeur_id'] == $id_coiffeur) {
-            $planning_coiffeur[strtolower(trim($cles_d_nettoyees['jour_semaine']))] = [
-                'debut' => $cles_d_nettoyees['heure_debut'],
-                'fin' => $cles_d_nettoyees['heure_fin']
-            ];
-        }
+        $planning_coiffeur[strtolower(trim($d['jour_semaine']))] = [
+            'debut' => $d['heure_debut'],
+            'fin'   => $d['heure_fin']
+        ];
     }
 
-    $stmt_rdv = $pdo->prepare("SELECT * FROM rendez_vous WHERE statut_rdv IN ('en_attente', 'accepte')");
-    $stmt_rdv->execute();
-    $tous_les_rdv = $stmt_rdv->fetchAll(PDO::FETCH_ASSOC);
-
+    // Créneaux occupés — filtrés par coiffeur
+    $stmt_rdv = $pdo->prepare("
+        SELECT date_rdv, heure_debut FROM rendez_vous
+        WHERE coiffeur_id = ? AND statut_rdv IN ('en_attente','accepte','confirme')
+    ");
+    $stmt_rdv->execute([$id_coiffeur]);
     $busy_slots = [];
-    foreach ($tous_les_rdv as $r) {
-        $cles_r_nettoyees = array_combine(array_map('trim', array_keys($r)), array_values($r));
-        if (isset($cles_r_nettoyees['coiffeur_id']) && $cles_r_nettoyees['coiffeur_id'] == $id_coiffeur) {
-            $key = $cles_r_nettoyees['date_rdv'] . ' ' . substr($cles_r_nettoyees['heure_debut'], 0, 5);
-            $busy_slots[$key] = true;
-        }
+    foreach ($stmt_rdv->fetchAll() as $r) {
+        $key = $r['date_rdv'] . ' ' . substr($r['heure_debut'], 0, 5);
+        $busy_slots[$key] = true;
     }
 
 } catch (Exception $e) {
-    echo "<div class='container py-5 text-white'>Erreur technique : " . htmlspecialchars($e->getMessage()) . "</div>";
-    include __DIR__ . '/../layout/footer.php';
+    echo "<div style='background:#0a0a0a;color:#fff;padding:40px;font-family:sans-serif;'>Erreur : " . htmlspecialchars($e->getMessage()) . "</div>";
     exit();
 }
+
+// Charge le header client (navbar premium)
+require_once __DIR__ . '/../security/config.php';
+// Header standalone pour profil public
 ?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= htmlspecialchars($coiffeur['nom']) ?> — Coiffe Chez Toi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --gold: #D4AF37; --gold-dim: rgba(212,175,55,0.12); }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#0a0a0a; color:#fff; font-family:'Inter',sans-serif; }
+        .profil-topbar {
+            position:sticky;top:0;z-index:100;
+            display:flex;align-items:center;justify-content:space-between;
+            padding:0 2rem;height:58px;
+            background:rgba(0,0,0,0.9);backdrop-filter:blur(20px);
+            border-bottom:1px solid rgba(255,255,255,0.06);
+        }
+        .profil-topbar a { color:rgba(255,255,255,0.4);text-decoration:none;font-size:0.82rem;display:flex;align-items:center;gap:6px;transition:color 0.2s; }
+        .profil-topbar a:hover { color:var(--gold); }
+        .profil-brand { font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;color:var(--gold)!important; }
+        .page-anim { animation:fadeIn 0.35s ease forwards; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        .day-selector-card { flex:1 1 75px;max-width:90px;padding:12px 5px;text-align:center;border-radius:10px;cursor:pointer;transition:all 0.3s;border:2px solid transparent;background:#1a1a1a; }
+        .day-item-open { border-color:rgba(25,135,84,0.3); }
+        .day-item-open:hover { background:#222;border-color:var(--gold); }
+        .day-item-closed { border-color:rgba(220,53,69,0.4);background:rgba(220,53,69,0.05);opacity:0.5;cursor:not-allowed; }
+        .active-day { background:#ffc107!important;color:#000!important;transform:scale(1.05);box-shadow:0 4px 15px rgba(255,193,7,0.4); }
+        .active-day span { color:#000!important; }
+        .style-slots-box { background:#111;border:1px dashed rgba(212,175,55,0.3); }
+        .luxury-profile-card { background:#121212!important;border:1px solid rgba(255,255,255,0.05)!important;border-radius:12px!important;overflow:hidden;transition:transform 0.3s,border-color 0.3s; }
+        .luxury-profile-card:hover { transform:translateY(-4px);border-color:rgba(212,175,55,0.3)!important; }
+        .luxury-img-container { width:100%;height:240px;overflow:hidden;background:#1a1a1a; }
+        .luxury-img-container img { width:100%;height:100%;object-fit:cover; }
+    </style>
+</head>
+<body>
+<nav class="profil-topbar">
+    <a href="/coiffons/index.php" class="profil-brand">Coiffe Chez Toi</a>
+    <a href="javascript:history.back()"><i class="bi bi-arrow-left"></i> Retour</a>
+</nav>
+<div class="page-anim">
 
 <div class="luxury-profile-wrapper" style="background: linear-gradient(135deg, #0a0a0a 0%, #121212 100%); color: #fff; min-height: 100vh;">
-    
     <section class="py-5 border-bottom border-secondary" style="background: rgba(255,255,255,0.02);">
         <div class="container text-center">
             <div class="mb-3">
@@ -238,9 +270,10 @@ try {
         </div>
     </section>
 
-</div>
+</div><!-- /.luxury-profile-wrapper -->
+</div><!-- /.page-anim -->
 
-<script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 const slotsOccupes = <?php echo json_encode($busy_slots); ?>;
 const coiffeurId = <?php echo $id_coiffeur; ?>;
 

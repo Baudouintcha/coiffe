@@ -103,243 +103,165 @@ $historique_complet = $stmt_complet->fetchAll();
 // On extrait les 5 derniers mouvements pour l'aperçu de la page principale
 $historique_apercu = array_slice($historique_complet, 0, 5);
 
-include __DIR__ . '/../layout/header.php';
+include __DIR__ . '/../layout/header_coiffeur.php';
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh;">
-    <div class="container mt-4">
-        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">MON PORTEFEUILLE</h2>
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--gold);margin-bottom:2px;">
+            <i class="bi bi-wallet2 me-2"></i>Mon Portefeuille
+        </h2>
+        <p style="color:rgba(255,255,255,0.35);font-size:0.78rem;margin:0;">Gains, abonnement et historique financier</p>
+    </div>
+    <a href="/coiffons/index.php?page=dashboard_coiffeur"
+       style="color:rgba(255,255,255,0.35);text-decoration:none;font-size:0.8rem;display:flex;align-items:center;gap:5px;">
+        <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+</div>
 
-        <div class="row g-4 mb-5">
-            <div class="col-md-4">
-                <div class="card p-4 shadow-lg text-center h-100" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
-                    <i class="bi bi-wallet2 text-warning fs-1 mb-2"></i>
-                    <h5 class="text-secondary small text-uppercase">Total de mes gains bruts</h5>
-                    <h3 class="text-white fw-bold mt-2"><?php echo number_format($total_gains_bruts, 0, ',', ' '); ?> FCFA</h3>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card p-4 shadow-lg text-center h-100" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
-                    <i class="bi bi-percent text-warning fs-1 mb-2"></i>
-                    <h5 class="text-secondary small text-uppercase">Frais & Commissions (5%)</h5>
-                    <h3 class="text-danger fw-bold mt-2"><?php echo number_format($total_commissions, 0, ',', ' '); ?> FCFA</h3>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card p-4 shadow-lg text-center h-100" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
-                    <i class="bi bi-cash-stack text-success fs-1 mb-2"></i>
-                    <h5 class="text-secondary small text-uppercase">Solde Réel Disponible</h5>
-                    <h3 class="text-warning fw-bold mt-2"><?php echo number_format($solde_disponible, 0, ',', ' '); ?> FCFA</h3>
-                </div>
-            </div>
-        </div>
-
-        <?php if ($abonnement_expire): ?>
-            <div class="card bg-black border border-danger shadow-lg mb-5" style="border-radius: 12px;">
-                <div class="card-body p-4">
-                    <div class="text-center mb-3">
-                        <i class="bi bi-exclamation-triangle-fill text-danger fs-1 animate-pulse"></i>
-                        <h4 class="text-white fw-bold mt-2 h5"><?php echo ($date_expiration === null) ? "Activation initiale requise" : "Votre abonnement mensuel est arrivé à terme"; ?></h4>
-                        <p class="text-muted small">Date limite : <?php echo $date_expiration ? date('d/m/Y', strtotime($date_expiration)) : '--/--/----'; ?></p>
-                    </div>
-
-                    <div class="p-3 rounded mb-3" style="background-color: #1a0505; border: 1px solid #4a1414;">
-                        <h6 class="text-danger fw-bold small mb-2"><i class="bi bi-shield-x me-1"></i> RESTRICTIONS DE VISIBILITÉ ACTIVES :</h6>
-                        <ul class="text-secondary small mb-0 ps-3" style="font-size: 0.8rem; line-height: 1.6;">
-                            <li><strong class="text-white">Perte de visibilité :</strong> Votre salon n'apparaît plus dans les recherches des clients.</li>
-                            <li><strong class="text-white">Blocage des réservations :</strong> Les clients ne peuvent plus prendre rendez-vous.</li>
-                        </ul>
-                    </div>
-
-                    <div class="d-flex justify-content-center">
-                        <form action="portefeuille.php" method="POST">
-                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                            <input type="hidden" name="action" value="toggle_abo">
-                            <input type="hidden" name="status" value="1">
-                            <button type="submit" class="btn btn-success px-5 py-2 fw-bold text-uppercase" style="font-size: 0.85rem;">
-                                <i class="bi bi-check-circle-fill me-1"></i> Réactiver & Rester Visible (1500 F)
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        <?php else: ?>
-            <?php if ($jours_restants !== null && $jours_restants <= 5): ?>
-                <div class="alert alert-danger bg-black border-danger text-danger mb-4 p-3 small d-flex align-items-center gap-2">
-                    <i class="bi bi-bell-fill text-danger fs-5 animate-pulse"></i>
-                    <div>
-                        <strong>Attention Proche Échéance !</strong> Votre abonnement prend fin dans <strong><?php echo $jours_restants; ?> jours</strong> (le <?php echo date('d/m/Y', strtotime($date_expiration)); ?>).
-                        <?php echo ($renouvellement_auto == 1) ? "Un montant de 1 500 FCFA sera automatiquement prélevé de votre solde." : "Le renouvellement automatique est désactivé. Votre profil sera masqué à cette date."; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <div class="alert alert-warning mb-5 p-4 d-flex flex-column flex-md-row align-items-md-center justify-content-md-between gap-3" style="background-color: #2c2512; border: 1px solid var(--gold); color: var(--gold);">
-                <div>
-                    <i class="bi bi-info-circle-fill me-2"></i>
-                    <strong>Statut de l'abonnement :</strong> Actif jusqu'au <strong><?php echo date('d/m/Y', strtotime($date_expiration)); ?></strong>. Les 1 500 FCFA mensuels maintiennent votre vitrine ouverte.
-                </div>
-                <div>
-                    <form action="portefeuille.php" method="POST">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                        <input type="hidden" name="action" value="toggle_abo">
-                        <?php if ($renouvellement_auto == 1): ?>
-                            <input type="hidden" name="status" value="0">
-                            <button type="submit" class="btn btn-outline-warning btn-sm fw-bold px-3">
-                                <i class="bi bi-toggle-on me-1"></i> Désactiver le renouvellement
-                            </button>
-                        <?php else: ?>
-                            <input type="hidden" name="status" value="1">
-                            <button type="submit" class="btn btn-warning btn-sm fw-bold px-3 text-black">
-                                <i class="bi bi-toggle-off me-1"></i> Activer le renouvellement
-                            </button>
-                        <?php endif; ?>
-                    </form>
-                </div>
-            </div>
-        <?php endif; ?>
-
-        <h4 class="text-warning mb-3">Dernières opérations</h4>
-        <div class="table-responsive">
-            <table class="table table-dark table-bordered border-warning align-middle text-center small">
-                <thead>
-                    <tr class="text-warning">
-                        <th>Date & Heure</th>
-                        <th>Type d'opération</th>
-                        <th>Description / Libellé</th>
-                        <th>Brut (Client)</th>
-                        <th>Frais Platform (5%)</th>
-                        <th>Net Encaissé / Impact</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($historique_apercu)): ?>
-                        <tr>
-                            <td colspan="6" class="text-center text-secondary py-4">Aucun mouvement enregistré pour le moment.</td>
-                        </tr>
-                    <?php else: ?>
-                        <?php foreach ($historique_apercu as $t): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars(date('d/m/Y H:i', strtotime($t['date_transaction']))); ?></td>
-                                <td>
-                                    <?php if ($t['type_transaction'] === 'gain'): ?>
-                                        <span class="badge bg-success-subtle text-success border border-success px-2 py-1">Encaissment RDV</span>
-                                    <?php elseif ($t['type_transaction'] === 'abonnement'): ?>
-                                        <span class="badge bg-danger-subtle text-danger border border-danger px-2 py-1">Frais Abonnement</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-info-subtle text-info border border-info px-2 py-1">Retrait Compte</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-start"><?php echo htmlspecialchars($t['libelle'] ?? 'Opération de compte'); ?></td>
-                                
-                                <td><?php echo ($t['type_transaction'] === 'gain') ? number_format($t['montant_brut'], 0, ',', ' ') . ' F' : '-'; ?></td>
-                                <td><?php echo ($t['type_transaction'] === 'gain') ? number_format($t['montant_brut'] * $commission_pourcentage, 0, ',', ' ') . ' F' : '-'; ?></td>
-                                
-                                <td class="fw-bold <?php echo ($t['montant'] >= 0) ? 'text-success' : 'text-danger'; ?>">
-                                    <?php echo ($t['montant'] >= 0 ? '+' : '') . number_format($t['montant'], 0, ',', ' ') ; ?> FCFA
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="d-flex flex-column flex-sm-row justify-content-center align-items-center gap-3 mt-4">
-            <button class="btn btn-outline-warning px-4 py-2 fw-bold" data-bs-toggle="modal" data-bs-target="#modalHistoriqueComplet">
-                <i class="bi bi-clock-history me-1"></i> Voir tout mon historique
-            </button>
-            <button class="btn btn-gold px-5 py-2 fw-bold" onclick="alert('Demande de virement envoyée à l\'administration.')">
-                <i class="bi bi-bank me-1"></i> Demander un virement
-            </button>
+<!-- Stats financières -->
+<div class="row g-3 mb-4">
+    <div class="col-4">
+        <div class="glass-cct p-3 text-center">
+            <i class="bi bi-graph-up" style="color:var(--gold);font-size:1.3rem;display:block;margin-bottom:6px;"></i>
+            <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Gains bruts</div>
+            <div style="font-size:1rem;font-weight:700;color:#fff;"><?= number_format($total_gains_bruts, 0, ',', ' ') ?> <span style="font-size:0.65rem;color:rgba(255,255,255,0.4)">FCFA</span></div>
         </div>
     </div>
-</section>
-
-<div class="modal fade" id="modalHistoriqueComplet" tabindex="-1" aria-labelledby="titleModal" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content bg-black border border-warning" style="border-radius: 15px;">
-            <div class="modal-header border-bottom border-warning">
-                <h5 class="modal-title text-warning fw-bold" id="titleModal"><i class="bi bi-journal-text me-2"></i>HISTORIQUE COMPTABILISÉ COMPLET</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover table-bordered border-secondary align-middle text-center small">
-                        <thead>
-                            <tr class="text-warning" style="background-color: #111;">
-                                <th>Date / Heure</th>
-                                <th>Type</th>
-                                <th>Libellé / Description</th>
-                                <th>Brut Client</th>
-                                <th>Frais Site (5%)</th>
-                                <th>Net Impacté</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (empty($historique_complet)): ?>
-                                <tr>
-                                    <td colspan="6" class="text-center text-secondary py-4">Aucune transaction archivée.</td>
-                                </tr>
-                            <?php else: ?>
-                                <?php foreach ($historique_complet as $t): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars(date('d/m/Y H:i', strtotime($t['date_transaction']))); ?></td>
-                                        <td>
-                                            <span class="badge <?php echo ($t['type_transaction'] === 'gain') ? 'bg-success' : (($t['type_transaction'] === 'abonnement') ? 'bg-danger' : 'bg-info'); ?>">
-                                                <?php echo htmlspecialchars($t['type_transaction']); ?>
-                                            </span>
-                                        </td>
-                                        <td class="text-start"><?php echo htmlspecialchars($t['libelle'] ?? 'Transaction'); ?></td>
-                                        <td><?php echo ($t['type_transaction'] === 'gain') ? number_format($t['montant_brut'], 0, ',', ' ') . ' F' : '-'; ?></td>
-                                        <td><?php echo ($t['type_transaction'] === 'gain') ? number_format($t['montant_brut'] * $commission_pourcentage, 0, ',', ' ') . ' F' : '-'; ?></td>
-                                        <td class="fw-bold <?php echo ($t['montant'] >= 0) ? 'text-success' : 'text-danger'; ?>">
-                                            <?php echo ($t['montant'] >= 0 ? '+' : '') . number_format($t['montant'], 0, ',', ' '); ?> F
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer border-top border-warning">
-                <button type="button" class="btn btn-secondary px-4" data-bs-toggle="modal">Fermer</button>
-            </div>
+    <div class="col-4">
+        <div class="glass-cct p-3 text-center">
+            <i class="bi bi-percent" style="color:#ff6b6b;font-size:1.3rem;display:block;margin-bottom:6px;"></i>
+            <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Commissions 5%</div>
+            <div style="font-size:1rem;font-weight:700;color:#ff6b6b;"><?= number_format($total_commissions, 0, ',', ' ') ?> <span style="font-size:0.65rem;">FCFA</span></div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="glass-cct p-3 text-center" style="border-color:rgba(212,175,55,0.25);">
+            <i class="bi bi-cash-stack" style="color:var(--gold);font-size:1.3rem;display:block;margin-bottom:6px;"></i>
+            <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Solde disponible</div>
+            <div style="font-size:1rem;font-weight:700;color:var(--gold);"><?= number_format($solde_disponible, 0, ',', ' ') ?> <span style="font-size:0.65rem;">FCFA</span></div>
         </div>
     </div>
 </div>
 
+<!-- Abonnement -->
+<?php if ($abonnement_expire): ?>
+    <div style="background:rgba(220,53,69,0.12);border:1px solid rgba(220,53,69,0.3);border-radius:14px;padding:20px 24px;margin-bottom:1.5rem;">
+        <div style="display:flex;align-items:flex-start;gap:14px;">
+            <i class="bi bi-exclamation-triangle-fill" style="color:#ff6b6b;font-size:1.4rem;flex-shrink:0;margin-top:2px;"></i>
+            <div style="flex:1;">
+                <div style="font-weight:700;color:#ffb3b3;margin-bottom:4px;">
+                    <?= $date_expiration === null ? 'Activation requise' : 'Abonnement expiré' ?>
+                </div>
+                <div style="color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:12px;">
+                    Votre profil n'est plus visible dans l'annuaire.
+                    <?php if ($date_expiration): ?>
+                        Expiré le <?= date('d/m/Y', strtotime($date_expiration)) ?>.
+                    <?php endif; ?>
+                </div>
+                <form action="portefeuille.php" method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    <input type="hidden" name="action" value="toggle_abo">
+                    <input type="hidden" name="status" value="1">
+                    <button type="submit" style="background:rgba(25,135,84,0.2);color:#6ee7b7;border:1px solid rgba(25,135,84,0.3);border-radius:20px;padding:7px 20px;font-size:0.78rem;font-weight:700;cursor:pointer;">
+                        <i class="bi bi-check-circle me-1"></i>Réactiver l'abonnement (1 500 FCFA)
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+<?php else: ?>
+    <div style="background:rgba(25,135,84,0.08);border:1px solid rgba(25,135,84,0.2);border-radius:14px;padding:14px 20px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <i class="bi bi-check-circle-fill" style="color:#6ee7b7;"></i>
+            <span style="font-size:0.82rem;color:rgba(255,255,255,0.7);">
+                Abonnement actif jusqu'au <strong style="color:#fff;"><?= date('d/m/Y', strtotime($date_expiration)) ?></strong>
+                <?php if ($jours_restants !== null && $jours_restants <= 5): ?>
+                    <span style="color:#ffd60a;margin-left:6px;">— <?= $jours_restants ?> jour(s) restant</span>
+                <?php endif; ?>
+            </span>
+        </div>
+        <form action="portefeuille.php" method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+            <input type="hidden" name="action" value="toggle_abo">
+            <?php if ($renouvellement_auto == 1): ?>
+                <input type="hidden" name="status" value="0">
+                <button type="submit" style="background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:5px 14px;font-size:0.72rem;cursor:pointer;">
+                    Désactiver renouvellement auto
+                </button>
+            <?php else: ?>
+                <input type="hidden" name="status" value="1">
+                <button type="submit" style="background:var(--gold-dim);color:var(--gold);border:1px solid rgba(212,175,55,0.3);border-radius:20px;padding:5px 14px;font-size:0.72rem;cursor:pointer;">
+                    Activer renouvellement auto
+                </button>
+            <?php endif; ?>
+        </form>
+    </div>
+<?php endif; ?>
+
+<!-- Historique -->
+<div class="glass-cct" style="overflow:hidden;">
+    <div style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:0.88rem;font-weight:700;color:#fff;">Dernières opérations</span>
+    </div>
+    <?php if (empty($historique_apercu)): ?>
+        <div style="padding:2rem;text-align:center;color:rgba(255,255,255,0.25);font-size:0.82rem;">
+            Aucune transaction pour le moment
+        </div>
+    <?php else: ?>
+        <?php foreach ($historique_apercu as $t):
+            $is_gain = $t['type_transaction'] === 'gain';
+            $montant_color = $is_gain ? '#6ee7b7' : '#ff6b6b';
+            $montant_sign  = $is_gain ? '+' : '-';
+        ?>
+            <div style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;gap:12px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:<?= $is_gain ? 'rgba(25,135,84,0.15)' : 'rgba(220,53,69,0.15)' ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-<?= $is_gain ? 'arrow-down-circle' : 'arrow-up-circle' ?>" style="color:<?= $montant_color ?>;font-size:0.9rem;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.82rem;color:#fff;font-weight:500;"><?= htmlspecialchars($t['motif'] ?? $t['type_transaction']) ?></div>
+                    <div style="font-size:0.7rem;color:rgba(255,255,255,0.3);"><?= date('d/m/Y H:i', strtotime($t['date_creation'])) ?></div>
+                </div>
+                <div style="font-size:0.9rem;font-weight:700;color:<?= $montant_color ?>;">
+                    <?= $montant_sign ?><?= number_format(abs($t['montant']), 0, ',', ' ') ?> FCFA
+                </div>
+            </div>
+        <?php endforeach; ?>
+        <div style="padding:12px 20px;text-align:center;">
+            <button onclick="document.getElementById('modalHistorique').style.display='flex'"
+                    style="background:var(--gold-dim);color:var(--gold);border:1px solid rgba(212,175,55,0.25);border-radius:20px;padding:6px 20px;font-size:0.75rem;font-weight:700;cursor:pointer;">
+                Voir tout l'historique
+            </button>
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- MODAL HISTORIQUE -->
+<div id="modalHistorique" style="display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);" onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:#111;border:1px solid rgba(212,175,55,0.2);border-radius:20px;width:90%;max-width:700px;max-height:80vh;overflow-y:auto;padding:24px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--gold);">Historique complet</h3>
+            <button onclick="document.getElementById('modalHistorique').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <?php foreach ($historique_complet as $t):
+            $is_gain = $t['type_transaction'] === 'gain';
+            $montant_color = $is_gain ? '#6ee7b7' : '#ff6b6b';
+        ?>
+            <div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;gap:10px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.82rem;color:#fff;"><?= htmlspecialchars($t['motif'] ?? $t['type_transaction']) ?></div>
+                    <div style="font-size:0.68rem;color:rgba(255,255,255,0.3);"><?= date('d/m/Y H:i', strtotime($t['date_creation'])) ?></div>
+                </div>
+                <div style="font-size:0.88rem;font-weight:700;color:<?= $montant_color ?>;white-space:nowrap;">
+                    <?= $is_gain ? '+' : '-' ?><?= number_format(abs($t['montant']), 0, ',', ' ') ?> FCFA
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+
 <style>
-    .btn-gold {
-        background-color: var(--gold, #d4af37);
-        color: black;
-        border: none;
-        border-radius: 8px;
-        transition: 0.3s;
-    }
-    .btn-gold:hover {
-        background-color: #c99b2c;
-        color: black;
-    }
-    .animate-pulse { 
-        animation: pulse-danger 1.5s infinite; 
-    }
-    @keyframes pulse-danger { 
-        0% { opacity: 0.6; transform: scale(1); } 
-        50% { opacity: 1; transform: scale(1.03); } 
-        100% { opacity: 0.6; transform: scale(1); } 
-    }
-    /* Personnalisation de la scrollbar de la Modal */
-    .modal-body::-webkit-scrollbar {
-        width: 6px;
-    }
-    .modal-body::-webkit-scrollbar-thumb {
-        background-color: var(--gold, #d4af37);
-        border-radius: 4px;
-    }
+    .glass-cct { background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px; }
 </style>
 
-<?php include __DIR__ . '/../layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer_coiffeur.php'; ?>
