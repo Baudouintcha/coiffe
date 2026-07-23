@@ -75,12 +75,25 @@
             font-size: 0.85rem; font-weight: 700; color: var(--gold);
             cursor: pointer;
         }
-        /* ── HERO ── */
+        /* ── HERO — Capsule flottante centrée ── */
+        .hero-wrapper {
+            padding: calc(64px + 1.5rem) 0 0;
+            display: flex;
+            justify-content: center;
+        }
         .hero {
             position: relative;
-            height: 100vh;
-            min-height: 600px;
+            width: 92%;
+            max-width: 1400px;
+            height: 420px;
+            min-height: 380px;
+            max-height: 450px;
+            border-radius: 52px;
             overflow: hidden;
+            box-shadow:
+                0 24px 60px rgba(0,0,0,0.55),
+                0 4px 16px rgba(0,0,0,0.3),
+                0 0 0 1px rgba(255,255,255,0.06);
         }
         .hero-carousel {
             position: absolute; inset: 0; z-index: 0;
@@ -97,22 +110,59 @@
             position: absolute; inset: 0; z-index: 1;
             background: linear-gradient(
                 180deg,
-                rgba(10,10,10,0.5) 0%,
-                rgba(10,10,10,0.3) 50%,
-                rgba(10,10,10,0.8) 100%
+                rgba(10,10,10,0.35) 0%,
+                rgba(10,10,10,0.15) 40%,
+                rgba(10,10,10,0.75) 100%
             );
         }
         .hero-content {
-            position: relative; z-index: 2;
-            height: 100%;
+            position: absolute;
+            inset: 0;
+            z-index: 2;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-end;
-            padding: 0 1.5rem 4rem;
+            padding: 0 2rem 2rem;
             text-align: center;
         }
-        /* Carte profil client dans le hero */
+        /* Barre de recherche intégrée dans la capsule — glassmorphisme */
+        .hero-search-wrap {
+            width: 100%;
+            max-width: 560px;
+            margin: 0 auto;
+        }
+        .search-bar {
+            display: flex; align-items: center;
+            background: rgba(255,255,255,0.12);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255,255,255,0.22);
+            border-radius: 50px;
+            padding: 6px 6px 6px 20px;
+            box-shadow:
+                0 8px 32px rgba(0,0,0,0.35),
+                inset 0 1px 0 rgba(255,255,255,0.1);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .search-bar:focus-within {
+            border-color: var(--gold);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 3px rgba(212,175,55,0.15);
+        }
+        .search-bar input {
+            flex: 1; background: none; border: none; outline: none;
+            color: #fff; font-size: 0.92rem; padding: 9px 0;
+        }
+        .search-bar input::placeholder { color: rgba(255,255,255,0.45); }
+        .search-bar .search-btn {
+            background: var(--gold); color: #000;
+            border: none; border-radius: 50px;
+            padding: 10px 22px; font-weight: 700;
+            font-size: 0.82rem; cursor: pointer;
+            transition: all 0.2s; white-space: nowrap;
+        }
+        .search-bar .search-btn:hover { background: #c9a227; }
+        /* Carte profil client dans le hero — en haut à droite de la capsule */
         .profile-glass-card {
             position: absolute;
             top: 84px; right: 24px;
@@ -146,40 +196,19 @@
         .profile-glass-card .pc-greeting { font-size: 0.72rem; color: rgba(255,255,255,0.5); }
         .profile-glass-card .pc-name { font-weight: 700; font-size: 0.9rem; color: #fff; }
         .profile-glass-card .pc-stat { font-size: 0.7rem; color: var(--gold); margin-top: 2px; }
-        /* Barre de recherche dans le hero */
-        .hero-search-wrap { width: 100%; max-width: 560px; margin: 0 auto 2rem; }
+        /* Titre et sous-titre dans la capsule */
         .hero-title {
             font-family: 'Playfair Display', serif;
-            font-size: clamp(2rem, 5vw, 3.5rem);
-            font-weight: 900; margin-bottom: 0.5rem;
-            line-height: 1.1;
+            font-size: clamp(1.6rem, 3.5vw, 2.6rem);
+            font-weight: 900; margin-bottom: 0.4rem;
+            line-height: 1.15; text-shadow: 0 2px 12px rgba(0,0,0,0.5);
         }
-        .hero-sub { color: rgba(255,255,255,0.5); font-size: 1rem; margin-bottom: 2rem; font-weight: 300; }
-        .search-bar {
-            display: flex; align-items: center;
-            background: rgba(255,255,255,0.09);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 50px;
-            padding: 6px 6px 6px 20px;
-            box-shadow: 0 4px 30px rgba(0,0,0,0.3);
-            transition: border-color 0.2s;
+        .hero-sub {
+            color: rgba(255,255,255,0.65);
+            font-size: 0.9rem; margin-bottom: 1.2rem;
+            font-weight: 300; text-shadow: 0 1px 6px rgba(0,0,0,0.4);
         }
-        .search-bar:focus-within { border-color: var(--gold); }
-        .search-bar input {
-            flex: 1; background: none; border: none; outline: none;
-            color: #fff; font-size: 0.95rem; padding: 8px 0;
-        }
-        .search-bar input::placeholder { color: rgba(255,255,255,0.35); }
-        .search-bar .search-btn {
-            background: var(--gold); color: #000;
-            border: none; border-radius: 50px;
-            padding: 10px 22px; font-weight: 700;
-            font-size: 0.85rem; cursor: pointer;
-            transition: all 0.2s; white-space: nowrap;
-        }
-        .search-bar .search-btn:hover { background: #c9a227; }
+
         /* ── SECTION COIFFEURS ── */
         .section-coiffeurs { padding: 4rem 0 2rem; }
         .section-title {
@@ -335,13 +364,15 @@
         /* ── RESPONSIVE ── */
         @media (max-width: 768px) {
             .profile-glass-card { display: none; }
-            .hero { height: 85vh; }
+            .hero { height: 340px; border-radius: 28px; }
+            .hero-wrapper { padding: 0.75rem 0.75rem 0; }
             .cct-nav { padding: 0 1rem; }
         }
         @media (max-width: 480px) {
-            .hero-title { font-size: 1.8rem; }
+            .hero-title { font-size: 1.4rem; }
+            .hero { height: 300px; border-radius: 20px; }
             .search-bar { flex-direction: column; border-radius: 16px; padding: 12px; gap: 8px; }
-            .search-bar .search-btn { width: 100%; border-radius: 10px; }
+            .search-bar .search-btn { width: 100%; border-radius: 10px; justify-content:center;display:flex; }
         }
     </style>
 </head>
@@ -408,55 +439,60 @@ if (empty($hero_images)) {
     </div>
 </nav>
 
-<!-- ── HERO ── -->
-<section class="hero">
-    <!-- Carousel images du dossier imgid/ -->
-    <div class="hero-carousel" id="heroCarousel">
-        <?php foreach ($hero_images as $i => $img): ?>
-            <div class="hero-slide <?= $i === 0 ? 'active' : '' ?>"
-                 style="background-image: url('/coiffons/imgid/<?= basename($img) ?>')"
-                 loading="lazy"></div>
-        <?php endforeach; ?>
-    </div>
-    <div class="hero-overlay"></div>
+<!-- ── HERO — Capsule flottante centrée ── -->
+<div class="hero-wrapper">
+    <section class="hero">
+        <!-- Carousel images — confinées dans la capsule -->
+        <div class="hero-carousel" id="heroCarousel">
+            <?php foreach ($hero_images as $i => $img): ?>
+                <div class="hero-slide <?= $i === 0 ? 'active' : '' ?>"
+                     style="background-image: url('/coiffons/imgid/<?= basename($img) ?>')"
+                     loading="lazy"></div>
+            <?php endforeach; ?>
+        </div>
+        <div class="hero-overlay"></div>
 
-    <!-- Carte profil glassmorphism (desktop) -->
-    <div class="profile-glass-card">
-        <?php if ($photo_profil && file_exists(__DIR__ . '/../../' . $photo_profil)): ?>
-            <img src="/coiffons/<?= htmlspecialchars($photo_profil) ?>" class="pc-avatar" alt="">
-        <?php else: ?>
-            <div class="pc-avatar-ph"><?= $initiale ?></div>
-        <?php endif; ?>
-        <div class="pc-info">
-            <div class="pc-greeting">Bonjour 👋</div>
-            <div class="pc-name"><?= $prenom_client ?></div>
-            <div class="pc-stat">
-                <?php if ($nb_rdv_termines > 0): ?>
-                    <?= $nb_rdv_termines ?> rendez-vous terminé<?= $nb_rdv_termines > 1 ? 's' : '' ?>
-                <?php else: ?>
-                    Bienvenue sur Coiffe Chez Toi
-                <?php endif; ?>
+        <!-- Carte profil glassmorphism — en haut à droite dans la capsule -->
+        <div class="profile-glass-card">
+            <?php if ($photo_profil && file_exists(__DIR__ . '/../../' . $photo_profil)): ?>
+                <img src="/coiffons/<?= htmlspecialchars($photo_profil) ?>" class="pc-avatar" alt="">
+            <?php else: ?>
+                <div class="pc-avatar-ph"><?= $initiale ?></div>
+            <?php endif; ?>
+            <div class="pc-info">
+                <div class="pc-greeting">Bonjour 👋</div>
+                <div class="pc-name"><?= $prenom_client ?></div>
+                <div class="pc-stat">
+                    <?php if ($nb_rdv_termines > 0): ?>
+                        <?= $nb_rdv_termines ?> RDV terminé<?= $nb_rdv_termines > 1 ? 's' : '' ?>
+                    <?php else: ?>
+                        Bienvenue sur Coiffe Chez Toi
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Contenu hero centré -->
-    <div class="hero-content">
-        <h1 class="hero-title">Votre coiffeur,<br>directement chez vous</h1>
-        <p class="hero-sub">Des professionnels certifiés dans votre quartier</p>
+        <!-- Contenu centré en bas de la capsule -->
+        <div class="hero-content">
+            <h1 class="hero-title">Votre coiffeur,<br>directement chez vous</h1>
+            <p class="hero-sub">Des professionnels certifiés dans votre quartier</p>
 
-        <div class="hero-search-wrap">
-            <div class="search-bar">
-                <i class="bi bi-search" style="color:rgba(255,255,255,0.35);margin-right:4px;"></i>
-                <input type="text"
-                       id="searchInput"
-                       placeholder="Rechercher un coiffeur, un salon..."
-                       autocomplete="off">
-                <button class="search-btn" onclick="lancerRecherche()">Rechercher</button>
+            <!-- Barre de recherche intégrée dans la capsule -->
+            <div class="hero-search-wrap">
+                <div class="search-bar">
+                    <i class="bi bi-search" style="color:rgba(255,255,255,0.5);margin-right:6px;font-size:0.9rem;"></i>
+                    <input type="text"
+                           id="searchInput"
+                           placeholder="Rechercher un coiffeur, un salon..."
+                           autocomplete="off">
+                    <button class="search-btn" onclick="lancerRecherche()">
+                        <i class="bi bi-search me-1"></i>Rechercher
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
+</div>
 
 <!-- ── SECTION COIFFEURS PROCHES ── -->
 <section class="section-coiffeurs">

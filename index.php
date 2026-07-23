@@ -34,14 +34,7 @@ switch ($page) {
         include __DIR__ . '/views/coiffeur/dashboard.php';
         exit();
 
-    case 'dashboard_coiffeur':
-        // Dashboard coiffeur — uniquement pour les coiffeurs connectés
-        if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'coiffeur') {
-            header("Location: /coiffons/index.php?page=login");
-            exit();
-        }
-        include __DIR__ . '/views/coiffeur/dashboard.php';
-        exit();
+    case 'dashboard':
         // Dashboard client — uniquement pour les clients connectés
         if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'client') {
             header("Location: /coiffons/index.php?page=login");
@@ -90,8 +83,22 @@ switch ($page) {
 
     case 'home':
     default:
-        // La vue home.php est autonome (slider + header intégré)
-        // Elle ne nécessite pas le layout/header.php
+        // Si l'utilisateur est déjà connecté, redirige vers son dashboard
+        if (isset($_SESSION['id_user'])) {
+            $role_session = $_SESSION['role'] ?? 'client';
+            if ($role_session === 'coiffeur') {
+                header("Location: /coiffons/index.php?page=dashboard_coiffeur");
+                exit();
+            } elseif ($role_session === 'client') {
+                header("Location: /coiffons/index.php?page=dashboard");
+                exit();
+            } elseif ($role_session === 'admin') {
+                header("Location: /coiffons/first/admin_dashboard.php");
+                exit();
+            }
+        }
+
+        // Invité — affiche la page d'accueil avec le slider
 
         $role_actuel  = $_SESSION['role'] ?? 'invite';
         $coiffeur_id  = $_SESSION['id_user'] ?? null;

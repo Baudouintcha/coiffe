@@ -128,7 +128,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $vd = $vn->fetch();
                         $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
 
-                        // Redirection selon le rôle — empêche le retour arrière
+                        // Redirection selon le rôle avec headers anti-cache
+                        header("Cache-Control: no-store, no-cache, must-revalidate");
+                        header("Pragma: no-cache");
                         if ($role === 'client') {
                             header("Location: /coiffons/index.php?page=dashboard");
                         } elseif ($role === 'coiffeur') {
@@ -136,9 +138,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         } else {
                             header("Location: /coiffons/index.php");
                         }
-                        // Headers anti-cache pour empêcher le retour arrière vers le formulaire
-                        header("Cache-Control: no-store, no-cache, must-revalidate");
-                        header("Pragma: no-cache");
                         exit();
                     } else {
                         $message = "<div class='alert-msg alert-msg-danger'>Erreur lors de l'enregistrement.</div>";
