@@ -1,6 +1,8 @@
 # RAPPORT D'AUDIT UI — Coiffe Chez Toi
 > Analyse complète du projet existant : composants, CSS, doublons, incohérences.
-> Version : 1.0 — Juillet 2026
+> Version : 1.1 — Juillet 2026 | Mis à jour suite à la stabilisation Design System v2.0
+
+> **Note de mise à jour :** Les corrections documentées dans `DESIGN_SYSTEM_REVIEW.md` ont été appliquées dans `DESIGN_SYSTEM.md` v2.0 et `COMPONENT_LIBRARY.md` v2.0. Ce rapport reflète l'état actuel du code source (pages PHP non encore migrées) et reste valide comme référence de l'état initial.
 
 ---
 
@@ -94,13 +96,18 @@ Chaque page redéclare ses propres variables CSS au lieu d'utiliser un fichier c
 - → `global.css` doit être mis à jour pour aligner avec la référence du dashboard
 
 ### Variables manquantes dans le projet
-Ces variables n'existent nulle part mais sont utilisées sous forme de valeurs codées en dur :
-- `--dark-3: #161616` — utilisé dans `dashboard.php` sans variable
-- `--dark-4: #1A1A1A` — utilisé partout sans variable
-- `--radius-*` — aucun border-radius n'est variabilisé
-- `--shadow-*` — aucune ombre n'est variabilisée
-- `--font-display` / `--font-body` — non définis, polices codées en dur
-- `--transition-*` — non définis, transitions codées en dur
+Ces variables n'existent nulle part mais sont utilisées sous forme de valeurs codées en dur.
+**Elles sont désormais définies dans DS §2 v2.0** et seront disponibles après création de `css/variables.css` :
+- `--dark-3: #161616` ✅ Défini dans DS v2.0
+- `--dark-4: #1A1A1A` ✅ Défini dans DS v2.0
+- `--radius-*` ✅ Définis dans DS v2.0
+- `--shadow-*` ✅ Définis dans DS v2.0
+- `--font-display` / `--font-body` ✅ Définis dans DS v2.0
+- `--transition-*` ✅ Définis dans DS v2.0
+- `--danger-icon: #FF6B6B` ✅ Ajouté dans DS v2.0
+- `--select-active: #FFC107` ✅ Ajouté dans DS v2.0
+- `--glass-bg-subtle: rgba(255,255,255,0.02)` ✅ À ajouter dans `css/variables.css`
+- `--z-navbar`, `--z-modal`, etc. ✅ Ajoutés dans DS v2.0
 
 ---
 
@@ -215,15 +222,16 @@ Problème majeur : **de nombreux styles sont écrits directement en `style=""`**
 
 ---
 
-## 8. FICHIERS CSS — ÉTAT ACTUEL
+## 8. FICHIERS CSS — ÉTAT ACTUEL ET CIBLE
 
 | Fichier | Rôle actuel | Action |
 |---------|-------------|--------|
 | `css/style.css` | Hero slider home page | ✅ Garder, minimal |
-| `css/global.css` | Variables + auth card + emerge animation | 🟡 Migrer vers `variables.css` + `components.css` |
-| `css/responsive-custom.css` | Ajustements responsive (très minimal) | 🟡 Fusionner dans `components.css` |
-| `css/variables.css` | — | 🔲 À créer |
-| `css/components.css` | — | 🔲 À créer |
+| `css/global.css` | Variables + auth card + emerge animation | 🔴 Supprimer en Phase 6 (remplacé par les 3 fichiers ci-dessous) |
+| `css/responsive-custom.css` | Ajustements responsive (très minimal) | 🔴 Supprimer en Phase 6 (fusionner dans `components.css`) |
+| `css/variables.css` | Tokens officiels DS §2 | 🔲 À créer en Phase 0 |
+| `css/animations.css` | Animations officielles DS §8 | 🔲 À créer en Phase 0 |
+| `css/components.css` | Classes utilitaires communes | 🔲 À créer en Phase 0 |
 
 ---
 
@@ -252,14 +260,15 @@ Problème majeur : **de nombreux styles sont écrits directement en `style=""`**
 3. `access/connexion.php` et `access/inscription.php` — glassmorphisme bien réalisé
 4. La charte couleur gold/dark est globalement cohérente
 
-### Points à corriger en priorité
-1. **Centraliser les variables CSS** → `css/variables.css` (aucune variable n'est partagée)
-2. **Supprimer les 4 doublons critiques** (`.glass-cct`, `.btn-gold-cct`, `.fc-dark`, `.msg-*`)
-3. **Unifier les polices** → remplacer Segoe UI / Arial / Verdana par Inter partout
-4. **Extraire les composants partagés** → `views/components/`
-5. **Refactoriser `layout/header.php`** → supprimer la sidebar legacy
-6. **Réduire le style inline** → classes utilitaires
-7. **Standardiser les noms de classes** → 1 nom par composant
+### Points à corriger en priorité (restants — non encore corrigés dans le code)
+1. **Créer les 3 fichiers CSS fondations** → `css/variables.css`, `css/animations.css`, `css/components.css`
+2. **Remplacer `.btn-gold-cct` → `.btn-gold`** dans 4 fichiers PHP (Phase 6)
+3. **Remplacer `.luxury-profile-card` → `.gallery-card`** dans 2 fichiers PHP (Phase 6)
+4. **Unifier les polices** → remplacer Segoe UI / Arial / Verdana par `var(--font-body)` partout
+5. **Extraire les composants partagés** → `views/components/`
+6. **Refactoriser `layout/header.php`** → supprimer la sidebar legacy
+7. **Réduire le style inline** → remplacer ~150 attributs `style=""` par des classes
+8. **Centraliser toutes les animations** → supprimer tous les `@keyframes` dans les pages PHP
 
 ### Nombre estimé de blocs CSS redondants à supprimer
 - Blocs `<style>` en fin de page PHP : **~12 blocs** (un par fichier)

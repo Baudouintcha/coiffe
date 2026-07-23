@@ -1,6 +1,15 @@
 # DESIGN SYSTEM — Coiffe Chez Toi
 > Référence officielle du projet. Toute modification d'interface doit respecter ce document.
-> Version : 1.0 — Juillet 2026
+> Version : 2.0 — Juillet 2026 | Statut : **VALIDÉ — Référence officielle**
+
+---
+
+> ### ⚠️ RÈGLE D'OR — À LIRE AVANT TOUT DÉVELOPPEMENT
+> Avant d'introduire un nouveau composant, une nouvelle classe CSS ou une nouvelle animation, vérifier :
+> **"Est-ce que quelque chose d'équivalent existe déjà dans le Design System ?"**
+> - **OUI** → réutiliser le composant existant, sans exception.
+> - **NON** → ajouter le composant dans `DESIGN_SYSTEM.md` ET dans `COMPONENT_LIBRARY.md` avant de l'utiliser.
+> Cette discipline garantit l'identité visuelle cohérente de toutes les pages du projet.
 
 ---
 
@@ -38,8 +47,10 @@
 | Success text | `--success-text` | `#6EE7B7` | Texte succès |
 | Danger | `--danger` | `rgba(220,53,69,0.15)` | Fond alertes danger |
 | Danger text | `--danger-text` | `#FFB3B3` | Texte danger/erreur |
+| Danger icon | `--danger-icon` | `#FF6B6B` | Icônes de danger/erreur (rouge vif) |
 | Warning | `--warning-color` | `#FFD60A` | Alertes urgentes |
 | Info | `--info-text` | `#93C5FD` | Texte informatif |
+| Select active | `--select-active` | `#FFC107` | État sélectionné (calendrier, jour actif) — usage exclusif |
 
 ---
 
@@ -72,14 +83,17 @@ Toutes ces variables doivent être définies dans un futur fichier `css/variable
   --danger-bg:       rgba(220,53,69,0.15);
   --danger-border:   rgba(220,53,69,0.30);
   --danger-text:     #FFB3B3;
+  --danger-icon:     #FF6B6B;
   --warning-color:   #FFD60A;
+  --select-active:   #FFC107;
 
   /* Glassmorphism */
-  --glass-bg:        rgba(255,255,255,0.06);
-  --glass-bg-strong: rgba(255,255,255,0.10);
-  --glass-border:    rgba(255,255,255,0.08);
-  --glass-border-md: rgba(255,255,255,0.14);
-  --glass-border-lg: rgba(255,255,255,0.22);
+  --glass-bg:         rgba(255,255,255,0.06);
+  --glass-bg-strong:  rgba(255,255,255,0.10);
+  --glass-bg-subtle:  rgba(255,255,255,0.02); /* Fond très léger — sections ProfileSummary */
+  --glass-border:     rgba(255,255,255,0.08);
+  --glass-border-md:  rgba(255,255,255,0.14);
+  --glass-border-lg:  rgba(255,255,255,0.22);
 
   /* Typographie */
   --font-display:    'Playfair Display', Georgia, serif;
@@ -118,8 +132,17 @@ Toutes ces variables doivent être définies dans un futur fichier `css/variable
 
   /* Layout */
   --max-width:       1400px;
-  --navbar-height:   64px;
+  --navbar-height:        64px;
+  --navbar-height-coiffeur: 60px; /* Topbar espace coiffeur — valeur distincte justifiée par le contexte d'espace dédié */
   --bottomnav-height: 56px;
+
+  /* Z-index — ordre de superposition officiel */
+  --z-navbar:    100;
+  --z-bottomnav: 200;
+  --z-modal:     500;
+  --z-sidebar:   3000;
+  --z-ai:        9998;
+  --z-ai-window: 9999;
 }
 ```
 
@@ -135,6 +158,13 @@ Toutes ces variables doivent être définies dans un futur fichier `css/variable
 
 > ⚠️ Aucune autre police ne doit être introduite dans le projet.  
 > `'Segoe UI'` et `'Arial'` encore présents dans certaines pages doivent être remplacés par `Inter`.
+
+### Fallbacks officiels (pour réseau lent, hors-ligne, RGPD)
+```css
+--font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+--font-body:    'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+```
+Les fallbacks sont intentionnels et documentés. Ne pas les modifier.
 
 ### Hiérarchie des titres
 ```css
@@ -262,32 +292,54 @@ box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
 
 ### Classe utilitaire
 ```css
-.glass { background:var(--glass-bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--glass-border); border-radius:var(--radius-lg); }
+.glass    { background:var(--glass-bg);        backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--glass-border);    border-radius:var(--radius-lg); }
 .glass-md { background:var(--glass-bg-strong); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border:1px solid var(--glass-border-md); border-radius:var(--radius-xl); }
+.glass-lg { background:rgba(255,255,255,0.12); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border:1px solid var(--glass-border-lg); border-radius:var(--radius-pill); box-shadow:0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10); }
 ```
+
+> **Note :** `.glass-cct` est un alias historique de `.glass` (niveau 1). Les deux sont valides pendant la migration. À terme, `.glass` est la classe canonique.
 
 ---
 
 ## 8. ANIMATIONS
 
+> ### ⚠️ RÈGLE ABSOLUE — CENTRALISATION DES ANIMATIONS
+> **Toutes les animations `@keyframes` sont définies exclusivement dans `css/animations.css`.**  
+> Aucune animation ne doit être écrite directement dans une page PHP, un `<style>` inline ou un `<head>`.  
+> Pour utiliser une animation dans une page, importer `css/animations.css` et utiliser la classe CSS correspondante.  
+> Toute animation non listée dans cette section est **interdite** sans validation préalable.
+
+### Ordre de chargement CSS obligatoire
+```html
+<!-- 1. Variables CSS (tokens) -->
+<link rel="stylesheet" href="/coiffons/css/variables.css">
+<!-- 2. Animations centralisées -->
+<link rel="stylesheet" href="/coiffons/css/animations.css">
+<!-- 3. Composants utilitaires -->
+<link rel="stylesheet" href="/coiffons/css/components.css">
+<!-- 4. Bootstrap (grille uniquement) -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- 5. Styles spécifiques à la page (si nécessaire — à minimiser) -->
+```
+
 ### Animations de base autorisées dans le projet
 
 ```css
-/* Apparition fluide — transitions de page, cartes */
+/* ── 1. Apparition fluide — transitions de page, cartes ── */
 @keyframes fadeSlideIn {
   from { opacity:0; transform:translateY(12px); }
   to   { opacity:1; transform:translateY(0); }
 }
 .page-transition { animation: fadeSlideIn 0.3s ease forwards; }
 
-/* Émergence — modales, glass cards */
+/* ── 2. Émergence — modales, glass cards ── */
 @keyframes emerge {
   from { opacity:0; transform:translateY(30px) scale(0.95); }
   to   { opacity:1; transform:translateY(0) scale(1); }
 }
 .fade-in-card { animation: emerge 0.6s cubic-bezier(0.22,1,0.36,1); }
 
-/* Shimmer — skeleton loaders */
+/* ── 3. Shimmer — skeleton loaders ── */
 @keyframes shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -298,7 +350,7 @@ box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
   animation: shimmer 1.5s infinite;
 }
 
-/* Pulse — cloche notifications, alertes */
+/* ── 4. Pulse — cloche notifications, alertes ── */
 @keyframes pulseBell {
   0%   { transform:scale(0.9); opacity:0.8; }
   50%  { transform:scale(1.1); opacity:1; }
@@ -306,21 +358,29 @@ box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
 }
 .animate-pulse { animation: pulseBell 1.5s infinite; }
 
-/* Blink — indicateur de saisie IA */
+/* ── 5. Blink — indicateur de saisie IA (typing dots) ── */
 @keyframes blink {
   0%   { opacity:.2; }
   20%  { opacity:1; }
   100% { opacity:.2; }
 }
+.typing-dot              { animation: blink 1.4s infinite both; }
+.typing-dot:nth-child(2) { animation-delay: .2s; }
+.typing-dot:nth-child(3) { animation-delay: .4s; }
+
+/* ── 6. Carousel / Slider d'images ── */
+.hero-slide             { opacity: 0; transition: opacity 1.2s ease; }
+.hero-slide.active      { opacity: 1; }
 ```
 
 ### Règles d'animation
 - Durée standard : `0.2s` (hover léger), `0.3s` (transition), `0.6s` (émergence)
-- Easing standard : `ease` ou `cubic-bezier(0.25,0.8,0.25,1)` pour les cartes
+- Easing standard : `ease` ou `var(--transition-spring)` pour les cartes
 - Easing premium : `cubic-bezier(0.22,1,0.36,1)` pour les modales
 - **Aucune animation > 0.6s** sauf skeleton et pulse
 - Toutes les transitions hover sur cartes : `transform: translateY(-4px) à -8px`
 - Transition de bordure gold au hover : `border-color: rgba(212,175,55,0.3–0.4)`
+- **Interdit :** définir un `@keyframes` dans une page PHP ou un `<style>` inline
 
 ---
 
@@ -336,6 +396,7 @@ box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
 
 ### Règles responsive obligatoires
 - Toute page a une `bottom nav` sur mobile (< 768px)
+- Toute page avec bottom nav applique `padding-bottom: calc(var(--bottomnav-height) + 1rem)` sur son wrapper de contenu principal
 - La navbar desktop est sticky et blurée (`position: sticky; backdrop-filter: blur`)
 - Les hero desktop (`border-radius: 52px`) passent à `28px` sur MD et `20px` sur SM
 - Le padding des pages passe de `2rem` à `1rem` sur mobile
@@ -355,7 +416,8 @@ box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
 - Hover icône : `background: var(--gold-dim)`, `color: var(--gold)`, `border-color: var(--gold)`
 
 ### Navbar coiffeur (espace coiffeur)
-- `position: sticky`, `height: 60px`
+- `position: sticky`, `height: var(--navbar-height-coiffeur)` (60px)
+- **Distinction intentionnelle :** la topbar coiffeur est légèrement plus compacte que la navbar client (64px) pour optimiser l'espace de travail dans l'espace coiffeur.
 - Même traitement glassmorphism
 - Brand `CCT` → sera remplacé par logo image quand disponible
 - Affiche le nom de page courante à droite du brand (`:` separator)
@@ -418,18 +480,35 @@ box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
 .msg-warning { background:rgba(255,214,10,0.12); border:1px solid rgba(255,214,10,0.30);  color:#FFD60A;  border-radius:10px; padding:10px 16px; font-size:0.85rem; }
 ```
 
+### Accessibilité — focus visible (WCAG 2.1 AA)
+```css
+.form-field:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.btn-gold:focus-visible,
+.btn-outline-gold:focus-visible,
+.btn-ghost:focus-visible,
+.btn-danger-cct:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+```
+
 ---
 
 ## 12. BOUTONS
 
 ### Hiérarchie des boutons
-| Variant | Classe | Usage |
-|---------|--------|-------|
+| Variant | Classe officielle | Usage |
+|---------|------------------|-------|
 | Primary (gold) | `.btn-gold` | Action principale, CTA |
 | Secondary (outline gold) | `.btn-outline-gold` | Action secondaire |
 | Ghost | `.btn-ghost` | Action tertiaire, navigation |
 | Danger | `.btn-danger-cct` | Suppression, annulation |
 | Floating | `.btn-floating` | Actions rapides en overlay |
+
+> **Classes interdites :** `.btn-gold-cct`, `.btn-luxury-gold`, `.btn-warning` (Bootstrap natif) ne doivent plus être utilisées. `.btn-gold` est la seule classe canonique du bouton primaire.
 
 ### Styles
 
@@ -484,14 +563,39 @@ box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
 
 ### Glass card (portefeuille, sections coiffeur)
 ```css
+/* Classe canonique : .glass (niveau 1 — voir §7) */
+/* .glass-cct est un alias historique, accepté pendant la migration vers .glass */
 .glass-cct {
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: var(--radius-lg);
-  transition: border-color 0.3s;
+  transition: var(--transition-base);
 }
 .glass-cct:hover { border-color: rgba(212,175,55,0.25); }
 ```
+
+### Gallery Card (galerie de prestations)
+```css
+/* Classe canonique : .gallery-card — remplace l'ancien .luxury-profile-card */
+.gallery-card {
+  background: var(--dark-2);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: var(--transition-spring), border-color 0.3s;
+}
+.gallery-card:hover { transform: translateY(-4px); border-color: rgba(212,175,55,0.30); }
+
+/* Image container */
+.gallery-card-img { width:100%; height:240px; overflow:hidden; background:var(--dark-4); }
+.gallery-card-img img { width:100%; height:100%; object-fit:cover; }
+.gallery-card-img-placeholder {
+  width:100%; height:100%;
+  background: linear-gradient(135deg, #151515 0%, #252525 100%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+```
+> **Classe interdite :** `.luxury-profile-card` ne doit plus être utilisée. Remplacer par `.gallery-card` lors de la migration.
 
 ### Auth card (connexion / inscription)
 ```css
@@ -516,20 +620,26 @@ box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
 ## 14. BADGES & TAGS
 
 ```css
+/* Règle commune à tous les badges */
+/* border-radius: 20px; font-weight: 700; padding: 3px 10px; font-size: 0.75rem; */
+
 /* Badge certifié (vert) */
-.badge-verified { background:rgba(25,135,84,0.90); backdrop-filter:blur(8px); color:#fff; font-size:0.68rem; font-weight:700; padding:3px 8px; border-radius:20px; }
+.badge-verified { background:rgba(25,135,84,0.90); backdrop-filter:blur(8px); color:#fff; font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:20px; }
 
 /* Badge gold (catégorie, type) */
-.badge-gold { background:rgba(212,175,55,0.10); border:1px solid rgba(212,175,55,0.20); color:var(--gold); font-size:0.65rem; padding:2px 8px; border-radius:20px; }
+.badge-gold { background:rgba(212,175,55,0.10); border:1px solid rgba(212,175,55,0.20); color:var(--gold); font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:20px; }
 
-/* Status badge */
-.badge-pending  { background:#FFC107; color:#000; }
-.badge-confirmed{ background:#0D6EFD; color:#fff; }
-.badge-done     { background:#198754; color:#fff; }
-.badge-cancelled{ background:#6C757D; color:#fff; }
-
-/* Tous les badges : border-radius: 20px; font-weight:700; padding: 3px 10px; font-size: 0.75rem */
+/* Status badges — RDV */
+.badge-pending   { background:#FFC107; color:#000;    font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:20px; }
+.badge-confirmed { background:#0D6EFD; color:#fff;    font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:20px; }
+.badge-done      { background:#198754; color:#fff;    font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:20px; }
+.badge-cancelled { background:#6C757D; color:#fff;    font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:20px; }
 ```
+
+> **Séparateur de section :** Deux types de séparateurs sont autorisés :
+> - Standard : `border-bottom: 1px solid rgba(255,255,255,0.06)`
+> - Premium (footer, sections gold) : `border-bottom: 1px solid rgba(212,175,55,0.20)`
+> **Interdit :** `<hr>` Bootstrap natif sans classe custom.
 
 ---
 
@@ -658,7 +768,9 @@ Toute liste, tableau ou section vide doit afficher un empty state cohérent.
 ## 21. FOOTER
 
 ```css
-.cct-footer { background:#000; border-top:1px solid rgba(212,175,55,0.20); padding:3rem 0 1.5rem; }
+/* Note : var(--black) = #000 est utilisé intentionnellement ici.
+   Le footer crée un contraste maximal avec le contenu (var(--dark) = #0A0A0A). */
+.cct-footer { background:var(--black); border-top:1px solid rgba(212,175,55,0.20); padding:3rem 0 1.5rem; }
 .footer-brand { font-family:var(--font-display); font-size:1.2rem; font-weight:700; color:var(--gold); }
 .footer-desc  { color:rgba(255,255,255,0.35); font-size:0.82rem; line-height:1.6; }
 .footer-link  { color:rgba(255,255,255,0.40); text-decoration:none; font-size:0.82rem; display:block; margin-bottom:6px; transition:color 0.2s; }
@@ -700,9 +812,69 @@ Sur mobile : tout centré, stacked
 2. Toute page inclut la navbar (client ou coiffeur selon le contexte)
 3. Toute page mobile a une bottom navigation fixe
 4. Le contenu commence à `padding-top: var(--navbar-height)` ou via wrapper
-5. Sections alternent entre `var(--dark)` et `var(--dark-2)` si plusieurs blocs
-6. Aucune couleur blanche de fond — le projet est 100% dark theme
-7. Tous les textes par défaut sont `color: #fff`
-8. Les liens sans style explicite héritent de `color: var(--gold)`
-9. Le project utilise Bootstrap 5.3.3 comme grille — les composants Bootstrap natifs sont restyled en dark
-10. La scrollbar custom s'applique aux modales et aux zones scrollables : `4px wide`, `thumb: var(--gold)`
+5. Le contenu des pages avec bottom nav a un `padding-bottom: calc(var(--bottomnav-height) + 1rem)`
+6. Sections alternent entre `var(--dark)` et `var(--dark-2)` si plusieurs blocs
+7. Aucune couleur blanche de fond — le projet est 100% dark theme
+8. Tous les textes par défaut sont `color: #fff`
+9. Les liens sans style explicite héritent de `color: var(--gold)`
+10. Le project utilise Bootstrap 5.3.3 comme grille — les composants Bootstrap natifs sont restyled en dark
+11. La scrollbar custom s'applique aux modales et aux zones scrollables : `4px wide`, `thumb: var(--gold)`
+
+---
+
+## 25. NOMENCLATURE OFFICIELLE
+
+### Préfixes CSS autorisés
+| Préfixe | Usage | Exemples |
+|---------|-------|---------|
+| `.btn-` | Boutons | `.btn-gold`, `.btn-outline-gold`, `.btn-ghost`, `.btn-danger-cct` |
+| `.glass` | Glassmorphisme | `.glass`, `.glass-md`, `.glass-lg` |
+| `.badge-` | Badges | `.badge-gold`, `.badge-verified`, `.badge-pending` |
+| `.msg-` | Messages de feedback | `.msg-success`, `.msg-danger`, `.msg-warning` |
+| `.nav-` | Éléments de navigation | `.nav-icon-btn`, `.nav-avatar` |
+| `.cct-` | Composants globaux CCT | `.cct-nav`, `.cct-footer` |
+| `.skeleton-` | Loaders squelette | `.skeleton-card`, `.skeleton-text` |
+| `.hero-` | Composants hero | `.hero-slide`, `.hero-content`, `.hero-overlay` |
+| `.card-` | Sous-éléments de cartes | `.card-cover`, `.card-body`, `.card-name` |
+| `.gallery-` | Cartes galerie | `.gallery-card`, `.gallery-card-img` |
+| `.fc-` | Form controls | `.fc-dark` |
+| `.table-` | Tableaux | `.table-dark-cct` |
+| `.modal-` | Modales | `.modal-overlay`, `.modal-box` |
+| `.page-` | Wrappers de page | `.page-transition` |
+| `.empty-` | Empty states | `.empty-state` |
+
+### Classes interdites (noms dépréciés)
+| Classe interdite | Remplacée par |
+|-----------------|---------------|
+| `.btn-gold-cct` | `.btn-gold` |
+| `.btn-luxury-gold` | `.btn-gold` |
+| `.btn-outline-warning` | `.btn-outline-gold` |
+| `.luxury-profile-card` | `.gallery-card` |
+| `.glass-card` | `.glass-md` |
+| `.glass-card-annuaire` | `.glass-md` |
+| `.content-wrapper` | `.glass` ou `.glass-md` selon le contexte |
+| `.custom-input` | `.fc-dark` |
+| `.alert-msg-danger` | `.msg-danger` |
+| `.btn-warning` (Bootstrap natif) | `.btn-gold` |
+
+### Conventions de nommage CSS
+- Classes : `kebab-case` (ex : `.hero-slide`, `.card-avatar-wrap`)
+- Variables CSS : `--kebab-case` (ex : `--gold-dim`, `--navbar-height`)
+- Pas d'underscore, pas de camelCase dans les classes CSS
+
+### Conventions de nommage JavaScript
+- Fonctions : `camelCase` (ex : `lancerRecherche()`, `selectionnerJour()`, `toggleChat()`)
+- Variables : `camelCase` (ex : `slotsOccupes`, `coiffeurId`)
+- IDs HTML ciblés par JS : `kebab-case` (ex : `#ai-bubble`, `#chat-window`, `#zone-slots-horaires`)
+- Constantes : `SCREAMING_SNAKE_CASE` si globales (ex : `MAX_SLOTS`)
+
+### Conventions de nommage HTML
+- IDs : `kebab-case` (ex : `id="hero-carousel"`, `id="zone-slots-horaires"`)
+- Classes : `kebab-case` (voir préfixes ci-dessus)
+- Attributs `data-*` : `kebab-case` (ex : `data-date`, `data-open`, `data-start`)
+- Noms de composants dans les commentaires : `PascalCase` (ex : `<!-- HeroCapsule -->`)
+
+### Conventions de nommage des composants PHP
+- Fichiers composants : `snake_case.php` (ex : `navbar_client.php`, `status_badge.php`)
+- Fonctions PHP helper : `snake_case` (ex : `render_status_badge()`)
+- Variables PHP dans les vues : `$snake_case` (ex : `$coiffeur_id`, `$note_moyenne`)

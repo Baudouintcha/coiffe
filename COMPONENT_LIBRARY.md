@@ -1,6 +1,6 @@
 # COMPONENT LIBRARY — Coiffe Chez Toi
 > Référence officielle de tous les composants réutilisables du projet.
-> Version : 1.0 — Juillet 2026
+> Version : 2.0 — Juillet 2026 | Statut : **VALIDÉ — Référence officielle**
 
 ---
 
@@ -8,9 +8,10 @@
 
 - Chaque composant est un bloc PHP/HTML autonome
 - Les composants partagés sont placés dans `views/components/`
-- Les variables CSS du DESIGN_SYSTEM.md s'appliquent à tous les composants
+- Les variables CSS de `DESIGN_SYSTEM.md` s'appliquent à tous les composants
 - Les composants utilisent Bootstrap 5.3.3 pour la grille uniquement
 - Toute logique PHP (données dynamiques) reste dans la page appelante
+- **Règle d'or :** avant tout nouveau composant, vérifier si un équivalent existe déjà (voir DS §25)
 
 ---
 
@@ -212,23 +213,34 @@
 ## 7. GALLERY CARD (Carte Galerie Prestation)
 
 **Nom :** `GalleryCard`  
+**Classe CSS officielle :** `.gallery-card`  
+**Classe dépréciée :** ~~`.luxury-profile-card`~~ — **interdite, ne plus utiliser**  
 **Rôle :** Afficher une photo de prestation avec son nom et son prix  
 **Utilisé dans :** `profil_public.php`, `gestion_catalogue.php`
 
 ### Anatomie
 ```
-[.luxury-profile-card]
-  └─ [.luxury-img-container: 240px]
-       └─ [img ou placeholder]
+[.gallery-card]
+  └─ [.gallery-card-img: 240px]
+       └─ [img ou placeholder .gallery-card-img-placeholder]
   └─ [.card-body centré]
-       └─ [Nom du style]
-       └─ [Prix en FCFA gold]
-       └─ [CTA: "CHOISIR CE STYLE"]
+       └─ [Nom du style — font-weight:700]
+       └─ [Prix en FCFA — couleur var(--gold)]
+       └─ [CTA: "CHOISIR CE STYLE" — .btn-outline-gold]
 ```
 
 ### Variantes
-- Avec image réelle
-- Avec placeholder dégradé + icône étoile
+- **View** (`profil_public.php`) : lecture seule, CTA vers `reserver.php`
+- **Edit** (`gestion_catalogue.php`) : actions Modifier/Supprimer
+
+### Style
+```css
+/* Voir DS §13 — .gallery-card */
+```
+
+### Responsive
+- `col-sm-6 col-md-4`
+- Hover : `translateY(-4px)` + border gold
 
 ---
 
@@ -251,7 +263,7 @@
 |------|-------|
 | Disponible | `border-color: rgba(25,135,84,0.30)` |
 | Indisponible | `border-color: rgba(220,53,69,0.40)`, `opacity: 0.50`, `cursor: not-allowed` |
-| Sélectionné | `background: #ffc107`, `color: #000`, `transform: scale(1.05)` |
+| Sélectionné | `background: var(--select-active)`, `color: #000`, `transform: scale(1.05)` |
 
 ### Comportement
 - Clic sur un jour disponible → affiche les créneaux horaires
@@ -277,8 +289,8 @@
 
 ### Variantes
 - Gold (default) : icône `var(--gold)`
-- Danger : icône `#ff6b6b` (commissions/charges)
-- Success : icône `var(--success-text)`
+- Danger : icône `var(--danger-icon)` = `#FF6B6B`
+- Success : icône `var(--success-text)` = `#6EE7B7`
 
 ---
 
@@ -302,9 +314,10 @@
 
 ---
 
-## 11. FLOATING BUTTON (Bulle IA)
+## 11. AI BUBBLE (Bulle IA)
 
-**Nom :** `FloatingButton`  
+**Nom :** `AIBubble`  
+**Nom déprécié :** ~~`FloatingButton`~~ — remplacé par `AIBubble` pour éviter toute confusion avec un bouton d'action overlay  
 **Rôle :** Bouton d'accès rapide à l'assistant IA, toujours visible  
 **Utilisé dans :** `layout/footer.php` (toutes les pages client)
 
@@ -464,7 +477,7 @@ Toujours accompagné d'une confirmation (modal ou `confirm()`)
 
 **Nom :** `BottomNavigation`  
 **Rôle :** Navigation principale sur mobile  
-**Utilisé dans :** `layout/header_coiffeur.php` (coiffeur), à standardiser pour client
+**Utilisé dans :** `layout/header_coiffeur.php` (coiffeur), `views/components/bottom_nav_client.php` (client)
 
 ### Anatomie
 ```
@@ -474,15 +487,16 @@ Toujours accompagné d'une confirmation (modal ou `confirm()`)
 ```
 
 ### Items coiffeur
-- Dashboard, Catalogue, Agenda, RDV, Quitter
+- Dashboard (`bi-grid-1x2`), Catalogue (`bi-scissors`), Agenda (`bi-calendar3`), RDV (`bi-check2-circle`), Quitter (`bi-box-arrow-right`)
 
-### Items client (à implémenter)
-- Accueil, Rechercher, Mes RDV, Profil
+### Items client
+- Accueil (`bi-house`), Rechercher (`bi-search`), Mes RDV (`bi-calendar3`), Profil (`bi-person-circle`)
+- Liens : `/coiffons/index.php`, `/coiffons/filter/annuaire_coiffeurs.php`, `/coiffons/client/mes_rendezvous.php`, `/coiffons/profil.php`
 
 ### Responsive
 - `display: none` sur `>= 768px`
 - `display: block` sur `< 768px`
-- Z-index : `200` (au-dessus du contenu, sous les modales)
+- `z-index: var(--z-bottomnav)` = 200
 
 ---
 
@@ -542,7 +556,9 @@ La bulle IA et la fenêtre de chat sont liées au footer mais doivent être extr
 - Bootstrap 5.3.3 + Bootstrap Icons
 - Topbar avec brand, notifications, avatar
 - Bottom nav mobile
-- Classes utilitaires : `.glass-cct`, `.fc-dark`, `.btn-gold-cct`, `.msg-success`, `.msg-danger`
+- Classes utilitaires : `.glass` (alias `.glass-cct`), `.fc-dark`, `.btn-gold`, `.msg-success`, `.msg-danger`
+
+> **Note :** `.btn-gold-cct` n'est plus dans la liste des classes incluses. La classe canonique est `.btn-gold` (voir DS §12).
 
 ---
 
@@ -620,14 +636,16 @@ Si la photo de profil n'existe pas → afficher le placeholder initial :
 **Utilisé dans :** `mes_rendezvous.php`
 
 ### Variantes
-- Desktop : tableau dark avec colonne statut + bouton gérer
-- Mobile : carte individuelle `.card.bg-dark.border.border-warning`
+- Desktop : tableau `.table-dark-cct` avec colonne statut + bouton gérer
+- Mobile : carte individuelle `.glass-cct` avec badge statut + `.btn-outline-gold`
 
 ### États du statut
 - `en_attente` → `.badge-pending`
 - `confirme`/`accepte` → `.badge-confirmed`
 - `termine` → `.badge-done`
 - `annule` → `.badge-cancelled`
+
+> **Note :** La variante mobile utilise `.glass-cct` (alias `.glass`), plus `.border-warning` Bootstrap qui n'est pas dans la palette. Lors de la migration, remplacer `border border-warning` par `border: 1px solid rgba(212,175,55,0.40)`.
 
 ### Comportement
 - Bouton "Gérer" → ouvre Modal de détails
@@ -643,13 +661,15 @@ Si la photo de profil n'existe pas → afficher le placeholder initial :
 
 ### Anatomie
 ```
-[Section centré: background rgba(255,255,255,0.02)]
-  └─ [Avatar gold circle 80px]
-  └─ [Nom uppercase H1 text-warning]
-  └─ [Ville + quartier avec icône géo]
-  └─ [Badge note/5]
-  └─ [Bio courte max 600px]
+[Section centré: background var(--glass-bg-subtle) = rgba(255,255,255,0.02)]
+  └─ [Avatar gold circle 80px — composant Avatar LG]
+  └─ [Nom uppercase H2 Playfair couleur var(--gold)]
+  └─ [Ville + quartier avec icône bi-geo-alt-fill]
+  └─ [Badge note/5 — .badge-gold ou .badge-muted si aucun avis]
+  └─ [Bio courte max 600px — font-size 0.9rem]
 ```
+
+> **Variable ajoutée :** `--glass-bg-subtle: rgba(255,255,255,0.02)` — à ajouter dans `css/variables.css`. Valeur distincte de `--glass-bg` pour les sections de fond très léger.
 
 ---
 
@@ -698,18 +718,19 @@ Si la photo de profil n'existe pas → afficher le placeholder initial :
 ## 31. STATUS BADGE
 
 **Nom :** `StatusBadge`  
-**Rôle :** Afficher le statut d'un élément (RDV, abonnement, coiffeur)  
+**Rôle :** Wrapper PHP qui produit le HTML d'un Badge de statut  
+**Relation :** `StatusBadge` est le helper PHP de `Badge` (CL §16). Il n'est pas un composant indépendant — il utilise les mêmes classes CSS définies dans DS §14.  
 **Utilisé dans :** Tableaux, cartes, profils
 
 ```php
-/* PHP helper à créer dans views/components/status_badge.php */
+/* PHP helper — views/components/status_badge.php */
 function render_status_badge(string $status): string {
     return match($status) {
-        'en_attente' => '<span class="badge-pending badge px-3 py-2">En attente</span>',
-        'confirme','accepte' => '<span class="badge-confirmed badge px-3 py-2">Confirmé</span>',
-        'termine'  => '<span class="badge-done badge px-3 py-2">Terminé</span>',
-        'annule'   => '<span class="badge-cancelled badge px-3 py-2">Annulé</span>',
-        default    => '<span class="badge bg-secondary px-3 py-2">' . htmlspecialchars($status) . '</span>',
+        'en_attente'        => '<span class="badge-pending badge">En attente</span>',
+        'confirme','accepte'=> '<span class="badge-confirmed badge">Confirmé</span>',
+        'termine'           => '<span class="badge-done badge">Terminé</span>',
+        'annule'            => '<span class="badge-cancelled badge">Annulé</span>',
+        default             => '<span class="badge bg-secondary">' . htmlspecialchars($status) . '</span>',
     };
 }
 ```
@@ -741,3 +762,278 @@ function render_status_badge(string $status): string {
 - Réponse IA : lecture vocale `SpeechSynthesis`
 - Photo : Canvas compression base64 → envoi à `ia_controlleur.php`
 - Fetch POST vers `/coiffons/ia_controlleur.php`
+
+---
+
+## 33. FORM FIELD
+
+**Nom :** `FormField`  
+**Classe CSS officielle :** `.fc-dark`  
+**Rôle :** Champ de formulaire dark glassmorphisme — composant de base de tous les formulaires du projet  
+**Utilisé dans :** `access/connexion.php`, `access/inscription.php`, `coiffeurs/gestion_catalogue.php`, `coiffeurs/agenda_coiffeurs.php`, `coiffeurs/mes_zones.php`, `client/reserver.php`, `client/creer_rendezvous.php`
+
+### Variantes
+| Variante | Tag HTML | Usage |
+|---------|---------|-------|
+| Text / Email / Tel | `<input type="text|email|tel">` | Saisie libre |
+| Password | `<input type="password">` avec toggle | Mot de passe |
+| Select | `<select>` | Listes déroulantes |
+| Textarea | `<textarea>` | Descriptions, bio |
+| Time | `<input type="time">` | Créneaux horaires |
+| File | `<input type="file">` | Upload photos |
+| Input Group | Icône + champ + toggle | Connexion, recherche |
+
+### Style CSS
+```css
+.fc-dark {
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  color: #fff !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 11px 14px !important;
+  backdrop-filter: blur(4px);
+  transition: var(--transition-fast);
+}
+.fc-dark:focus {
+  border-color: var(--gold) !important;
+  background: rgba(255,255,255,0.10) !important;
+  box-shadow: 0 0 0 3px rgba(212,175,55,0.12) !important;
+  color: #fff !important;
+}
+.fc-dark::placeholder { color: rgba(255,255,255,0.25) !important; }
+.fc-dark option       { background: var(--dark-2); color: #fff; }
+```
+
+### Labels (obligatoires au-dessus de chaque champ)
+```html
+<label class="form-label-cct">Libellé du champ</label>
+```
+```css
+.form-label-cct {
+  display: block;
+  color: rgba(255,255,255,0.65);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+```
+
+### Input Group (icône + champ + toggle)
+```html
+<div class="input-group-cct">
+  <span class="ig-prefix"><i class="bi bi-[icone]"></i></span>
+  <input type="text" class="fc-dark" placeholder="...">
+  <button type="button" class="ig-suffix"><i class="bi bi-eye"></i></button>
+</div>
+```
+```css
+.input-group-cct       { display:flex; align-items:stretch; }
+.ig-prefix, .ig-suffix { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.50); display:flex; align-items:center; padding:0 12px; }
+.ig-prefix             { border-right:none; border-radius:var(--radius-sm) 0 0 var(--radius-sm); }
+.ig-suffix             { border-left:none;  border-radius:0 var(--radius-sm) var(--radius-sm) 0; cursor:pointer; }
+.ig-suffix:hover       { background:rgba(212,175,55,0.15); color:var(--gold); }
+.input-group-cct .fc-dark { border-radius:0 !important; border-left:none !important; border-right:none !important; }
+```
+
+### Responsive
+- Tous les champs : `width: 100%`
+- Sur mobile, les grilles de champs en ligne (`row g-3`) passent en colonne simple
+
+---
+
+## 34. AUTH CARD
+
+**Nom :** `AuthCard`  
+**Classe CSS officielle :** `.auth-card`  
+**Rôle :** Conteneur glassmorphisme pour les pages d'authentification (connexion, inscription)  
+**Utilisé dans :** `access/connexion.php`, `access/inscription.php`
+
+### Variantes
+| Variante | max-width | Page |
+|---------|----------|------|
+| Connexion | `440px` | `connexion.php` |
+| Inscription | `620px` | `inscription.php` |
+
+### Anatomie
+```
+[.auth-bg: fond flou fixe — image hero]
+[.auth-overlay: rgba(0,0,0,0.35) fixe]
+[.auth-wrapper: flex centré min-height 100vh]
+  └─ [.auth-card: glass niveau 2]
+       └─ [Titre H2 Playfair couleur var(--gold)]
+       └─ [Sous-titre muted]
+       └─ [Message flash .msg-danger / .msg-success]
+       └─ [Formulaire avec .fc-dark fields]
+       └─ [.btn-gold pleine largeur]
+       └─ [Lien secondaire (inscription/connexion)]
+```
+
+### Style CSS
+```css
+/* Fond flou fixe — utilise la première image du slider */
+.auth-bg {
+  position: fixed; inset: 0; z-index: 0;
+  background-size: cover; background-position: center;
+  filter: blur(20px) brightness(0.5);
+  transform: scale(1.1);
+}
+.auth-overlay { position:fixed; inset:0; z-index:1; background:rgba(0,0,0,0.35); }
+.auth-wrapper {
+  position:relative; z-index:10;
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  padding:2rem 1rem; overflow-y:auto;
+}
+.auth-card {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 10px 50px rgba(0,0,0,0.50);
+  padding: 2.5rem 2rem;
+  width: 100%;
+  color: #fff;
+}
+.auth-card--sm { max-width: 440px; } /* connexion */
+.auth-card--lg { max-width: 620px; } /* inscription */
+```
+
+### Responsive
+- Padding réduit à `1.5rem 1.25rem` sur mobile
+- Champs en colonne unique sur `< 480px`
+
+---
+
+## 35. SLOTS CONTAINER
+
+**Nom :** `SlotsContainer`  
+**Classe CSS officielle :** `.slots-container`  
+**Rôle :** Grille de créneaux horaires générée dynamiquement après sélection d'un jour disponible  
+**Utilisé dans :** `coiffeurs/profil_public.php`
+
+### Anatomie
+```
+[#zone-slots-horaires.slots-container: d-none → visible au clic sur AvailabilityCard]
+  └─ [Titre "Heures disponibles..." — small gold uppercase]
+  └─ [#slots-container: flex wrap gap-2]
+       └─ [Créneau libre — .btn-outline-gold.btn-sm]
+       └─ [Créneau occupé — .btn-ghost.btn-sm disabled opacity-25]
+```
+
+### Style CSS
+```css
+.slots-container {
+  background: var(--dark-2);
+  border: 1px dashed rgba(212,175,55,0.30);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  text-align: center;
+}
+.slots-container-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--gold);
+  margin-bottom: 1rem;
+}
+```
+
+### Comportement JS
+- Généré dynamiquement par `selectionnerJour(element)` 
+- Paramètres lus depuis les `data-start` et `data-end` de l'`AvailabilityCard` cliquée
+- Créneaux par heure entière entre `data-start` et `data-end`
+- Créneau libre → `href` vers `reserver.php?coiffeur_id=&presta_id=&date_rdv=&heure_debut=`
+- Créneau occupé → désactivé (vérification via `slotsOccupes` object PHP injecté)
+
+### Responsive
+- `flex-wrap: wrap; justify-content: center; gap: 8px`
+- Boutons : `padding: 6px 14px; font-size: 0.82rem`
+
+---
+
+## 36. DATA TABLE
+
+**Nom :** `DataTable`  
+**Classe CSS officielle :** `.table-dark-cct`  
+**Rôle :** Tableau de données dark theme (planning, historique, liste RDV desktop)  
+**Utilisé dans :** `coiffeurs/agenda_coiffeurs.php`, `client/mes_rendezvous.php`
+
+### Style CSS
+```css
+/* Voir DS §16 — .table-dark-cct */
+```
+
+### Anatomie
+```
+[.table-responsive] (wrapper mobile)
+  └─ [table.table-dark-cct]
+       └─ [thead tr]
+            └─ [th — uppercase 0.75rem muted]
+       └─ [tbody tr — hover background léger]
+            └─ [td — 0.85rem #fff]
+```
+
+### Responsive
+- Wrapper `.table-responsive` obligatoire
+- Sur mobile (`< 768px`) : masquer le tableau, afficher la variante carte de l'`AppointmentCard`
+
+---
+
+## 37. HERO COMPACT
+
+**Nom :** `HeroCompact`  
+**Rôle :** Section hero compacte (35vh) avec fond flou et formulaire de recherche/filtres  
+**Utilisé dans :** `filter/annuaire_coiffeurs.php`
+
+### Anatomie
+```
+[.annuaire-hero: min-height 35vh, position relative]
+  └─ [::before pseudo-element: image fond, blur(4px) brightness(0.18)]
+  └─ [.container]
+       └─ [.glass-md (HeroCard): border-radius 20px, glass niveau 2]
+            └─ [Titre H1 Playfair clamp(1.4rem, 3vw, 2rem)]
+            └─ [Sous-titre muted 0.82rem]
+            └─ [Formulaire de filtres — grille Bootstrap]
+                 └─ [.fc-dark select × 3]
+                 └─ [.fc-dark input number]
+                 └─ [.btn-gold submit]
+```
+
+### Responsive
+- Sur mobile : formulaire en colonne, padding réduit
+- Fond `filter:blur(4px) brightness(0.18)` conservé à toutes tailles
+
+---
+
+## 38. INFORMATION BLOCK (étendu)
+
+**Nom :** `InformationBlock`  
+**Rôle :** Bloc d'alerte/information contextuelle large avec icône + texte + action optionnelle  
+**Relation :** Variante large des messages `.msg-*` (DS §11) — partage les mêmes tokens de couleur  
+**Utilisé dans :** `coiffeurs/portefeuille.php` (abonnement actif/expiré)
+
+### Variantes
+| Variante | Classe | Fond | Icône |
+|---------|--------|------|-------|
+| Danger | `.info-block--danger` | `rgba(220,53,69,0.12)` | `bi-exclamation-triangle-fill`, couleur `var(--danger-icon)` |
+| Success | `.info-block--success` | `rgba(25,135,84,0.08)` | `bi-check-circle-fill`, couleur `var(--success-text)` |
+
+### Style CSS
+```css
+.info-block {
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.info-block--danger  { background:rgba(220,53,69,0.12); border:1px solid var(--danger-border); }
+.info-block--success { background:rgba(25,135,84,0.08);  border:1px solid var(--success-border); }
+.info-block-icon     { font-size:1.4rem; flex-shrink:0; margin-top:2px; }
+.info-block-title    { font-weight:700; margin-bottom:4px; }
+.info-block-text     { color:rgba(255,255,255,0.50); font-size:0.80rem; margin-bottom:12px; }
+```

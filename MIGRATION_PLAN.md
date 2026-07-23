@@ -1,6 +1,6 @@
 # PLAN DE MIGRATION — Coiffe Chez Toi
 > Feuille de route pour la refonte UI vers le nouveau Design System.
-> Version : 1.0 — Juillet 2026
+> Version : 2.0 — Juillet 2026 | Mis à jour suite à la stabilisation Design System v2.0
 
 ---
 
@@ -8,11 +8,11 @@
 
 La migration suit une logique **du général au particulier** :
 
-1. D'abord les **fondations CSS partagées** (variables, classes utilitaires)
+1. D'abord les **fondations CSS partagées** (variables, animations, composants)
 2. Ensuite les **composants partagés** (layouts header/footer)
 3. Ensuite les **pages à fort trafic** (pages d'entrée et conversion)
 4. Ensuite les **pages secondaires** par espace (client, coiffeur, admin)
-5. Enfin le **nettoyage** (suppression des CSS inline et des doublons)
+5. Enfin le **nettoyage** (suppression des CSS inline, des doublons, des anciens fichiers)
 
 **Règle d'or :** Chaque étape est validée avant de passer à la suivante.  
 **Aucune logique PHP n'est modifiée** pendant la migration.
@@ -25,21 +25,34 @@ La migration suit une logique **du général au particulier** :
 > À faire AVANT toute modification de page
 
 ### 0.1 — Créer `css/variables.css`
-- Extraire toutes les variables `:root` du DESIGN_SYSTEM.md
-- Ce fichier sera importé en premier dans chaque page
+- Copier-coller le bloc `:root` complet depuis DS §2
+- Ce fichier sera importé EN PREMIER dans chaque page
 
-### 0.2 — Créer `css/components.css`
-- Regrouper les classes utilitaires communes :
-  - `.glass`, `.glass-md`
+### 0.2 — Créer `css/animations.css` et `css/components.css`
+
+**`css/animations.css`** — Copier les 6 animations officielles de DS §8 :
+- `@keyframes fadeSlideIn` + `.page-transition`
+- `@keyframes emerge` + `.fade-in-card`
+- `@keyframes shimmer` + `.skeleton`, `.skeleton-*`
+- `@keyframes pulseBell` + `.animate-pulse`
+- `@keyframes blink` + `.typing-dot`
+- `.hero-slide` + `.hero-slide.active`
+
+**`css/components.css`** — Regrouper les classes utilitaires communes :
+  - `.glass`, `.glass-md`, `.glass-lg` (+ alias `.glass-cct`)
   - `.btn-gold`, `.btn-outline-gold`, `.btn-ghost`, `.btn-danger-cct`
   - `.badge-*` (verified, gold, pending, confirmed, done, cancelled)
   - `.msg-success`, `.msg-danger`, `.msg-warning`
-  - `.skeleton`, `.skeleton-card`, `.skeleton-text`, `.skeleton-avatar`
+  - `.skeleton-card`, `.skeleton-text`, `.skeleton-title`, `.skeleton-avatar`
   - `.empty-state`
   - `.page-transition`, `.fade-in-card`
   - `.avatar-placeholder`
   - `.table-dark-cct`
+  - `.fc-dark`, `.form-label-cct`, `.input-group-cct`
+  - `.gallery-card`, `.gallery-card-img`
   - `.cct-footer` et ses enfants
+  - `.info-block`, `.info-block--danger`, `.info-block--success`
+  - `.slots-container`
 
 ### 0.3 — Créer `views/components/` (dossier de composants PHP)
 - `views/components/navbar_client.php`
@@ -52,7 +65,21 @@ La migration suit une logique **du général au particulier** :
 
 ### 0.4 — Valider le Design System sur `views/home.php`
 - La page d'accueil est déjà la référence visuelle
-- La valider comme conformes à 100% avant de migrer les autres
+- La valider comme conforme à 100% avant de migrer les autres
+
+**Checklist de validation obligatoire :**
+- [ ] `css/variables.css` importé en tête de page
+- [ ] `css/animations.css` importé en tête de page
+- [ ] `css/components.css` importé en tête de page
+- [ ] Polices Google Fonts chargées (Playfair Display + Inter)
+- [ ] Bootstrap 5.3.3 chargé après les variables
+- [ ] Animation `fadeSlideIn` utilisée (pas `fadeIn`)
+- [ ] Bouton primaire utilise `.btn-gold` (pas `.btn-gold-cct`)
+- [ ] Aucun `@keyframes` défini dans la page
+- [ ] Bottom nav présente sur mobile (< 768px)
+- [ ] Aucun style inline `style=""` sauf exceptions documentées
+- [ ] `--glass-cct` ou `.glass` utilisé pour les glass cards
+- [ ] Fond body : `var(--dark)` = `#0A0A0A`
 
 ---
 
@@ -126,6 +153,9 @@ La page `dashboard.php` est déjà très avancée et proche du Design System. La
 - Remplacer les variables CSS codées en dur par les variables globales
 - Standardiser les noms de classes CSS
 
+### Note sur `profil_public.php`
+Cette page est physiquement dans `/coiffeurs/` mais fonctionnellement une **page client** (vue en lecture seule du profil d'un coiffeur). Elle est listée ici car c'est un point de conversion critique (passage de l'annuaire à la réservation).
+
 ---
 
 ## PHASE 4 — PAGES COIFFEUR
@@ -159,6 +189,9 @@ Les pages coiffeur utilisent déjà `header_coiffeur.php` qui est le plus avanc�
 | 3 | `first/admin_dashboard.php` | Interface admin |
 | 4 | `first/admin_actions.php` | Actions admin |
 | 5 | `views/domizi/choix_role.php` | Page de choix rôle |
+| 6 | `deconnexion.php` | Page de déconnexion — peut afficher un écran flash de confirmation |
+| 7 | `coiffeurs/sauvegarder_agenda.php` | Page de traitement POST de l'agenda — pas de vue, vérifier si elle retourne un redirect vers une page UI |
+| 8 | `envoyer_notification_whatsapp.php` | Backend uniquement — confirmer si elle a une interface utilisateur. Si non, hors-scope UI. |
 
 ---
 
@@ -169,10 +202,13 @@ Les pages coiffeur utilisent déjà `header_coiffeur.php` qui est le plus avanc�
 ### Tâches
 1. **Supprimer** tous les blocs `<style>` inline dans les fichiers PHP
 2. **Supprimer** les doublons de `.glass-cct`, `.btn-gold-cct`, `.fc-dark` dans chaque page
-3. **Supprimer** `css/global.css` (remplacé par `css/variables.css` + `css/components.css`)
-4. **Garder** `css/style.css` uniquement pour la home page hero slider
-5. **Vérifier** la responsive sur : Chrome mobile, Firefox, Safari iOS
-6. **Tester** l'accessibilité (contraste minimum 4.5:1 entre gold et fond sombre)
+3. **Supprimer** `css/global.css` (remplacé par `css/variables.css` + `css/animations.css` + `css/components.css`)
+4. **Supprimer** `css/responsive-custom.css` (fusionner dans `css/components.css`)
+5. **Garder** `css/style.css` uniquement pour la home page hero slider
+6. **Remplacer** toutes les occurrences de `.btn-gold-cct` par `.btn-gold`
+7. **Remplacer** toutes les occurrences de `.luxury-profile-card` par `.gallery-card`
+8. **Vérifier** la responsive sur : Chrome mobile, Firefox, Safari iOS
+9. **Tester** l'accessibilité (contraste minimum 4.5:1 entre gold et fond sombre)
 
 ---
 
@@ -181,6 +217,7 @@ Les pages coiffeur utilisent déjà `header_coiffeur.php` qui est le plus avanc�
 | Fichier | Statut | Phase |
 |---------|--------|-------|
 | `css/variables.css` | 🔲 À créer | 0 |
+| `css/animations.css` | 🔲 À créer | 0 |
 | `css/components.css` | 🔲 À créer | 0 |
 | `views/components/*` | 🔲 À créer | 0 |
 | `views/home.php` | ✅ Référence | — |
@@ -192,7 +229,7 @@ Les pages coiffeur utilisent déjà `header_coiffeur.php` qui est le plus avanc�
 | `access/inscription.php` | 🟡 Avancé | 2 |
 | `views/client/dashboard.php` | 🟡 Très avancé | 3 |
 | `filter/annuaire_coiffeurs.php` | 🔴 CSS mixte | 3 |
-| `coiffeurs/profil_public.php` | 🟡 Partiel | 3 |
+| `coiffeurs/profil_public.php` | 🟡 Partiel (page client) | 3 |
 | `client/mes_rendezvous.php` | 🔴 Legacy | 3 |
 | `client/reserver.php` | 🔴 Non analysé | 3 |
 | `client/catalogue.php` | 🔴 Non analysé | 3 |
@@ -207,6 +244,11 @@ Les pages coiffeur utilisent déjà `header_coiffeur.php` qui est le plus avanc�
 | `profil.php` | 🔴 Non analysé | 5 |
 | `modifier_profil.php` | 🔴 Non analysé | 5 |
 | `first/admin_dashboard.php` | 🔴 Non analysé | 5 |
+| `first/admin_actions.php` | 🔴 Non analysé | 5 |
+| `views/domizi/choix_role.php` | 🔴 Non analysé | 5 |
+| `deconnexion.php` | 🔴 Non analysé | 5 |
+| `coiffeurs/sauvegarder_agenda.php` | 🔴 À vérifier (backend ?) | 5 |
+| `envoyer_notification_whatsapp.php` | 🔴 À vérifier (backend ?) | 5 |
 | Nettoyage CSS global | 🔲 À faire | 6 |
 
 **Légende :** ✅ Conforme | 🟡 Partiellement conforme | 🔴 À migrer | 🔲 À créer
