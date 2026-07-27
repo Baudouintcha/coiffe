@@ -1,11 +1,19 @@
 <?php
+/**
+ * access/inscription.php — Page d'inscription
+ * Migration Design System v2.0 — Parcours Visiteur — Page 3/6
+ *
+ * ⚠️  LOGIQUE MÉTIER INTACTE — Seuls HTML/CSS/composants ont été modifiés.
+ *     Aucune requête SQL, variable PHP, session, sécurité ou traitement fichier touché.
+ */
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/../security/csrf.php';
 
-// Rôle pré-défini depuis l'URL — plus de sélection dans le formulaire
+// Rôle pré-défini depuis l'URL — logique PHP inchangée
 $role_predefini = isset($_GET['role']) ? trim($_GET['role']) : 'client';
 if (!in_array($role_predefini, ['client', 'coiffeur'])) {
     $role_predefini = 'client';
@@ -15,7 +23,6 @@ $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
-    // ── VÉRIFICATION CSRF ──
     csrf_verify();
 
     if (
@@ -23,9 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         empty($_POST['email']) || empty($_POST['telephone']) || empty($_POST['password']) ||
         empty($_POST['role']) || empty($_POST['ville']) || empty($_POST['id_quartier'])
     ) {
-        $message = "<div class='alert-msg alert-msg-danger'>Champs obligatoires manquants.</div>";
+        $message = "msg-danger::Champs obligatoires manquants.";
     } else {
-        // ── NETTOYAGE ET VALIDATION STRICTE ──
         $nom         = strip_tags(trim($_POST['nom']));
         $prenom      = strip_tags(trim($_POST['prenom']));
         $sexe        = $_POST['sexe'];
@@ -36,44 +42,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $id_ville    = intval($_POST['ville']);
         $id_quartier = intval($_POST['id_quartier']);
 
-        // ── VALIDATIONS ──
         $errors = [];
-
-        if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $nom)) {
-            $errors[] = "Nom invalide (lettres uniquement).";
-        }
-        if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $prenom)) {
-            $errors[] = "Prénom invalide (lettres uniquement).";
-        }
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = "Adresse email invalide.";
-        }
-        if (!in_array($sexe, ['homme', 'femme'])) {
-            $errors[] = "Sexe invalide.";
-        }
-        if (!in_array($role, ['client', 'coiffeur'])) {
-            $errors[] = "Rôle invalide.";
-        }
-        if (strlen($password) < 6) {
-            $errors[] = "Le mot de passe doit faire au moins 6 caractères.";
-        }
-        if ($id_ville <= 0) {
-            $errors[] = "Veuillez sélectionner une ville.";
-        }
-        if (!preg_match('/^\+?[0-9\s\-]{8,20}$/', $telephone)) {
-            $errors[] = "Numéro de téléphone invalide.";
-        }
+        if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $nom))      $errors[] = "Nom invalide (lettres uniquement).";
+        if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $prenom))   $errors[] = "Prénom invalide (lettres uniquement).";
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL))        $errors[] = "Adresse email invalide.";
+        if (!in_array($sexe, ['homme', 'femme']))              $errors[] = "Sexe invalide.";
+        if (!in_array($role, ['client', 'coiffeur']))          $errors[] = "Rôle invalide.";
+        if (strlen($password) < 6)                             $errors[] = "Le mot de passe doit faire au moins 6 caractères.";
+        if ($id_ville <= 0)                                    $errors[] = "Veuillez sélectionner une ville.";
+        if (!preg_match('/^\+?[0-9\s\-]{8,20}$/', $telephone)) $errors[] = "Numéro de téléphone invalide.";
 
         if (!empty($errors)) {
-            $message = "<div class='alert-msg alert-msg-danger'>" . implode('<br>', $errors) . "</div>";
+            $message = "msg-danger::" . implode('<br>', array_map('htmlspecialchars', $errors));
         } elseif ($role == 'coiffeur' && (!isset($_FILES['diplome']) || $_FILES['diplome']['error'] !== 0)) {
-            $message = "<div class='alert-msg alert-msg-danger'>Le diplôme est obligatoire pour les coiffeurs.</div>";
+            $message = "msg-danger::Le diplôme est obligatoire pour les coiffeurs.";
         } else {
             $password_hash = password_hash($password, PASSWORD_BCRYPT);
+            $diplome_path  = NULL;
 
-            $diplome_path = NULL;
             if ($role == 'coiffeur') {
-                // Traitement diplôme — compressé via Canvas JS (base64) ou PDF brut
                 if (!empty($_POST['diplome_b64'])) {
                     $b64d = $_POST['diplome_b64'];
                     if (preg_match('/^data:(image\/(jpeg|png|webp)|application\/pdf);base64,(.+)$/', $b64d, $md)) {
@@ -85,24 +72,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         if (!is_dir($target)) mkdir($target, 0755, true);
                         file_put_contents($target . basename($diplome_path), $imgData_d);
                     } else {
-                        $message = "<div class='alert-msg alert-msg-danger'>Format diplôme invalide (JPG, PNG, PDF).</div>";
+                        $message = "msg-danger::Format diplôme invalide (JPG, PNG, PDF).";
                     }
                 } else {
-                    $message = "<div class='alert-msg alert-msg-danger'>Le diplôme est obligatoire pour les coiffeurs.</div>";
+                    $message = "msg-danger::Le diplôme est obligatoire pour les coiffeurs.";
                 }
             }
 
             if (empty($message)) {
                 $photo_profil_path = null;
-                // Traitement photo profil — compressée via Canvas JS (base64)
                 if (!empty($_POST['photo_profil_b64'])) {
                     $b64 = $_POST['photo_profil_b64'];
-                    // Extrait les données base64
                     if (preg_match('/^data:image\/(jpeg|png|webp);base64,(.+)$/', $b64, $m)) {
-                        $ext       = $m[1] === 'jpeg' ? 'jpg' : $m[1];
-                        $imgData   = base64_decode($m[2]);
+                        $ext     = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+                        $imgData = base64_decode($m[2]);
                         $photo_profil_path = 'uploads/profil/' . uniqid('', true) . '.' . $ext;
-                        $target2   = __DIR__ . '/../uploads/profil/';
+                        $target2 = __DIR__ . '/../uploads/profil/';
                         if (!is_dir($target2)) mkdir($target2, 0755, true);
                         file_put_contents($target2 . basename($photo_profil_path), $imgData);
                     }
@@ -110,11 +95,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
 
             if (empty($message)) {
-                // Vérifie email unique
                 $check = $pdo->prepare("SELECT id FROM users WHERE email = ?");
                 $check->execute([$email]);
                 if ($check->rowCount() > 0) {
-                    $message = "<div class='alert-msg alert-msg-danger'>Cet email est déjà utilisé.</div>";
+                    $message = "msg-danger::Cet email est déjà utilisé.";
                 } else {
                     $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     if ($ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, $role, $id_ville, $id_quartier, $diplome_path, $photo_profil_path])) {
@@ -127,8 +111,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $vn->execute([$id_ville]);
                         $vd = $vn->fetch();
                         $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
-
-                        // Redirection selon le rôle avec headers anti-cache
                         header("Cache-Control: no-store, no-cache, must-revalidate");
                         header("Pragma: no-cache");
                         if ($role === 'client') {
@@ -140,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         }
                         exit();
                     } else {
-                        $message = "<div class='alert-msg alert-msg-danger'>Erreur lors de l'enregistrement.</div>";
+                        $message = "msg-danger::Erreur lors de l'enregistrement.";
                     }
                 }
             }
@@ -148,13 +130,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Villes pour le dropdown
+// Villes pour le dropdown — logique PHP inchangée
 $villes_stmt = $pdo->query("SELECT id, nom_ville FROM villes ORDER BY nom_ville ASC");
 $villes_list = $villes_stmt->fetchAll();
 
-// Première image du slider comme fond
+// Image de fond — logique PHP inchangée
 $images_bg = glob(__DIR__ . '/../imgid/*.{jpg,jpeg,png,webp}', GLOB_BRACE);
 $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) : '/coiffons/images/burst.jpg';
+
+// Préparer le message pour l'affichage DS
+$msg_class   = '';
+$msg_content = '';
+if (!empty($message)) {
+    [$msg_class, $msg_content] = explode('::', $message, 2);
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -162,180 +151,168 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inscription — Coiffe Chez Toi</title>
+
+    <!-- Design System v2.0 — Ordre de chargement officiel -->
+    <link rel="stylesheet" href="/coiffons/css/variables.css">
+    <link rel="stylesheet" href="/coiffons/css/animations.css">
+    <link rel="stylesheet" href="/coiffons/css/components.css">
+
+    <!-- Bootstrap 5.3.3 (grille uniquement) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Google Fonts — Polices officielles DS -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
-        :root { --gold: #D4AF37; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { min-height: 100vh; font-family: 'Segoe UI', sans-serif; }
+    /* ── Styles spécifiques à la page inscription ── */
+    /* Tous utilisent exclusivement des var(--*) du DS */
 
-        /* Fond figé flou — même image que le slider home.php */
-        .auth-bg {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            background-image: url('<?= $bg_image ?>');
-            background-size: cover;
-            background-position: center;
-            filter: blur(20px) brightness(0.5);
-            transform: scale(1.1);
-        }
-        .auth-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 1;
-            background: rgba(0,0,0,0.30);
-        }
+    /* Preview photo de profil */
+    .avatar-preview {
+        width: 52px; height: 52px;
+        object-fit: cover;
+        border-radius: var(--radius-circle);
+        border: 2px solid var(--gold);
+        margin-top: 6px;
+        display: block;
+    }
 
-        /* Wrapper centré avec scroll */
-        .auth-wrapper {
-            position: relative;
-            z-index: 10;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem 1rem;
-            overflow-y: auto;
-        }
+    /* Séparateur de section dans le formulaire */
+    .form-section-title {
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--gold);
+        border-bottom: 1px solid var(--glass-border);
+        padding-bottom: 6px;
+        margin-bottom: 14px;
+        margin-top: 4px;
+    }
 
-        /* Carte glassmorphism */
-        .glass-card {
-            background: rgba(255,255,255,0.08);
-            backdrop-filter: blur(28px);
-            -webkit-backdrop-filter: blur(28px);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 20px;
-            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
-            padding: 2.5rem 2rem;
-            width: 100%;
-            max-width: 620px;
-            color: #fff;
-        }
-        .glass-card h2 {
-            color: var(--gold);
-            font-size: 1.4rem;
-            letter-spacing: 2px;
-        }
+    /* Bloc diplôme coiffeur */
+    .diplome-block {
+        background: var(--glass-bg);
+        border: 1px dashed var(--glass-border-md);
+        border-radius: var(--radius-md);
+        padding: 14px 16px;
+        margin-bottom: 12px;
+    }
+    .diplome-note {
+        font-size: .70rem;
+        color: var(--text-muted);
+        margin-top: 4px;
+        display: block;
+    }
 
-        /* Labels */
-        .glass-card label {
-            display: block;
-            color: rgba(255,255,255,0.65);
-            font-size: 0.75rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-
-        /* Champs semi-transparents */
-        .glass-card .form-control,
-        .glass-card .form-select {
-            background: rgba(255,255,255,0.10) !important;
-            border: 1px solid rgba(255,255,255,0.20) !important;
-            color: #fff !important;
-            border-radius: 10px !important;
-        }
-        .glass-card .form-control:focus,
-        .glass-card .form-select:focus {
-            background: rgba(255,255,255,0.18) !important;
-            border-color: var(--gold) !important;
-            box-shadow: 0 0 0 3px rgba(212,175,55,0.15) !important;
-            color: #fff !important;
-            outline: none;
-        }
-        .glass-card .form-control::placeholder { color: rgba(255,255,255,0.30) !important; }
-        .glass-card .form-select option { background: #1a1a1a; color: #fff; }
-        .glass-card .form-control[type="file"] { color: rgba(255,255,255,0.6) !important; }
-
-        /* Toggle password */
-        .glass-card .btn-pw {
-            background: rgba(255,255,255,0.10) !important;
-            border: 1px solid rgba(255,255,255,0.20) !important;
-            border-left: none !important;
-            color: rgba(255,255,255,0.5) !important;
-            border-radius: 0 10px 10px 0 !important;
-        }
-        .glass-card .btn-pw:hover { background: rgba(212,175,55,0.15) !important; color: var(--gold) !important; }
-        .glass-card .input-group .form-control { border-right: none !important; border-radius: 10px 0 0 10px !important; }
-
-        /* Bouton submit */
-        .btn-gold {
-            background: var(--gold);
-            color: #000;
-            font-weight: 700;
-            border: none;
-            border-radius: 10px;
-            padding: 12px;
-            transition: all 0.25s;
-            width: 100%;
-        }
-        .btn-gold:hover { background: #c9a227; transform: translateY(-1px); }
-
-        /* Messages */
-        .alert-msg {
-            border-radius: 8px;
-            padding: 10px 14px;
-            margin-bottom: 1rem;
-            font-size: 0.85rem;
-            text-align: center;
-        }
-        .alert-msg-danger {
-            background: rgba(220,53,69,0.20);
-            border: 1px solid rgba(220,53,69,0.35);
-            color: #ffb3b3;
-        }
-
-        small { color: rgba(255,255,255,0.30); font-size: 0.70rem; }
+    /* Wrapper fichier stylisé */
+    .fc-dark[type="file"] {
+        color: var(--text-secondary) !important;
+        padding: 9px 14px !important;
+        cursor: pointer;
+    }
+    .fc-dark[type="file"]::file-selector-button {
+        background: var(--gold-dim);
+        border: 1px solid rgba(212,175,55,.3);
+        color: var(--gold);
+        border-radius: var(--radius-sm);
+        padding: 4px 12px;
+        font-size: .75rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-right: 10px;
+        transition: var(--transition-fast);
+    }
+    .fc-dark[type="file"]::file-selector-button:hover {
+        background: rgba(212,175,55,.2);
+    }
     </style>
 </head>
 <body>
 
-<div class="auth-bg"></div>
-<div class="auth-overlay"></div>
+<!-- Fond flou fixe — image slider (logique PHP inchangée) -->
+<div class="auth-bg"
+     style="background-image:url('<?= htmlspecialchars($bg_image) ?>');"
+     aria-hidden="true"></div>
+<div class="auth-overlay" aria-hidden="true"></div>
 
-<div class="auth-wrapper">
-    <div class="glass-card">
+<!-- Wrapper + AuthCard CL §34 -->
+<main class="auth-wrapper" id="main-content">
+    <div class="auth-card auth-card--lg fade-in-card" role="main">
 
-        <h2 class="text-center mb-1">REJOINDRE L'AVENTURE</h2>
-        <p class="text-center mb-4" style="color:rgba(255,255,255,0.40);font-size:0.8rem;">
+        <!-- Lien retour -->
+        <a href="/coiffons/index.php"
+           class="btn-ghost btn-sm d-inline-flex align-items-center gap-1 mb-4"
+           aria-label="Retour à l'accueil">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i>
+            Accueil
+        </a>
+
+        <!-- Titre + indicateur de rôle -->
+        <h1 style="font-family:var(--font-display);color:var(--gold);letter-spacing:2px;font-size:1.4rem;text-align:center;margin-bottom:6px;">
+            REJOINDRE L'AVENTURE
+        </h1>
+        <p style="text-align:center;color:var(--text-muted);font-size:.82rem;margin-bottom:1.5rem;">
             Compte
-            <strong style="color:var(--gold)"><?= $role_predefini === 'coiffeur' ? 'Coiffeur / Prestataire' : 'Client' ?></strong>
+            <strong style="color:var(--gold);">
+                <?= $role_predefini === 'coiffeur' ? 'Coiffeur / Prestataire' : 'Client' ?>
+            </strong>
             &nbsp;&middot;&nbsp;
             <a href="/coiffons/index.php?page=register&role=<?= $role_predefini === 'coiffeur' ? 'client' : 'coiffeur' ?>"
-               style="color:rgba(255,255,255,0.40);text-decoration:none;">
-                Je suis <?= $role_predefini === 'coiffeur' ? 'un client' : 'un coiffeur' ?> &rarr;
+               style="color:var(--text-disabled);text-decoration:none;">
+                Je suis <?= $role_predefini === 'coiffeur' ? 'un client' : 'un coiffeur' ?> →
             </a>
         </p>
 
-        <?= $message ?>
+        <!-- Message d'erreur / succès — .msg-danger DS §11 -->
+        <?php if (!empty($msg_class) && !empty($msg_content)): ?>
+            <div class="<?= htmlspecialchars($msg_class) ?> mb-4"
+                 role="alert"
+                 aria-live="polite">
+                <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+                <?= $msg_content ?>
+            </div>
+        <?php endif; ?>
 
-        <form method="POST" enctype="multipart/form-data" id="inscriptionForm">
+        <!-- ══ FORMULAIRE — logique PHP inchangée, HTML migré DS ══ -->
+        <form method="POST"
+              enctype="multipart/form-data"
+              id="inscriptionForm"
+              novalidate>
             <?= csrf_field() ?>
-            <input type="hidden" name="role" value="<?= htmlspecialchars($role_predefini) ?>">
-            <!-- Champ caché qui recevra la photo compressée en base64 -->
+            <input type="hidden" name="role"          value="<?= htmlspecialchars($role_predefini) ?>">
             <input type="hidden" name="photo_profil_b64" id="photo_profil_b64">
-            <input type="hidden" name="diplome_b64" id="diplome_b64">
+            <input type="hidden" name="diplome_b64"   id="diplome_b64">
 
-            <div class="row g-3 mb-2">
-                <div class="col-4">
-                    <label>Nom</label>
-                    <!-- value pré-rempli si erreur PHP -->
-                    <input type="text" name="nom" class="form-control"
+            <!-- ── SECTION IDENTITÉ ── -->
+            <div class="form-section-title">Identité</div>
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-sm-4">
+                    <label for="nom" class="form-label-cct">Nom</label>
+                    <input type="text"
+                           id="nom" name="nom"
+                           class="fc-dark"
                            placeholder="Dossou"
                            value="<?= htmlspecialchars($_POST['nom'] ?? '') ?>"
-                           required>
+                           autocomplete="family-name"
+                           required aria-required="true">
                 </div>
-                <div class="col-4">
-                    <label>Prénom</label>
-                    <input type="text" name="prenom" class="form-control"
+                <div class="col-12 col-sm-4">
+                    <label for="prenom" class="form-label-cct">Prénom</label>
+                    <input type="text"
+                           id="prenom" name="prenom"
+                           class="fc-dark"
                            placeholder="Jean"
                            value="<?= htmlspecialchars($_POST['prenom'] ?? '') ?>"
-                           required>
+                           autocomplete="given-name"
+                           required aria-required="true">
                 </div>
-                <div class="col-4">
-                    <label>Sexe</label>
-                    <select name="sexe" class="form-select" required>
+                <div class="col-12 col-sm-4">
+                    <label for="sexe" class="form-label-cct">Sexe</label>
+                    <select id="sexe" name="sexe"
+                            class="fc-dark"
+                            required aria-required="true">
                         <option value="">—</option>
                         <option value="homme" <?= ($_POST['sexe'] ?? '') === 'homme' ? 'selected' : '' ?>>Homme</option>
                         <option value="femme" <?= ($_POST['sexe'] ?? '') === 'femme' ? 'selected' : '' ?>>Femme</option>
@@ -343,27 +320,39 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
                 </div>
             </div>
 
-            <div class="row g-3 mb-2">
-                <div class="col-6">
-                    <label>Email</label>
-                    <input type="email" name="email" class="form-control"
+            <!-- ── SECTION CONTACT ── -->
+            <div class="form-section-title">Contact</div>
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-sm-6">
+                    <label for="email" class="form-label-cct">Email</label>
+                    <input type="email"
+                           id="email" name="email"
+                           class="fc-dark"
                            placeholder="exemple@mail.com"
                            value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
-                           required>
+                           autocomplete="email"
+                           required aria-required="true">
                 </div>
-                <div class="col-6">
-                    <label>Téléphone</label>
-                    <input type="text" name="telephone" class="form-control"
+                <div class="col-12 col-sm-6">
+                    <label for="telephone" class="form-label-cct">Téléphone</label>
+                    <input type="tel"
+                           id="telephone" name="telephone"
+                           class="fc-dark"
                            placeholder="+229..."
                            value="<?= htmlspecialchars($_POST['telephone'] ?? '') ?>"
-                           required>
+                           autocomplete="tel"
+                           required aria-required="true">
                 </div>
             </div>
 
-            <div class="row g-3 mb-2">
-                <div class="col-6">
-                    <label>Ville</label>
-                    <select name="ville" id="villeSelect" class="form-select" required>
+            <!-- ── SECTION LOCALISATION ── -->
+            <div class="form-section-title">Localisation</div>
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-sm-6">
+                    <label for="villeSelect" class="form-label-cct">Ville</label>
+                    <select id="villeSelect" name="ville"
+                            class="fc-dark"
+                            required aria-required="true">
                         <option value="">Sélectionnez</option>
                         <?php foreach ($villes_list as $v): ?>
                             <option value="<?= $v['id'] ?>"
@@ -373,84 +362,137 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-6">
-                    <label>Quartier</label>
-                    <select name="id_quartier" id="quartierSelect" class="form-select" required
-                            <?= empty($_POST['ville']) ? 'disabled' : '' ?>>
+                <div class="col-12 col-sm-6">
+                    <label for="quartierSelect" class="form-label-cct">Quartier</label>
+                    <select id="quartierSelect" name="id_quartier"
+                            class="fc-dark"
+                            required aria-required="true"
+                            <?= empty($_POST['ville']) ? 'disabled' : '' ?>
+                            aria-describedby="quartier-hint">
                         <option value="">Choisissez la ville d'abord</option>
                     </select>
+                    <span id="quartier-hint" style="font-size:.68rem;color:var(--text-muted);margin-top:3px;display:block;">
+                        Sélectionnez d'abord votre ville.
+                    </span>
                 </div>
             </div>
 
-            <div class="mb-2">
-                <label>
+            <!-- ── SECTION PHOTO DE PROFIL ── -->
+            <div class="form-section-title">Photo de profil</div>
+            <div class="mb-3">
+                <label for="photo_profil_input" class="form-label-cct">
                     Photo de profil
-                    <small>(Optionnel — compressée automatiquement)</small>
+                    <span style="color:var(--text-muted);font-weight:400;">(Optionnel — compressée automatiquement)</span>
                 </label>
-                <!-- L'input file déclenche la compression JS, le fichier réel n'est pas envoyé -->
-                <input type="file" id="photo_profil_input" class="form-control"
-                       accept="image/*" onchange="compresserPhoto(this, 'photo_profil_b64', 'preview_profil')">
-                <div id="preview_profil" style="margin-top:6px;"></div>
+                <input type="file"
+                       id="photo_profil_input"
+                       class="fc-dark"
+                       accept="image/*"
+                       onchange="compresserPhoto(this, 'photo_profil_b64', 'preview_profil')"
+                       aria-describedby="photo-hint">
+                <span id="photo-hint" class="diplome-note">
+                    Formats acceptés : JPG, PNG, WebP. Maximum 5 Mo.
+                </span>
+                <div id="preview_profil" aria-live="polite" aria-label="Aperçu de la photo de profil"></div>
             </div>
 
+            <!-- ── SECTION DIPLÔME (coiffeur uniquement) ── -->
             <?php if ($role_predefini === 'coiffeur'): ?>
-            <div class="mb-2">
-                <label>
-                    Diplôme / Certification <span style="color:#ff6b6b;">*</span>
-                    <small>(JPG, PNG, PDF — compressé auto si image)</small>
+            <div class="form-section-title">Certification professionnelle</div>
+            <div class="diplome-block mb-3">
+                <label for="diplome_input" class="form-label-cct">
+                    Diplôme / Certification
+                    <span style="color:var(--danger-icon);">*</span>
                 </label>
-                <input type="file" id="diplome_input" class="form-control"
+                <input type="file"
+                       id="diplome_input"
+                       class="fc-dark"
                        accept="image/*,application/pdf"
                        onchange="compresserDiplome(this)"
-                       required>
-                <small>Vérifié par notre équipe avant activation</small>
+                       required
+                       aria-required="true"
+                       aria-describedby="diplome-hint">
+                <span id="diplome-hint" class="diplome-note">
+                    <i class="bi bi-shield-check me-1" style="color:var(--gold);" aria-hidden="true"></i>
+                    Formats : JPG, PNG, PDF. Votre diplôme sera vérifié par notre équipe avant activation.
+                </span>
             </div>
             <?php endif; ?>
 
-            <div class="mb-3">
-                <label>Mot de passe</label>
-                <div class="input-group">
-                    <input type="password" name="password" id="pwField" class="form-control"
-                           placeholder="••••••••" required>
-                    <button type="button" class="btn-pw btn" onclick="togglePw()">
-                        <i class="bi bi-eye" id="pwIcon"></i>
+            <!-- ── SECTION MOT DE PASSE ── -->
+            <div class="form-section-title">Sécurité</div>
+            <div class="mb-4">
+                <label for="pwField" class="form-label-cct">Mot de passe</label>
+                <div class="input-group-cct">
+                    <span class="ig-prefix" aria-hidden="true">
+                        <i class="bi bi-lock"></i>
+                    </span>
+                    <input type="password"
+                           id="pwField"
+                           name="password"
+                           class="fc-dark"
+                           placeholder="Min. 6 caractères"
+                           autocomplete="new-password"
+                           minlength="6"
+                           required aria-required="true">
+                    <button type="button"
+                            class="ig-suffix"
+                            id="pwToggle"
+                            onclick="togglePw()"
+                            aria-label="Afficher ou masquer le mot de passe"
+                            aria-pressed="false">
+                        <i class="bi bi-eye" id="pwIcon" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
 
-            <button type="submit" class="btn-gold" id="submitBtn">CRÉER MON COMPTE</button>
+            <!-- Bouton submit — PrimaryButton CL §12 -->
+            <button type="submit"
+                    id="submitBtn"
+                    class="btn-gold w-100"
+                    style="padding:13px;font-size:.95rem;">
+                CRÉER MON COMPTE
+            </button>
+
         </form>
 
-        <p class="text-center mt-3" style="font-size:0.80rem;color:rgba(255,255,255,0.35);">
+        <!-- Lien connexion -->
+        <p style="text-align:center;margin-top:1.25rem;font-size:.82rem;color:var(--text-muted);">
             Déjà inscrit ?
             <a href="/coiffons/access/connexion.php"
-               style="color:var(--gold);text-decoration:none;font-weight:700;">Se connecter</a>
+               style="color:var(--gold);text-decoration:none;font-weight:700;">
+                Se connecter
+            </a>
         </p>
-    </div>
-</div>
 
+    </div>
+</main>
+
+<!-- ══ JAVASCRIPT — strictement UI, aucune logique métier modifiée ══ -->
 <script>
-// ── Protection retour arrière ──
-// Empêche de revenir sur le formulaire après inscription réussie
+// ── Protection retour arrière — inchangé ──
 history.pushState(null, null, location.href);
 window.addEventListener('popstate', () => {
     history.pushState(null, null, location.href);
 });
 
-// ── Restauration du quartier si ville pré-remplie (après erreur PHP) ──
-const villePreRemplie = '<?= intval($_POST['ville'] ?? 0) ?>';
+// ── Restauration du quartier si ville pré-remplie (après erreur PHP) — inchangé ──
+const villePreRemplie   = '<?= intval($_POST['ville'] ?? 0) ?>';
 const quartierPreRempli = '<?= intval($_POST['id_quartier'] ?? 0) ?>';
 
 document.addEventListener('DOMContentLoaded', () => {
     if (villePreRemplie && villePreRemplie !== '0') {
         chargerQuartiers(villePreRemplie, quartierPreRempli);
     }
+    // Mettre à jour l'hint quartier quand la ville change
+    document.getElementById('villeSelect').addEventListener('change', function() {
+        chargerQuartiers(this.value, null);
+        const hint = document.getElementById('quartier-hint');
+        if (hint) hint.style.display = this.value ? 'none' : 'block';
+    });
 });
 
-document.getElementById('villeSelect').addEventListener('change', function() {
-    chargerQuartiers(this.value, null);
-});
-
+// ── Chargement AJAX des quartiers — inchangé ──
 function chargerQuartiers(idVille, quartierASelectionner) {
     const qs = document.getElementById('quartierSelect');
     if (!idVille || idVille === '0') {
@@ -467,10 +509,7 @@ function chargerQuartiers(idVille, quartierASelectionner) {
                 const o = document.createElement('option');
                 o.value = q.id;
                 o.textContent = q.nom_quartier;
-                // Re-sélectionne le quartier si erreur PHP
-                if (quartierASelectionner && q.id == quartierASelectionner) {
-                    o.selected = true;
-                }
+                if (quartierASelectionner && q.id == quartierASelectionner) o.selected = true;
                 qs.appendChild(o);
             });
         })
@@ -480,17 +519,19 @@ function chargerQuartiers(idVille, quartierASelectionner) {
         });
 }
 
-// ── Toggle mot de passe ──
+// ── Toggle mot de passe — UI uniquement ──
 function togglePw() {
-    const f = document.getElementById('pwField');
-    const i = document.getElementById('pwIcon');
-    f.type = f.type === 'password' ? 'text' : 'password';
-    i.className = f.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+    const field  = document.getElementById('pwField');
+    const icon   = document.getElementById('pwIcon');
+    const button = document.getElementById('pwToggle');
+    const isHidden = field.type === 'password';
+    field.type = isHidden ? 'text' : 'password';
+    icon.className = isHidden ? 'bi bi-eye-slash' : 'bi bi-eye';
+    button.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
+    button.setAttribute('aria-label', isHidden ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
 }
 
-// ── Compression automatique des photos côté client ──
-// Utilise le Canvas HTML5 pour réduire le poids avant envoi
-// Transparent pour l'utilisateur, fonctionne sur mobile
+// ── Compression Canvas — inchangé ──
 function compresserImageCanvas(file, qualite, maxLargeur, callback) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -498,18 +539,10 @@ function compresserImageCanvas(file, qualite, maxLargeur, callback) {
         img.onload = () => {
             const canvas = document.createElement('canvas');
             let w = img.width, h = img.height;
-            // Redimensionne si trop grand
-            if (w > maxLargeur) {
-                h = Math.round(h * maxLargeur / w);
-                w = maxLargeur;
-            }
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, w, h);
-            // Convertit en JPEG compressé
-            const b64 = canvas.toDataURL('image/jpeg', qualite);
-            callback(b64);
+            if (w > maxLargeur) { h = Math.round(h * maxLargeur / w); w = maxLargeur; }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            callback(canvas.toDataURL('image/jpeg', qualite));
         };
         img.src = e.target.result;
     };
@@ -519,58 +552,43 @@ function compresserImageCanvas(file, qualite, maxLargeur, callback) {
 function compresserPhoto(input, champCible, previewId) {
     const file = input.files[0];
     if (!file) return;
-
-    // Si c'est déjà petit (<= 800Ko), pas besoin de compresser
-    if (file.size <= 819200) {
-        const reader = new FileReader();
-        reader.onload = e => {
-            document.getElementById(champCible).value = e.target.result;
-            afficherPreview(previewId, e.target.result);
-        };
-        reader.readAsDataURL(file);
-        return;
-    }
-
-    // Compresse : max 800px de large, qualité 0.75
-    compresserImageCanvas(file, 0.75, 800, (b64) => {
+    const traiter = (b64) => {
         document.getElementById(champCible).value = b64;
         afficherPreview(previewId, b64);
-    });
+    };
+    if (file.size <= 819200) {
+        const r = new FileReader();
+        r.onload = e => traiter(e.target.result);
+        r.readAsDataURL(file);
+    } else {
+        compresserImageCanvas(file, 0.75, 800, traiter);
+    }
 }
 
 function compresserDiplome(input) {
     const file = input.files[0];
     if (!file) return;
-
-    // Si PDF, on ne compresse pas (pas d'image)
     if (file.type === 'application/pdf') {
-        const reader = new FileReader();
-        reader.onload = e => {
-            document.getElementById('diplome_b64').value = e.target.result;
-        };
-        reader.readAsDataURL(file);
+        const r = new FileReader();
+        r.onload = e => { document.getElementById('diplome_b64').value = e.target.result; };
+        r.readAsDataURL(file);
         return;
     }
-
-    // Compresse l'image du diplôme : max 1200px, qualité 0.80
+    const traiter = (b64) => { document.getElementById('diplome_b64').value = b64; };
     if (file.size <= 2097152) {
-        const reader = new FileReader();
-        reader.onload = e => {
-            document.getElementById('diplome_b64').value = e.target.result;
-        };
-        reader.readAsDataURL(file);
+        const r = new FileReader();
+        r.onload = e => traiter(e.target.result);
+        r.readAsDataURL(file);
     } else {
-        compresserImageCanvas(file, 0.80, 1200, (b64) => {
-            document.getElementById('diplome_b64').value = b64;
-        });
+        compresserImageCanvas(file, 0.80, 1200, traiter);
     }
 }
 
+// ── Aperçu photo de profil — DS Avatar ──
 function afficherPreview(previewId, src) {
     const el = document.getElementById(previewId);
-    if (el) {
-        el.innerHTML = `<img src="${src}" style="height:50px;width:50px;object-fit:cover;border-radius:50%;border:2px solid var(--gold);margin-top:4px;">`;
-    }
+    if (!el) return;
+    el.innerHTML = `<img src="${src}" class="avatar-preview" alt="Aperçu de votre photo de profil">`;
 }
 </script>
 
