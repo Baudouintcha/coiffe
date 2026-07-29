@@ -13,11 +13,10 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../security/config.php';
 
-// Redirection si non connecté — inchangé
-if (!isset($_SESSION['role']) || $_SESSION['role'] === 'invite') {
-    header("Location: /coiffons/index.php?page=login");
-    exit();
-}
+// Profil public accessible à tous — le visiteur peut parcourir le profil librement.
+// La vérification de connexion n'intervient qu'au moment de réserver (sur les boutons CTA).
+// $est_connecte est utilisé dans la vue pour adapter les boutons de réservation.
+$est_connecte = isset($_SESSION['id_user']) && !empty($_SESSION['role']) && $_SESSION['role'] !== 'invite';
 
 // Fix URL — inchangé
 $id_coiffeur = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT)
@@ -367,7 +366,10 @@ include __DIR__ . '/../views/components/navbar_client.php';
                             'nom_style'      => $p['nom_style'] ?? 'Style sans nom',
                             'prix'           => $p['prix'] ?? 0,
                             'photo_url'      => $photo_url,
-                            'href_reserver'  => '/coiffons/client/reserver.php?coiffeur_id=' . $coiffeur['id'] . '&presta_id=' . ($p['id_prestation'] ?? ''),
+                            // Si le visiteur n'est pas connecté → rediriger vers connexion avec retour prévu
+                            'href_reserver'  => $est_connecte
+                                ? '/coiffons/client/reserver.php?coiffeur_id=' . $coiffeur['id'] . '&presta_id=' . ($p['id_prestation'] ?? '')
+                                : '/coiffons/index.php?page=login&redirect=' . urlencode('/coiffons/client/reserver.php?coiffeur_id=' . $coiffeur['id'] . '&presta_id=' . ($p['id_prestation'] ?? '')),
                             'variante'       => 'view',
                         ];
                         include __DIR__ . '/../views/components/gallery_card.php';
@@ -401,13 +403,17 @@ include __DIR__ . '/../views/components/bottom_nav_client.php';
     const coiffeurId   = <?= (int)$id_coiffeur ?>;
     const pageRoot     = '/coiffons';
 
+    // Connexion PHP → JS : visiteur connecté ou non
+    const estConnecte = <?= $est_connecte ? 'true' : 'false' ?>;
+
     window.selectionnerJour = function(element) {
-        // Reset sélection
         document.querySelectorAll('.day-selector-card').forEach(el => el.classList.remove('active-day'));
+        // Supprimer l'éventuel message d'invitation précédent
+        const oldNotice = document.getElementById('slot-login-notice');
+        if (oldNotice) oldNotice.remove();
 
         if (element.getAttribute('data-open') === '0') {
             document.getElementById('zone-slots-horaires').classList.add('d-none');
-            // Toast non bloquant à la place du alert
             if (typeof showToast === 'function') {
                 showToast('Ce coiffeur ne travaille pas ce jour-là.', 'warning');
             }
@@ -423,12 +429,10 @@ include __DIR__ . '/../views/components/bottom_nav_client.php';
         const zone        = document.getElementById('zone-slots-horaires');
 
         container.innerHTML = '';
-
         if (!heureDebut || !heureFin) { zone.classList.add('d-none'); return; }
 
         const [hStart] = heureDebut.split(':').map(Number);
         const [hEnd]   = heureFin.split(':').map(Number);
-
         const urlParams = new URLSearchParams(window.location.search);
         const prestaId  = urlParams.get('presta_id') || '';
 
@@ -439,14 +443,24 @@ include __DIR__ . '/../views/components/bottom_nav_client.php';
             btn.setAttribute('role', 'listitem');
 
             if (slotsOccupes[cleVerif]) {
+                // Créneau occupé
                 btn.className = 'btn-ghost btn-sm disabled';
                 btn.style.opacity = '.25';
                 btn.title = 'Déjà réservé';
                 btn.setAttribute('aria-disabled', 'true');
                 btn.textContent = slotHeure;
-            } else {
+            } else if (!estConnecte) {
+                // Visiteur non connecté → créneau visible mais redirige vers connexion
+                const reservationUrl = `${pageRoot}/client/reserver.php?coiffeur_id=${coiffeurId}&presta_id=${prestaId}&date_rdv=${dateChoisie}&heure_debut=${slotHeure}`;
                 btn.className = 'btn-outline-gold btn-sm';
-                btn.href = `${pageRoot}/client/reserver.php?coiffeur_id=${coiffeurId}&presta_id=${prestaId}&date_rdv=${dateChoisie}&heure_debut=${slotHeure}`;
+                btn.href      = `${pageRoot}/index.php?page=login&redirect=${encodeURIComponent(reservationUrl)}`;
+                btn.title     = 'Connexion requise pour réserver ce créneau';
+                btn.setAttribute('aria-label', `Se connecter pour réserver le ${slotHeure}`);
+                btn.textContent = slotHeure;
+            } else {
+                // Connecté → accès direct à la réservation
+                btn.className = 'btn-outline-gold btn-sm';
+                btn.href      = `${pageRoot}/client/reserver.php?coiffeur_id=${coiffeurId}&presta_id=${prestaId}&date_rdv=${dateChoisie}&heure_debut=${slotHeure}`;
                 btn.setAttribute('aria-label', `Réserver le créneau ${slotHeure}`);
                 btn.textContent = slotHeure;
             }
@@ -454,6 +468,19 @@ include __DIR__ . '/../views/components/bottom_nav_client.php';
         }
 
         zone.classList.remove('d-none');
+
+        // Invitation à se connecter si visiteur non authentifié
+        if (!estConnecte) {
+            const notice = document.createElement('p');
+            notice.id    = 'slot-login-notice';
+            notice.style.cssText = 'font-size:.78rem;color:rgba(255,255,255,0.45);margin-top:14px;';
+            notice.innerHTML = `<i class="bi bi-lock" style="color:var(--gold);margin-right:5px;"></i>
+                Créez un compte ou connectez-vous pour finaliser votre réservation.&nbsp;
+                <a href="${pageRoot}/index.php?page=login" style="color:var(--gold);font-weight:600;text-decoration:none;">Se connecter →</a>
+                &nbsp;·&nbsp;
+                <a href="${pageRoot}/index.php?page=register&role=client" style="color:rgba(212,175,55,0.7);text-decoration:none;">S'inscrire</a>`;
+            zone.appendChild(notice);
+        }
     };
 })();
 </script>
