@@ -19,7 +19,7 @@ foreach ($images as $img) {
 // Variables du composant HeroPremium
 $hp_title              = 'COIFFE CHEZ TOI';
 $hp_subtitle           = 'Des coupes modernes, un style unique et une expérience premium.';
-$hp_role_client_href   = '/coiffons/index.php?page=register&role=client';
+$hp_role_client_href   = '/coiffons/filter/annuaire_coiffeurs.php';
 $hp_role_coiffeur_href = '/coiffons/index.php?page=register&role=coiffeur';
 $hp_login_href         = '/coiffons/index.php?page=login';
 $hp_show_roles         = true;
@@ -188,10 +188,10 @@ $hp_show_roles         = true;
                 Rejoignez Coiffe Chez Toi et vivez l'expérience de la coiffure premium à domicile.
             </p>
             <div class="d-flex gap-3 justify-content-center flex-wrap">
-                <a href="/coiffons/index.php?page=register&role=client"
+                <a href="/coiffons/filter/annuaire_coiffeurs.php"
                    class="btn-gold btn-lg"
-                   aria-label="Créer un compte client">
-                    Créer un compte client
+                   aria-label="Trouver un coiffeur">
+                    Trouver un coiffeur
                 </a>
                 <a href="/coiffons/index.php?page=login"
                    class="btn-ghost btn-lg"

@@ -17,7 +17,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
         }
         .back-btn {
             position: fixed;

@@ -1,79 +1,75 @@
 <?php
-// 1. TOUT EN HAUT : Gestion de la session et de la sécurité
+/**
+ * modifier_profil.php — Formulaire de modification du profil utilisateur
+ * Migration Design System v2.0 — Profil Partagé
+ *
+ * ✅ BUG CORRIGÉ : --gold: #f39c12 (orange) → #D4AF37 (officiel DS)
+ * ✅ layout/header.php → navbar_client.php
+ * ✅ layout/footer.php → footer_global.php
+ * ⚠️  LOGIQUE MÉTIER INTACTE — SQL, upload photo, mot de passe, quartiers : inchangés.
+ */
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Sécurité : Si pas connecté, redirection immédiate
 if (!isset($_SESSION['id_user'])) {
-    header("Location: connexion.php");
+    header("Location: /coiffons/index.php?page=login");
     exit();
 }
 
 require_once __DIR__ . '/security/config.php';
-include __DIR__ . '/layout/header.php';
 
 $user_id = $_SESSION['id_user'];
 
-// ➕ MODIFICATION : RÉCUPÉRATION EN AMONT DE TOUS LES QUARTIERS DE LA BASE
+// Récupération quartiers — SQL inchangé
 try {
     $quartiers_stmt = $pdo->query("SELECT * FROM quartier ORDER BY nom_quartier ASC");
     $liste_quartiers = $quartiers_stmt->fetchAll();
 } catch (Exception $e) {
-    $liste_quartiers = []; // Sécurité si la table est vide
+    $liste_quartiers = [];
 }
 
-// 2. RÉCUPÉRATION DES INFOS ACTUELLES POUR PRÉ-REMPLIR LE FORMULAIRE
+// Récupération user — SQL inchangé
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch();
 
-// Sécurité Admin : L'admin n'a pas sa place sur cette page grand public
 if ($user['role'] === 'admin') {
     header("Location: index.php");
     exit();
 }
 
 $erreurs = [];
-$succes = false;
+$succes  = false;
 
-// 3. TRAITEMENT DU FORMULAIRE QUAND L'UTILISATEUR SOUMET SES MODIFS
+// Traitement formulaire — SQL inchangé
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nom = htmlspecialchars(trim($_POST['nom']));
-    $prenom = htmlspecialchars(trim($_POST['prenom']));
+    $nom       = htmlspecialchars(trim($_POST['nom']));
+    $prenom    = htmlspecialchars(trim($_POST['prenom']));
     $telephone = htmlspecialchars(trim($_POST['telephone']));
-    $ville = htmlspecialchars(trim($_POST['ville']));
-    
-    // 🎯 RECTIFICATION SÉCURISÉE : Évite la valeur 0 et applique un vrai NULL si aucun quartier n'est sélectionné
+    $ville     = htmlspecialchars(trim($_POST['ville']));
     $id_quartier = (!empty($_POST['id_quartier'])) ? intval($_POST['id_quartier']) : null;
-
     $nouveau_mdp = $_POST['nouveau_mdp'];
 
-    // Validations de base (CONSERVÉES INTACTES)
     if (empty($nom) || empty($prenom) || empty($telephone)) {
         $erreurs[] = "Le nom, le prénom et le téléphone sont obligatoires.";
     }
 
-    // Gestion de la Photo de Profil (si un fichier est envoyé - CONSERVÉ INTACT)
-    $chemin_photo = $user['photo_profil']; // Par défaut, on garde l'ancienne
+    $chemin_photo = $user['photo_profil'];
     if (isset($_FILES['photo_profil']) && $_FILES['photo_profil']['error'] === UPLOAD_ERR_OK) {
-        $file_tmp = $_FILES['photo_profil']['tmp_name'];
+        $file_tmp  = $_FILES['photo_profil']['tmp_name'];
         $file_name = $_FILES['photo_profil']['name'];
-        $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-        
+        $file_ext  = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
         $extensions_autorisees = ['jpg', 'jpeg', 'png'];
 
         if (in_array($file_ext, $extensions_autorisees)) {
-            // Création du dossier s'il n'existe pas
             $dossier_cible = __DIR__ . '/uploads/profil/';
             if (!is_dir($dossier_cible)) {
                 mkdir($dossier_cible, 0777, true);
             }
-            
-            // On renomme l'image de manière unique pour éviter les doublons
             $nouveau_nom_fichier = 'profil_' . $user_id . '_' . time() . '.' . $file_ext;
             $destination = $dossier_cible . $nouveau_nom_fichier;
-
             if (move_uploaded_file($file_tmp, $destination)) {
                 $chemin_photo = 'uploads/profil/' . $nouveau_nom_fichier;
             } else {
@@ -84,181 +80,155 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Si aucune erreur, on prépare la mise à jour
     if (empty($erreurs)) {
         try {
-            // ➕ MODIFICATION : REQUÊTE ALTERÉE POUR VISER LA BONNE COLONNE 'id_quartier'
-            $sql = "UPDATE users SET nom = ?, prenom = ?, telephone = ?, ville = ?, id_quartier = ?, photo_profil = ? WHERE id = ?";
-            $params = [$nom, $prenom, $telephone, $ville, $id_quartier, $chemin_photo, $user_id];
-            
-            $stmt_update = $pdo->prepare($sql);
-            $stmt_update->execute($params);
+            $stmt_update = $pdo->prepare("UPDATE users SET nom = ?, prenom = ?, telephone = ?, ville = ?, id_quartier = ?, photo_profil = ? WHERE id = ?");
+            $stmt_update->execute([$nom, $prenom, $telephone, $ville, $id_quartier, $chemin_photo, $user_id]);
 
-            // Étape B : Gestion du Mot de passe (Uniquement s'il a rempli la case - CONSERVÉ INTACT)
             if (!empty($nouveau_mdp)) {
                 if (strlen($nouveau_mdp) >= 6) {
                     $mdp_hache = password_hash($nouveau_mdp, PASSWORD_BCRYPT);
-                    $stmt_mdp = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
-                    $stmt_mdp->execute([$mdp_hache, $user_id]);
+                    $pdo->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$mdp_hache, $user_id]);
                 } else {
                     $erreurs[] = "Le nouveau mot de passe doit faire au moins 6 caractères.";
                 }
             }
 
-            // Si tout s'est bien passé
             if (empty($erreurs)) {
-                $succes = true;
-                // On rafraîchit les données locales pour l'affichage immédiat
-                $stmt->execute([$user_id]);
-                $user = $stmt->fetch();
-                
-                // Redirection magique après 2 secondes vers le profil mis à jour
-                echo "<script>
-                        alert('Vos informations ont été mises à jour avec succès !');
-                        window.location.href='profil.php';
-                      </script>";
+                echo "<script>alert('Vos informations ont été mises à jour avec succès !');window.location.href='/coiffons/profil.php';</script>";
                 exit();
             }
-
         } catch (Exception $e) {
             $erreurs[] = "Une erreur est survenue lors de l'enregistrement : " . $e->getMessage();
         }
     }
 }
 ?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modifier mon profil — Coiffe Chez Toi</title>
+    <link rel="stylesheet" href="/coiffons/css/variables.css">
+    <link rel="stylesheet" href="/coiffons/css/animations.css">
+    <link rel="stylesheet" href="/coiffons/css/components.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+    .modifier-page { padding-top:calc(var(--navbar-height) + 2rem); padding-bottom:calc(var(--bottomnav-height) + 2rem); min-height:100vh; background:var(--dark); }
+    </style>
+</head>
+<body>
+<?php
+$page_root = '/coiffons';
+include __DIR__ . '/views/components/navbar_client.php';
+?>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh; color: #fff;">
-    <div class="container mt-4">
-        
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                
-                <div class="card p-4 shadow-lg" style="background-color: #111; border: 1px solid #222; border-radius: 20px;">
-                    
-                    <div class="text-center mb-4">
-                        <h2 class="text-warning fw-bold">MODIFIER MES INFORMATIONS</h2>
-                        <p class="text-secondary small">Mettez à jour vos bails personnels en toute sécurité</p>
-                    </div>
+<main class="modifier-page page-transition">
+    <div class="container" style="max-width:680px;">
 
-                    <?php if (!empty($erreurs)): ?>
-                        <div class="alert alert-danger bg-danger text-white border-0 small">
-                            <ul class="mb-0">
-                                <?php foreach ($erreurs as $erreur): ?>
-                                    <li><?php echo $erreur; ?></li>
-                                <?php endforeach; ?>
-                            </ul>
+        <!-- Lien retour -->
+        <div class="mb-4">
+            <a href="/coiffons/profil.php" class="btn-ghost btn-sm d-inline-flex align-items-center gap-1">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Mon profil
+            </a>
+        </div>
+
+        <div class="text-center mb-4">
+            <h1 style="font-family:var(--font-display);font-size:clamp(1.2rem,3vw,1.5rem);color:var(--gold);font-weight:700;letter-spacing:2px;margin-bottom:4px;">
+                MODIFIER MES INFORMATIONS
+            </h1>
+            <p style="color:var(--text-muted);font-size:0.78rem;">Mettez à jour vos informations personnelles en toute sécurité</p>
+        </div>
+
+        <!-- Erreurs -->
+        <?php if (!empty($erreurs)):
+            $toast_type = 'danger';
+            $toast_message = implode(' | ', $erreurs);
+            include __DIR__ . '/views/components/toast.php';
+        endif; ?>
+
+        <div class="glass-cct p-4">
+            <form method="POST" enctype="multipart/form-data" novalidate>
+
+                <!-- Photo de profil -->
+                <div class="text-center mb-4">
+                    <?php if (!empty($user['photo_profil']) && file_exists(__DIR__ . '/' . $user['photo_profil'])): ?>
+                        <img src="/coiffons/<?= htmlspecialchars($user['photo_profil']) ?>"
+                             style="width:88px;height:88px;border-radius:50%;border:3px solid var(--gold);object-fit:cover;display:block;margin:0 auto 12px;"
+                             alt="Photo actuelle">
+                    <?php else: ?>
+                        <div style="width:88px;height:88px;border-radius:50%;border:3px solid var(--gold);background:var(--gold-dim);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-family:var(--font-display);font-size:1.8rem;color:var(--gold);">
+                            <?= strtoupper(substr($user['nom'] ?? 'U', 0, 1)) ?>
                         </div>
                     <?php endif; ?>
-
-                    <form method="POST" enctype="multipart/form-data" class="row g-3">
-                        
-                        <div class="col-12 text-center mb-3">
-                            <div class="position-relative d-inline-block mx-auto mb-2">
-                                <img src="<?php echo !empty($user['photo_profil']) ? htmlspecialchars($user['photo_profil']) : 'uploads/profil/default.png'; ?>" 
-                                     class="rounded-circle border-gold shadow" 
-                                     style="width: 110px; height: 110px; object-fit: cover;" alt="Avatar">
-                            </div>
-                            <div class="mx-auto" style="max-width: 250px;">
-                                <label class="form-label text-secondary small">Changer la photo de profil</label>
-                                <input type="file" name="photo_profil" class="form-control form-control-sm bg-dark text-white border-secondary">
-                            </div>
-                        </div>
-
-                        <hr class="border-secondary my-2">
-
-                        <div class="col-md-6">
-                            <label class="form-label text-warning small fw-bold">Nom :</label>
-                            <input type="text" name="nom" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['nom'] ?? ''); ?>" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label text-warning small fw-bold">Prénom :</label>
-                            <input type="text" name="prenom" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['prenom'] ?? ''); ?>" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label text-muted small fw-bold">Adresse Email (Non modifiable) :</label>
-                            <input type="email" class="form-control bg-black text-secondary border-secondary cursor-not-allowed" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" readonly>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label text-warning small fw-bold">Téléphone (WhatsApp) :</label>
-                            <input type="text" name="telephone" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['telephone'] ?? ''); ?>" required>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label text-warning small fw-bold">Ville :</label>
-                            <input type="text" name="ville" class="form-control bg-dark text-white border-secondary" value="<?php echo htmlspecialchars($user['ville'] ?? ''); ?>" placeholder="Ex: Cotonou">
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label text-warning small fw-bold">Quartier (Choix ciblé) :</label>
-                            <select name="id_quartier" class="form-select bg-dark text-white border-secondary select-style">
-                                <option value="">-- Sélectionnez votre quartier --</option>
-                                <?php foreach ($liste_quartiers as $q): ?>
-                                    <option value="<?php echo $q['id_quartier']; ?>" <?php echo (isset($user['id_quartier']) && $user['id_quartier'] == $q['id_quartier']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($q['nom_quartier'] ?? ''); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <hr class="border-secondary my-3">
-
-                        <div class="col-12">
-                            <label class="form-label text-warning small fw-bold"><i class="bi bi-shield-lock-fill"></i> Changer le mot de passe (Laissez vide si aucun changement) :</label>
-                            <input type="password" name="nouveau_mdp" class="form-control bg-dark text-white border-secondary" placeholder="Entrez un nouveau mot de passe sécurisé">
-                        </div>
-
-                        <div class="col-12 d-flex gap-3 mt-4">
-                            <a href="profil.php" class="btn btn-outline-secondary w-50 fw-bold py-2" style="border-radius: 8px;">
-                                ANNULER
-                            </a>
-                            <button type="submit" class="btn btn-gold w-50 fw-bold py-2" style="border-radius: 8px;">
-                                <i class="bi bi-check-circle-fill me-1"></i> ENREGISTRER LES MODIFS
-                            </button>
-                        </div>
-
-                    </form>
-
+                    <?php
+                    $ff = ['type'=>'file','name'=>'photo_profil','label'=>'Changer la photo de profil','attrs'=>'accept="image/jpeg,image/png"'];
+                    include __DIR__ . '/views/components/form_field.php';
+                    ?>
                 </div>
 
-            </div>
+                <hr style="border-color:var(--glass-border);margin:1.5rem 0;">
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <?php $ff = ['type'=>'text','name'=>'nom','label'=>'Nom','value'=>$user['nom']??'','required'=>true]; include __DIR__ . '/views/components/form_field.php'; ?>
+                    </div>
+                    <div class="col-md-6">
+                        <?php $ff = ['type'=>'text','name'=>'prenom','label'=>'Prénom','value'=>$user['prenom']??'','required'=>true]; include __DIR__ . '/views/components/form_field.php'; ?>
+                    </div>
+                    <div class="col-12">
+                        <?php $ff = ['type'=>'email','name'=>'_email_readonly','label'=>'Adresse Email (non modifiable)','value'=>$user['email']??'','disabled'=>true,'icon_prefix'=>'bi-envelope']; include __DIR__ . '/views/components/form_field.php'; ?>
+                    </div>
+                    <div class="col-12">
+                        <?php $ff = ['type'=>'tel','name'=>'telephone','label'=>'Téléphone (WhatsApp)','value'=>$user['telephone']??'','placeholder'=>'Ex: +22967000000','required'=>true,'icon_prefix'=>'bi-telephone']; include __DIR__ . '/views/components/form_field.php'; ?>
+                    </div>
+                    <div class="col-md-6">
+                        <?php $ff = ['type'=>'text','name'=>'ville','label'=>'Ville','value'=>$user['ville']??'','placeholder'=>'Ex: Cotonou','icon_prefix'=>'bi-building']; include __DIR__ . '/views/components/form_field.php'; ?>
+                    </div>
+                    <div class="col-md-6">
+                        <?php
+                        $opts_q = [['value'=>'','label'=>'-- Sélectionnez votre quartier --']];
+                        foreach ($liste_quartiers as $q) {
+                            $opts_q[] = ['value'=>$q['id_quartier'], 'label'=>$q['nom_quartier']??'', 'selected'=>(isset($user['id_quartier']) && $user['id_quartier'] == $q['id_quartier'])];
+                        }
+                        $ff = ['type'=>'select','name'=>'id_quartier','label'=>'Quartier','options'=>$opts_q];
+                        include __DIR__ . '/views/components/form_field.php';
+                        ?>
+                    </div>
+                </div>
+
+                <hr style="border-color:var(--glass-border);margin:1.5rem 0;">
+
+                <?php
+                $ff = ['type'=>'password','name'=>'nouveau_mdp','label'=>'Changer le mot de passe (laisser vide si aucun changement)','placeholder'=>'Entrez un nouveau mot de passe sécurisé','toggle_pw'=>true,'icon_prefix'=>'bi-shield-lock'];
+                include __DIR__ . '/views/components/form_field.php';
+                ?>
+
+                <div class="d-flex gap-3 mt-4">
+                    <a href="/coiffons/profil.php" class="btn-ghost w-50 text-center" style="padding:11px;">
+                        ANNULER
+                    </a>
+                    <button type="submit" class="btn-gold w-50" style="padding:11px;">
+                        <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>
+                        ENREGISTRER LES MODIFS
+                    </button>
+                </div>
+
+            </form>
         </div>
 
     </div>
-</section>
+</main>
 
-<style>
-    :root {
-        --gold: #f39c12;
-    }
-    .border-gold {
-        border: 3px solid var(--gold) !important;
-    }
-    .btn-gold {
-        background-color: var(--gold) !important;
-        color: #000 !important;
-        border: none !important;
-        transition: 0.3s ease-in-out;
-    }
-    .btn-gold:hover {
-        background-color: #d35400 !important;
-    }
-    .form-control:focus, .form-select:focus {
-        background-color: #1a1a1a !important;
-        border-color: var(--gold) !important;
-        box-shadow: none !important;
-        color: #fff !important;
-    }
-    .select-style {
-        background-color: #212529;
-        color: #fff;
-        border-radius: 6px;
-    }
-    .cursor-not-allowed {
-        cursor: not-allowed;
-    }
-</style>
-
-<?php include __DIR__ . '/layout/footer.php'; ?>
+<?php
+$page_root = '/coiffons';
+include __DIR__ . '/views/components/footer_global.php';
+$current_page = 'modifier_profil.php';
+include __DIR__ . '/views/components/bottom_nav_client.php';
+?>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

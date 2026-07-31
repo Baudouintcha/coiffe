@@ -18,6 +18,6 @@ if (ini_get("session.use_cookies")) {
 session_destroy();
 
 // 5. On redirige instantanément vers l'accueil
-header("Location: index.php");
+header("Location: /coiffons/index.php");
 exit();
 ?>
