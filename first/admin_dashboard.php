@@ -99,7 +99,7 @@ $retraits_attente = $bdd->query("SELECT t.*, u.nom, u.prenom, u.telephone FROM t
     <style>
         :root {
             --gold: #D4AF37;
-            --gold-hover: #b8932d;
+            --gold-hover: #C9A227;
             --dark-bg: #000000;
             --card-bg: #0c0c0c;
             --border-color: #222222;

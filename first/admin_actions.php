@@ -43,7 +43,8 @@ switch ($action) {
         $id_user = intval($_GET['id'] ?? 0);
 
         if ($id_user > 0) {
-            $stmt = $pdo->prepare("DELETE FROM users WHERE id_user = ?");
+            // ✅ BUG CORRIGÉ : id_user → id (colonne réelle de la table users)
+            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
             $stmt->execute([$id_user]);
 
             header("Location: admin_dashboard.php?success=user_supprime");
@@ -105,14 +106,14 @@ switch ($action) {
     case 'toggle_approbation':
         $id_user = intval($_GET['id'] ?? 0);
         if ($id_user > 0) {
-            // On récupère le statut actuel
-            $stmt = $pdo->prepare("SELECT is_approved FROM users WHERE id_user = ?");
+            // On récupère le statut actuel — ✅ BUG CORRIGÉ : id_user → id
+            $stmt = $pdo->prepare("SELECT is_approved FROM users WHERE id = ?");
             $stmt->execute([$id_user]);
             $user = $stmt->fetch();
 
             if ($user) {
                 $nouveau_statut = $user['is_approved'] ? 0 : 1;
-                $update = $pdo->prepare("UPDATE users SET is_approved = ? WHERE id_user = ?");
+                $update = $pdo->prepare("UPDATE users SET is_approved = ? WHERE id = ?");
                 $update->execute([$nouveau_statut, $id_user]);
             }
             header("Location: admin_dashboard.php?success=statut_visibilite_maj");
@@ -129,17 +130,17 @@ switch ($action) {
             $raison = trim($_POST['raison_ban'] ?? '');
 
             if ($id_user > 0) {
-                // On récupère le statut actuel
-                $stmt = $pdo->prepare("SELECT statut FROM users WHERE id_user = ?");
+                // On récupère le statut actuel — ✅ BUG CORRIGÉ : id_user → id
+                $stmt = $pdo->prepare("SELECT statut FROM users WHERE id = ?");
                 $stmt->execute([$id_user]);
                 $user = $stmt->fetch();
 
                 if ($user) {
                     if ($user['statut'] === 'actif') {
-                        $update = $pdo->prepare("UPDATE users SET statut = 'banni', raison_ban = ? WHERE id_user = ?");
+                        $update = $pdo->prepare("UPDATE users SET statut = 'banni', raison_ban = ? WHERE id = ?");
                         $update->execute([$raison, $id_user]);
                     } else {
-                        $update = $pdo->prepare("UPDATE users SET statut = 'actif', raison_ban = NULL WHERE id_user = ?");
+                        $update = $pdo->prepare("UPDATE users SET statut = 'actif', raison_ban = NULL WHERE id = ?");
                         $update->execute([$id_user]);
                     }
                 }
@@ -165,8 +166,8 @@ switch ($action) {
                     $stmt1 = $pdo->prepare("UPDATE users SET statut = 'banni', raison_ban = 'Contournement de plateforme avéré' WHERE id_user = ?");
                     $stmt1->execute([$id_coiffeur]);
 
-                    // 2. Créditer le portefeuille du client dénonciateur (+2000 FCFA)
-                    $stmt2 = $pdo->prepare("UPDATE users SET solde = solde + 2000 WHERE id_user = ?");
+                    // 2. Créditer le portefeuille du client dénonciateur (+2000 FCFA) — ✅ BUG CORRIGÉ : id_user → id
+                    $stmt2 = $pdo->prepare("UPDATE users SET solde = solde + 2000 WHERE id = ?");
                     $stmt2->execute([$id_client]);
 
                     // 3. Envoyer une notification in-app au client
