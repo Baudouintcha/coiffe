@@ -1,22 +1,28 @@
 <?php
-// 1. TOUT EN HAUT : Sécurité et Session
+/**
+ * coiffeurs/gestion_catalogue.php — Gestion CRUD du catalogue de prestations
+ * Migration Design System v2.0 — Parcours Coiffeur — Page 1
+ *
+ * ⚠️  LOGIQUE MÉTIER INTACTE — SQL, upload, sécurité : inchangés.
+ */
+
+// 1. Sécurité et Session
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Sécurité : Seul un coiffeur connecté peut accéder à cette page
 if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
-    echo "<script>window.location.href='connexion.php';</script>";
+    echo "<script>window.location.href='/coiffons/access/connexion.php';</script>";
     exit();
 }
 
 require_once __DIR__ . '/../security/config.php';
-include __DIR__ . '/../layout/header_coiffeur.php';
 
-$coiffeur_id = $_SESSION['id_user']; 
-$message = "";
+$coiffeur_id = $_SESSION['id_user'];
+$message_type = '';
+$message_text = '';
 
-// --- FONCTION POUR SÉPARER DESCRIPTION ET OPTIONS ---
+// --- FONCTION POUR SÉPARER DESCRIPTION ET OPTIONS --- (inchangée)
 function formaterDescriptionWithOptions($texte_desc, $option_noms, $option_prix) {
     $options_array = [];
     if (!empty($option_noms) && is_array($option_noms)) {
@@ -52,19 +58,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_prestation']))
         $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
         if (!in_array($fileExt, $allowed)) {
-            $message = "<div class='alert alert-danger text-center'>❌ Format non supporté. (Uniquement JPG, JPEG, PNG, WEBP)</div>";
+            $message_type = 'danger';
+            $message_text = 'Format non supporté. (Uniquement JPG, JPEG, PNG, WEBP)';
             $upload_ok = false;
-        } elseif ($fileSize > (5 * 1024 * 1024)) { // 5 Mo
-            $message = "<div class='alert alert-danger text-center'>❌ La photo est trop lourde. Maximum 5 Mo autorisés.</div>";
+        } elseif ($fileSize > (5 * 1024 * 1024)) {
+            $message_type = 'danger';
+            $message_text = 'La photo est trop lourde. Maximum 5 Mo autorisés.';
             $upload_ok = false;
         } else {
             $photo_style_path = 'uploads/prestations/' . uniqid('', true) . '.' . $fileExt;
             $target_dir = __DIR__ . '/../uploads/prestations';
-            
             if (!file_exists($target_dir)) {
                 mkdir($target_dir, 0777, true);
             }
-            
             move_uploaded_file($_FILES['photo_style']['tmp_name'], __DIR__ . '/../' . $photo_style_path);
         }
     }
@@ -72,7 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_prestation']))
     if ($upload_ok) {
         $stmt = $pdo->prepare("INSERT INTO prestations (id_coiffeur, nom_style, prix, photo_style, description, duree) VALUES (?, ?, ?, ?, ?, ?)");
         if ($stmt->execute([$coiffeur_id, $nom_style, $prix, $photo_style_path, $description_complete, $duree])) {
-            $message = "<div class='alert alert-success text-center fw-bold'>✨ Prestation ajoutée avec succès !</div>";
+            $message_type = 'success';
+            $message_text = 'Prestation ajoutée avec succès !';
         }
     }
 }
@@ -88,7 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])
     $raw_description = $_POST['description'];
     $ancienne_photo = $_POST['ancienne_photo'];
 
-    // Vérification de sécurité propriétaire
     $check = $pdo->prepare("SELECT id_prestation FROM prestations WHERE id_prestation = ? AND id_coiffeur = ?");
     $check->execute([$id_prestation, $coiffeur_id]);
 
@@ -103,16 +109,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])
             $fileSize = $_FILES['photo_style']['size'];
 
             if (!in_array($fileExt, $allowed)) {
-                $message = "<div class='alert alert-danger text-center'>❌ Format d'image non supporté.</div>";
+                $message_type = 'danger';
+                $message_text = 'Format d\'image non supporté.';
                 $upload_ok = false;
             } elseif ($fileSize > (5 * 1024 * 1024)) {
-                $message = "<div class='alert alert-danger text-center'>❌ La nouvelle photo dépasse 5 Mo.</div>";
+                $message_type = 'danger';
+                $message_text = 'La nouvelle photo dépasse 5 Mo.';
                 $upload_ok = false;
             } else {
                 if (!empty($ancienne_photo) && file_exists(__DIR__ . '/../' . $ancienne_photo)) {
                     @unlink(__DIR__ . '/../' . $ancienne_photo);
                 }
-                
                 $photo_style_path = 'uploads/prestations/' . uniqid('', true) . '.' . $fileExt;
                 $target_dir = __DIR__ . '/../uploads/prestations';
                 if (!file_exists($target_dir)) {
@@ -125,7 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])
         if ($upload_ok) {
             $upd = $pdo->prepare("UPDATE prestations SET nom_style = ?, prix = ?, photo_style = ?, description = ?, duree = ? WHERE id_prestation = ?");
             if ($upd->execute([$nom_style, $prix, $photo_style_path, $description_complete, $duree, $id_prestation])) {
-                $message = "<div class='alert alert-success text-center fw-bold'>🔄 Prestation mise à jour avec succès !</div>";
+                $message_type = 'success';
+                $message_text = 'Prestation mise à jour avec succès !';
             }
         }
     }
@@ -136,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])
 // ==========================================
 if (isset($_GET['supprimer'])) {
     $id_prestation = intval($_GET['supprimer']);
-    
+
     $check = $pdo->prepare("SELECT photo_style FROM prestations WHERE id_prestation = ? AND id_coiffeur = ?");
     $check->execute([$id_prestation, $coiffeur_id]);
     $prest = $check->fetch();
@@ -145,13 +153,10 @@ if (isset($_GET['supprimer'])) {
         if (!empty($prest['photo_style']) && file_exists(__DIR__ . '/../' . $prest['photo_style'])) {
             @unlink(__DIR__ . '/../' . $prest['photo_style']);
         }
-        
         $del = $pdo->prepare("DELETE FROM prestations WHERE id_prestation = ?");
         $del->execute([$id_prestation]);
-        
-        // Redirection vers la page d'origine (soit catalogue, soit index, soit lui-même)
         $redirect = $_SERVER['HTTP_REFERER'] ?? 'gestion_catalogue.php';
-        echo "<script>alert('🗑️ Prestation supprimée du catalogue.'); window.location.href='$redirect';</script>";
+        echo "<script>alert('Prestation supprimée du catalogue.'); window.location.href='" . htmlspecialchars($redirect, ENT_QUOTES) . "';</script>";
         exit();
     }
 }
@@ -160,266 +165,366 @@ if (isset($_GET['supprimer'])) {
 $stmt = $pdo->prepare("SELECT * FROM prestations WHERE id_coiffeur = ? ORDER BY id_prestation DESC");
 $stmt->execute([$coiffeur_id]);
 $prestations = $stmt->fetchAll();
+
+// Header coiffeur (ouverture HTML + topbar)
+include __DIR__ . '/../layout/header_coiffeur.php';
 ?>
 
-<section class="py-0">
-<div class="d-flex align-items-center justify-content-between mb-4 pt-2">
-    <div>
-        <h2 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--gold);margin-bottom:2px;">Mon Catalogue</h2>
-        <p style="color:rgba(255,255,255,0.35);font-size:0.78rem;margin:0;">Gérez vos prestations et tarifs</p>
-    </div>
-    <a href="/coiffons/index.php?page=dashboard_coiffeur"
-       style="color:rgba(255,255,255,0.35);text-decoration:none;font-size:0.8rem;display:flex;align-items:center;gap:5px;">
-        <i class="bi bi-arrow-left"></i> Dashboard
-    </a>
-</div>
-<?php if (!empty($message)): ?>
-    <div class="<?= str_contains($message,'success') ? 'msg-success' : 'msg-danger' ?> mb-3">
-        <?= strip_tags($message, '<strong><br>') ?>
-    </div>
-<?php endif; ?>
+<!-- Design System v2.0 -->
+<link rel="stylesheet" href="/coiffons/css/variables.css">
+<link rel="stylesheet" href="/coiffons/css/animations.css">
+<link rel="stylesheet" href="/coiffons/css/components.css">
 
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="card p-4 shadow-lg sticky-top" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px; top: 20px; z-index: 1;">
-                    <h4 class="text-warning mb-3">Ajouter un style</h4>
-                    <form method="POST" enctype="multipart/form-data">
-                        <div class="mb-3">
-                            <label class="text-white small">Nom de la coiffure</label>
-                            <input type="text" name="nom_style" class="form-control" placeholder="Ex: Nattes Collées Homme" required>
+<!-- ActionBar -->
+<?php
+$ab = [
+    'icon'     => 'bi-scissors',
+    'title'    => 'Mon Catalogue',
+    'subtitle' => 'Gérez vos prestations et tarifs',
+];
+include __DIR__ . '/../views/components/action_bar.php';
+?>
+
+<!-- Toast message -->
+<?php if (!empty($message_text)):
+    $toast_type    = $message_type;
+    $toast_message = $message_text;
+    include __DIR__ . '/../views/components/toast.php';
+endif; ?>
+
+<div class="row g-4">
+
+    <!-- ── Colonne gauche : Formulaire ajout ── -->
+    <div class="col-lg-4">
+        <div class="glass-cct p-4" style="position:sticky;top:calc(var(--navbar-height-coiffeur) + 1rem);">
+            <h4 style="font-family:var(--font-display);font-size:1rem;color:var(--gold);margin-bottom:1.25rem;">
+                <i class="bi bi-plus-circle me-2" aria-hidden="true"></i>Ajouter un style
+            </h4>
+            <form method="POST" enctype="multipart/form-data" novalidate>
+
+                <?php
+                $ff = ['type'=>'text','name'=>'nom_style','label'=>'Nom de la coiffure','placeholder'=>'Ex: Nattes Collées Homme','required'=>true];
+                include __DIR__ . '/../views/components/form_field.php';
+
+                $ff = ['type'=>'number','name'=>'prix','label'=>'Prix de base (FCFA)','placeholder'=>'Ex: 5000','required'=>true,'attrs'=>'min="0"'];
+                include __DIR__ . '/../views/components/form_field.php';
+
+                $ff = [
+                    'type'    => 'select',
+                    'name'    => 'duree',
+                    'label'   => 'Durée estimée',
+                    'required'=> true,
+                    'options' => [
+                        ['value'=>'30', 'label'=>'30 minutes'],
+                        ['value'=>'60', 'label'=>'1 heure', 'selected'=>true],
+                        ['value'=>'90', 'label'=>'1h 30min'],
+                        ['value'=>'120','label'=>'2 heures'],
+                        ['value'=>'180','label'=>'3 heures'],
+                    ],
+                ];
+                include __DIR__ . '/../views/components/form_field.php';
+
+                $ff = ['type'=>'file','name'=>'photo_style','label'=>'Image (Max 5 Mo)','required'=>true,'attrs'=>'accept="image/*"'];
+                include __DIR__ . '/../views/components/form_field.php';
+
+                $ff = ['type'=>'textarea','name'=>'description','label'=>'Description de base','placeholder'=>'Ex: Lavage inclus...','rows'=>2];
+                include __DIR__ . '/../views/components/form_field.php';
+                ?>
+
+                <!-- Options tarifs -->
+                <div class="glass-cct p-3 mb-3" style="border:1px dashed var(--glass-border-md);">
+                    <label class="form-label-cct" style="color:var(--gold);">
+                        <i class="bi bi-tags me-1" aria-hidden="true"></i>
+                        Variations &amp; Options Tarifs
+                        <span style="color:var(--text-muted);font-weight:400;"> (Facultatif)</span>
+                    </label>
+                    <div id="wrapper-options-ajout"></div>
+                    <button type="button"
+                            class="btn-outline-gold btn-sm w-100 mt-2"
+                            onclick="ajouterOptionAjout()">
+                        <i class="bi bi-plus" aria-hidden="true"></i> Ajouter une option
+                    </button>
+                </div>
+
+                <button type="submit"
+                        name="ajouter_prestation"
+                        class="btn-gold w-100"
+                        style="padding:12px;">
+                    <i class="bi bi-plus-circle me-2" aria-hidden="true"></i>
+                    AJOUTER AU CATALOGUE
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ── Colonne droite : Grille prestations ── -->
+    <div class="col-lg-8">
+        <h4 style="font-family:var(--font-display);font-size:1rem;color:var(--text-secondary);margin-bottom:1.25rem;">
+            Mes prestations actuelles
+            <span style="color:var(--text-muted);font-weight:400;font-size:0.82rem;margin-left:8px;">
+                (<?= count($prestations) ?> style<?= count($prestations) > 1 ? 's' : '' ?>)
+            </span>
+        </h4>
+
+        <?php if (empty($prestations)): ?>
+            <?php
+            $es = [
+                'icon'      => 'bi-scissors',
+                'message'   => 'Aucune prestation enregistrée. Ajoutez votre premier style !',
+                'cta_label' => '',
+                'cta_href'  => '',
+            ];
+            include __DIR__ . '/../views/components/empty_state.php';
+            ?>
+        <?php else: ?>
+            <div class="row g-3">
+                <?php foreach ($prestations as $p):
+                    $explode     = explode("|||", $p['description']);
+                    $un_description = $explode[0] ?? '';
+                    $json_options   = $explode[1] ?? '[]';
+                    $options_array  = json_decode($json_options, true) ?: [];
+
+                    // URL photo
+                    $photo_url_p = null;
+                    if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])) {
+                        $photo_url_p = '/coiffons/' . htmlspecialchars($p['photo_style']);
+                    }
+
+                    $modal_id_p = 'modal-modifier-' . $p['id_prestation'];
+                ?>
+                    <div class="col-sm-6">
+                        <!-- GalleryCard étendue avec options + actions modal -->
+                        <div class="gallery-card h-100">
+                            <!-- Image -->
+                            <div class="gallery-card-img">
+                                <?php if ($photo_url_p): ?>
+                                    <img src="<?= $photo_url_p ?>"
+                                         alt="<?= htmlspecialchars($p['nom_style']) ?>"
+                                         loading="lazy">
+                                <?php else: ?>
+                                    <div class="gallery-card-img-placeholder">
+                                        <i class="bi bi-scissors" style="font-size:2rem;color:var(--gold);opacity:0.5;" aria-hidden="true"></i>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            <!-- Body -->
+                            <div class="p-4 d-flex flex-column" style="flex:1;">
+                                <h5 style="font-weight:700;color:#fff;margin-bottom:6px;">
+                                    <?= htmlspecialchars($p['nom_style']) ?>
+                                </h5>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span style="color:var(--gold);font-weight:700;font-size:1rem;">
+                                        <?= number_format($p['prix'], 0, ',', ' ') ?>
+                                        <span style="font-size:0.72rem;">FCFA</span>
+                                    </span>
+                                    <span class="badge-muted">
+                                        <i class="bi bi-clock me-1" aria-hidden="true"></i>
+                                        <?= $p['duree'] ?> min
+                                    </span>
+                                </div>
+                                <?php if (!empty($un_description)): ?>
+                                    <p style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:10px;">
+                                        <?= htmlspecialchars($un_description) ?>
+                                    </p>
+                                <?php endif; ?>
+
+                                <?php if (!empty($options_array)): ?>
+                                    <div style="margin-bottom:12px;">
+                                        <span style="font-size:0.72rem;color:var(--text-muted);display:block;margin-bottom:4px;">Options :</span>
+                                        <?php foreach ($options_array as $o): ?>
+                                            <span class="badge-gold" style="font-size:0.68rem;margin-right:4px;margin-bottom:4px;display:inline-block;">
+                                                <?= htmlspecialchars($o['nom']) ?> (+<?= number_format($o['prix'], 0, ',', ' ') ?> FCFA)
+                                            </span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <!-- Actions -->
+                                <div class="d-flex gap-2 mt-auto">
+                                    <button type="button"
+                                            class="btn-outline-gold btn-sm flex-grow-1"
+                                            onclick="openModal('<?= $modal_id_p ?>')"
+                                            aria-label="Modifier <?= htmlspecialchars($p['nom_style']) ?>">
+                                        <i class="bi bi-pencil me-1" aria-hidden="true"></i> Modifier
+                                    </button>
+                                    <a href="?supprimer=<?= $p['id_prestation'] ?>"
+                                       class="btn-danger-cct btn-sm"
+                                       onclick="return confirm('Supprimer définitivement ce style ?')"
+                                       aria-label="Supprimer <?= htmlspecialchars($p['nom_style']) ?>">
+                                        <i class="bi bi-trash" aria-hidden="true"></i>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="text-white small">Prix de base (FCFA)</label>
-                            <input type="number" name="prix" class="form-control" placeholder="Ex: 5000" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="text-white small">Durée estimée</label>
-                            <select name="duree" class="form-select" required>
-                                <option value="30">30 minutes</option>
-                                <option value="60" selected>1 heure</option>
-                                <option value="90">1h 30min</option>
-                                <option value="120">2 heures</option>
-                                <option value="180">3 heures</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="text-white small">Image de la coiffure (Max 5 Mo)</label>
-                            <input type="file" name="photo_style" class="form-control" accept="image/*" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="text-white small">Description de base</label>
-                            <textarea name="description" class="form-control" rows="2" placeholder="Ex: Lavage inclus..."></textarea>
+                    </div>
+
+                    <!-- Modal Modification -->
+                    <?php
+                    // Construction du contenu modal
+                    ob_start();
+                    ?>
+                    <form method="POST" enctype="multipart/form-data" novalidate>
+                        <input type="hidden" name="id_prestation" value="<?= $p['id_prestation'] ?>">
+                        <input type="hidden" name="ancienne_photo" value="<?= htmlspecialchars($p['photo_style']) ?>">
+
+                        <?php
+                        $ff = ['type'=>'text','name'=>'nom_style','label'=>'Nom de la coiffure','value'=>$p['nom_style'],'required'=>true];
+                        include __DIR__ . '/../views/components/form_field.php';
+                        ?>
+
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <?php
+                                $ff = ['type'=>'number','name'=>'prix','label'=>'Prix (FCFA)','value'=>$p['prix'],'required'=>true,'attrs'=>'min="0"'];
+                                include __DIR__ . '/../views/components/form_field.php';
+                                ?>
+                            </div>
+                            <div class="col-6">
+                                <?php
+                                $ff = [
+                                    'type'    => 'select',
+                                    'name'    => 'duree',
+                                    'label'   => 'Durée',
+                                    'options' => [
+                                        ['value'=>'30', 'label'=>'30 min',   'selected'=>$p['duree']==30],
+                                        ['value'=>'60', 'label'=>'1 heure',  'selected'=>$p['duree']==60],
+                                        ['value'=>'90', 'label'=>'1h 30',    'selected'=>$p['duree']==90],
+                                        ['value'=>'120','label'=>'2 heures', 'selected'=>$p['duree']==120],
+                                        ['value'=>'180','label'=>'3 heures', 'selected'=>$p['duree']==180],
+                                    ],
+                                ];
+                                include __DIR__ . '/../views/components/form_field.php';
+                                ?>
+                            </div>
                         </div>
 
-                        <div class="p-2 mb-3 rounded" style="background-color: #1a1a1a; border: 1px dashed #444;">
-                            <label class="text-warning small d-block mb-2 fw-bold">Variations & Options Tarifs (Facultatif)</label>
-                            <div id="wrapper-options-ajout"></div>
-                            <button type="button" class="btn btn-outline-warning btn-sm w-100 mt-1" onclick="ajouterOptionAjout()">
-                                ➕ Ajouter une option (Teinte, Grosseur...)
+                        <?php
+                        $ff = ['type'=>'file','name'=>'photo_style','label'=>'Changer la photo (optionnel — Max 5 Mo)','attrs'=>'accept="image/*"'];
+                        include __DIR__ . '/../views/components/form_field.php';
+
+                        $ff = ['type'=>'textarea','name'=>'description','label'=>'Description','value'=>$un_description,'rows'=>2];
+                        include __DIR__ . '/../views/components/form_field.php';
+                        ?>
+
+                        <!-- Options modales -->
+                        <div class="glass-cct p-3 mb-3" style="border:1px dashed var(--glass-border-md);">
+                            <label class="form-label-cct" style="color:var(--gold);">
+                                <i class="bi bi-tags me-1" aria-hidden="true"></i>
+                                Options / Variations
+                            </label>
+                            <div id="wrapper-options-edit-<?= $p['id_prestation'] ?>">
+                                <?php foreach ($options_array as $o): ?>
+                                    <div class="row g-2 mb-2 align-items-center option-item">
+                                        <div class="col-7">
+                                            <input type="text"
+                                                   name="edit_option_nom[]"
+                                                   class="fc-dark"
+                                                   value="<?= htmlspecialchars($o['nom']) ?>">
+                                        </div>
+                                        <div class="col-4">
+                                            <input type="number"
+                                                   name="edit_option_prix[]"
+                                                   class="fc-dark"
+                                                   value="<?= $o['prix'] ?>">
+                                        </div>
+                                        <div class="col-1">
+                                            <button type="button"
+                                                    class="btn-danger-cct btn-sm"
+                                                    onclick="this.closest('.option-item').remove()"
+                                                    aria-label="Supprimer cette option">
+                                                <i class="bi bi-x" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <button type="button"
+                                    class="btn-outline-gold btn-sm w-100 mt-2"
+                                    onclick="ajouterOptionEdit(<?= $p['id_prestation'] ?>)">
+                                <i class="bi bi-plus" aria-hidden="true"></i> Ajouter une variation
                             </button>
                         </div>
 
-                        <button type="submit" name="ajouter_prestation" class="btn btn-gold-cct w-100 py-2 fw-bold mt-2">
-                            <i class="bi bi-plus-circle me-1"></i> AJOUTER AU CATALOGUE
-                        </button>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button type="button"
+                                    class="btn-ghost btn-sm"
+                                    onclick="closeModal('<?= $modal_id_p ?>')">
+                                Annuler
+                            </button>
+                            <button type="submit"
+                                    name="modifier_prestation"
+                                    class="btn-gold btn-sm">
+                                <i class="bi bi-check2 me-1" aria-hidden="true"></i>
+                                SAUVEGARDER
+                            </button>
+                        </div>
                     </form>
-                </div>
+                    <?php
+                    $modal_content = ob_get_clean();
+                    $modal_id      = $modal_id_p;
+                    $modal_title   = 'Modifier : ' . htmlspecialchars($p['nom_style']);
+                    $modal_width   = '580px';
+                    include __DIR__ . '/../views/components/modal.php';
+                    unset($modal_content, $modal_id, $modal_title, $modal_width);
+                    ?>
+
+                <?php endforeach; ?>
             </div>
+        <?php endif; ?>
+    </div><!-- /.col-lg-8 -->
 
-            <div class="col-md-8">
-                <h4 class="text-warning mb-3">Mes prestations actuelles</h4>
-                <div class="row g-3">
-                    <?php if (empty($prestations)): ?>
-                        <div class="col-12 text-center text-secondary py-5">Aucune prestation enregistrée pour le moment.</div>
-                    <?php else: ?>
-                        <?php foreach ($prestations as $p): 
-                            $explode = explode("|||", $p['description']);
-                            $un_description = $explode[0] ?? '';
-                            $json_options = $explode[1] ?? '[]';
-                            $options_array = json_decode($json_options, true) ?: [];
-                        ?>
-                            <div class="col-md-6">
-                                <div class="card h-100 shadow-sm" style="background-color: #111; border: 1px solid #333; border-radius: 15px; overflow: hidden;">
-                                    
-                                    <?php if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])): ?>
-                                        <img src="/coiffons/<?php echo $p['photo_style']; ?>" class="card-img-top" style="height: 180px; object-fit: cover;" alt="Style">
-                                    <?php else: ?>
-                                        <div class="bg-secondary text-center py-5"><i class="bi bi-image" style="font-size: 2rem;"></i></div>
-                                    <?php endif; ?>
+</div><!-- /.row -->
 
-                                    <div class="card-body d-flex flex-column justify-content-between">
-                                        <div>
-                                            <h5 class="text-warning mb-1"><?php echo htmlspecialchars($p['nom_style']); ?></h5>
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <span class="text-success fw-bold"><?php echo number_format($p['prix'], 0, ',', ' '); ?> FCFA</span>
-                                                <span class="badge bg-dark border border-warning text-warning">⏱️ <?php echo $p['duree']; ?> min</span>
-                                            </div>
-                                            <p class="text-light small mb-2"><?php echo htmlspecialchars($un_description); ?></p>
-                                            
-                                            <?php if(!empty($options_array)): ?>
-                                                <div class="pt-1 border-top border-secondary">
-                                                    <span class="text-secondary" style="font-size:0.75rem;">Options :</span><br>
-                                                    <?php foreach($options_array as $o): ?>
-                                                        <span class="badge me-1 text-black" style="font-size: 0.7rem; background-color:#e0a96d !important;">
-                                                            <?php echo htmlspecialchars($o['nom']); ?> (+<?php echo $o['prix']; ?>F)
-                                                        </span>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-
-                                        <div class="d-flex gap-2 mt-3">
-                                            <button type="button" class="btn btn-outline-warning btn-sm flex-grow-1" data-bs-toggle="modal" data-bs-target="#modalModifier-<?php echo $p['id_prestation']; ?>">
-                                                ⚙️ Modifier
-                                            </button>
-                                            <a href="?supprimer=<?php echo $p['id_prestation']; ?>" class="btn btn-outline-danger btn-sm" onclick="return confirm('Supprimer définitivement ce style ?');">
-                                                ✕ Supprimer
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="modal fade" id="modalModifier-<?php echo $p['id_prestation']; ?>" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content text-white" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
-                                        <div class="modal-header border-secondary">
-                                            <h5 class="modal-title text-warning">Modifier : <?php echo htmlspecialchars($p['nom_style']); ?></h5>
-                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <form method="POST" enctype="multipart/form-data">
-                                            <div class="modal-body">
-                                                <input type="hidden" name="id_prestation" value="<?php echo $p['id_prestation']; ?>">
-                                                <input type="hidden" name="ancienne_photo" value="<?php echo $p['photo_style']; ?>">
-
-                                                <div class="mb-2">
-                                                    <label class="small text-secondary">Nom de la coiffure</label>
-                                                    <input type="text" name="nom_style" class="form-control" value="<?php echo htmlspecialchars($p['nom_style']); ?>" required>
-                                                </div>
-                                                <div class="row g-2 mb-2">
-                                                    <div class="col-6">
-                                                        <label class="small text-secondary">Prix de base (FCFA)</label>
-                                                        <input type="number" name="prix" class="form-control" value="<?php echo $p['prix']; ?>" required>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <label class="small text-secondary">Durée</label>
-                                                        <select name="duree" class="form-select">
-                                                            <option value="30" <?php echo $p['duree'] == 30 ? 'selected' : ''; ?>>30 min</option>
-                                                            <option value="60" <?php echo $p['duree'] == 60 ? 'selected' : ''; ?>>1 heure</option>
-                                                            <option value="90" <?php echo $p['duree'] == 90 ? 'selected' : ''; ?>>1h 30</option>
-                                                            <option value="120" <?php echo $p['duree'] == 120 ? 'selected' : ''; ?>>2 heures</option>
-                                                            <option value="180" <?php echo $p['duree'] == 180 ? 'selected' : ''; ?>>3 heures</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="small text-secondary">Changer la photo (Optionnel - Max 5 Mo)</label>
-                                                    <input type="file" name="photo_style" class="form-control" accept="image/*">
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="small text-secondary">Description</label>
-                                                    <textarea name="description" class="form-control" rows="2"><?php echo htmlspecialchars($un_description); ?></textarea>
-                                                </div>
-
-                                                <div class="p-2 rounded" style="background-color: #1a1a1a; border: 1px dashed #444;">
-                                                    <label class="text-warning small d-block mb-2 fw-bold">Modifier les Options / Tarifs</label>
-                                                    <div id="wrapper-options-edit-<?php echo $p['id_prestation']; ?>">
-                                                        <?php foreach ($options_array as $index => $o): ?>
-                                                            <div class="row g-1 mb-2 align-items-center option-item">
-                                                                <div class="col-7">
-                                                                    <input type="text" name="edit_option_nom[]" class="form-control form-control-sm" value="<?php echo htmlspecialchars($o['nom']); ?>">
-                                                                </div>
-                                                                <div class="col-4">
-                                                                    <input type="number" name="edit_option_prix[]" class="form-control form-control-sm" value="<?php echo $o['prix']; ?>">
-                                                                </div>
-                                                                <div class="col-1 text-end">
-                                                                    <button type="button" class="btn btn-danger btn-sm p-1 py-0" onclick="this.closest('.option-item').remove()">✕</button>
-                                                                </div>
-                                                            </div>
-                                                        <?php endforeach; ?>
-                                                    </div>
-                                                    <button type="button" class="btn btn-outline-warning btn-sm w-100 mt-2" onclick="ajouterOptionEdit(<?php echo $p['id_prestation']; ?>)">
-                                                        ➕ Rajouter une variation
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer border-secondary">
-                                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annuler</button>
-                                                <button type="submit" name="modifier_prestation" class="btn btn-gold btn-sm fw-bold">SAUVEGARDER LES MODIFICATIONS</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-        </div>
-    </div>
-</section>
-
+<!-- JS — Ouverture modale depuis URL (ergonomie préservée) + options dynamiques -->
 <script>
 function ajouterOptionAjout() {
-    var wrapper = document.getElementById('wrapper-options-ajout');
-    var div = document.createElement('div');
-    div.className = "row g-1 mb-2 align-items-center option-item";
+    const wrapper = document.getElementById('wrapper-options-ajout');
+    const div = document.createElement('div');
+    div.className = 'row g-2 mb-2 align-items-center option-item';
     div.innerHTML = `
         <div class="col-7">
-            <input type="text" name="option_nom[]" class="form-control form-control-sm" placeholder="Ex: Teinte Blanche" required>
+            <input type="text" name="option_nom[]" class="fc-dark" placeholder="Ex: Teinte Blanche" required>
         </div>
         <div class="col-4">
-            <input type="number" name="option_prix[]" class="form-control form-control-sm" placeholder="Prix" required>
+            <input type="number" name="option_prix[]" class="fc-dark" placeholder="Prix" required>
         </div>
-        <div class="col-1 text-end">
-            <button type="button" class="btn btn-danger btn-sm p-1 py-0" onclick="this.closest('.option-item').remove()">✕</button>
+        <div class="col-1">
+            <button type="button" class="btn-danger-cct btn-sm" onclick="this.closest('.option-item').remove()" aria-label="Supprimer">
+                <i class="bi bi-x"></i>
+            </button>
         </div>
     `;
     wrapper.appendChild(div);
 }
 
 function ajouterOptionEdit(idPrestation) {
-    var wrapper = document.getElementById('wrapper-options-edit-' + idPrestation);
-    var div = document.createElement('div');
-    div.className = "row g-1 mb-2 align-items-center option-item";
+    const wrapper = document.getElementById('wrapper-options-edit-' + idPrestation);
+    const div = document.createElement('div');
+    div.className = 'row g-2 mb-2 align-items-center option-item';
     div.innerHTML = `
         <div class="col-7">
-            <input type="text" name="edit_option_nom[]" class="form-control form-control-sm" placeholder="Ex: Mèches Longues" required>
+            <input type="text" name="edit_option_nom[]" class="fc-dark" placeholder="Ex: Mèches Longues" required>
         </div>
         <div class="col-4">
-            <input type="number" name="edit_option_prix[]" class="form-control form-control-sm" placeholder="Prix" required>
+            <input type="number" name="edit_option_prix[]" class="fc-dark" placeholder="Prix" required>
         </div>
-        <div class="col-1 text-end">
-            <button type="button" class="btn btn-danger btn-sm p-1 py-0" onclick="this.closest('.option-item').remove()">✕</button>
+        <div class="col-1">
+            <button type="button" class="btn-danger-cct btn-sm" onclick="this.closest('.option-item').remove()" aria-label="Supprimer">
+                <i class="bi bi-x"></i>
+            </button>
         </div>
     `;
     wrapper.appendChild(div);
 }
 
-// --- AJOUT NOUVELLE ERGONOMIE : OUVERTURE AUTOMATIQUE DEPUIS L'EXTÉRIEUR ---
-document.addEventListener("DOMContentLoaded", function() {
+// Ouverture automatique depuis l'extérieur via ?ouvrir_modifier=ID
+document.addEventListener('DOMContentLoaded', function () {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('ouvrir_modifier')) {
-        const idPrestation = urlParams.get('ouvrir_modifier');
-        const modalElement = document.getElementById('modalModifier-' + idPrestation);
-        if (modalElement) {
-            const myModal = new bootstrap.Modal(modalElement);
-            myModal.show();
-        }
+        const id = urlParams.get('ouvrir_modifier');
+        openModal('modal-modifier-' + id);
     }
 });
 </script>
-
-<style>
-    .fc-dark { background: rgba(255,255,255,0.06) !important; border: 1px solid rgba(255,255,255,0.12) !important; color: #fff !important; border-radius: 10px !important; }
-    .fc-dark:focus { border-color: var(--gold) !important; box-shadow: none !important; }
-    .fc-dark::placeholder { color: rgba(255,255,255,0.25) !important; }
-    .fc-dark option { background:#111; color:#fff; }
-    .btn-gold-cct { background:var(--gold); color:#000; font-weight:700; border:none; border-radius:10px; }
-    .btn-gold-cct:hover { background:#c9a227; color:#000; }
-    .glass-cct { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; }
-    .msg-success { background:rgba(25,135,84,0.15);border:1px solid rgba(25,135,84,0.3);color:#6ee7b7;border-radius:10px;padding:10px 16px;font-size:0.85rem; }
-    .msg-danger  { background:rgba(220,53,69,0.15);border:1px solid rgba(220,53,69,0.3);color:#ffb3b3;border-radius:10px;padding:10px 16px;font-size:0.85rem; }
-</style>
 
 <?php include __DIR__ . '/../layout/footer_coiffeur.php'; ?>

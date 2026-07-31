@@ -1,94 +1,140 @@
 <?php
+/**
+ * coiffeurs/profil_coiffeurs.php — Profil et paramètres du coiffeur
+ * Migration Design System v2.0 — Parcours Coiffeur — Page 6
+ *
+ * ✅ BUG CORRIGÉ : $_SESSION['user_id'] → $_SESSION['id_user']
+ * ✅ layout/header.php → layout/header_coiffeur.php
+ * ✅ layout/footer.php → layout/footer_coiffeur.php
+ * ⚠️  LOGIQUE MÉTIER INTACTE — SQL, sessions, mise à jour profil : inchangés.
+ */
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 require_once __DIR__ . '/../security/config.php';
-include __DIR__ . '/../layout/header.php';
-// Sécurité : réservé aux coiffeurs
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'coiffeur') {
-    header('Location: connexion.php');
+
+// Sécurité — BUG CORRIGÉ : $_SESSION['user_id'] → $_SESSION['id_user']
+if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+    header('Location: /coiffons/access/connexion.php');
     exit();
 }
 
-$id_coiffeur = $_SESSION['user_id'];
-$message = "";
+$id_coiffeur  = $_SESSION['id_user'];
+$message_type = '';
+$message_text = '';
 
-// Mise à jour du profil
+// Mise à jour du profil — SQL inchangé
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['maj_profil'])) {
-    $nom = htmlspecialchars($_POST['nom']);
-    $prenom = htmlspecialchars($_POST['prenom']);
-    $email = htmlspecialchars($_POST['email']);
+    $nom       = htmlspecialchars($_POST['nom']);
+    $prenom    = htmlspecialchars($_POST['prenom']);
+    $email     = htmlspecialchars($_POST['email']);
     $telephone = htmlspecialchars($_POST['telephone']);
-    $ville = htmlspecialchars($_POST['ville']);
-    $quartier = htmlspecialchars($_POST['quartier']);
+    $ville     = htmlspecialchars($_POST['ville']);
+    $quartier  = htmlspecialchars($_POST['quartier']);
 
     $stmt = $pdo->prepare("UPDATE users SET nom = ?, prenom = ?, email = ?, telephone = ?, ville = ?, quartier = ? WHERE id = ?");
     if ($stmt->execute([$nom, $prenom, $email, $telephone, $ville, $quartier, $id_coiffeur])) {
-        $_SESSION['nom'] = $nom; // Met à jour la session
-        $message = "<div class='alert alert-success'>Profil mis à jour avec succès.</div>";
+        $_SESSION['nom'] = $nom;
+        $message_type = 'success';
+        $message_text = 'Profil mis à jour avec succès.';
     } else {
-        $message = "<div class='alert alert-danger'>Une erreur est survenue.</div>";
+        $message_type = 'danger';
+        $message_text = 'Une erreur est survenue lors de la mise à jour.';
     }
 }
 
-// Récupération des informations actuelles du coiffeur
+// Récupération infos coiffeur — SQL inchangé
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$id_coiffeur]);
 $coiffeur = $stmt->fetch();
+
+include __DIR__ . '/../layout/header_coiffeur.php';
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh;">
-    <div class="container mt-4" style="max-width: 600px;">
-        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">MON PROFIL</h2>
+<!-- Design System v2.0 -->
+<link rel="stylesheet" href="/coiffons/css/variables.css">
+<link rel="stylesheet" href="/coiffons/css/animations.css">
+<link rel="stylesheet" href="/coiffons/css/components.css">
 
-        <?php echo $message; ?>
+<!-- ActionBar -->
+<?php
+$ab = [
+    'icon'     => 'bi-person-circle',
+    'title'    => 'Mon Profil',
+    'subtitle' => 'Gérez vos informations personnelles',
+];
+include __DIR__ . '/../views/components/action_bar.php';
+?>
 
-        <div class="card p-4 shadow-lg" style="background-color: #111; border: 1px solid var(--gold); border-radius: 15px;">
-            <form method="POST">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="text-white small mb-1">Nom</label>
-                        <input type="text" name="nom" class="form-control" value="<?php echo htmlspecialchars($coiffeur['nom']); ?>" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="text-white small mb-1">Prénom</label>
-                        <input type="text" name="prenom" class="form-control" value="<?php echo htmlspecialchars($coiffeur['prenom']); ?>" required>
-                    </div>
-                    <div class="col-12 mt-3">
-                        <label class="text-white small mb-1">Adresse e-mail</label>
-                        <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($coiffeur['email']); ?>" required>
-                    </div>
-                    <div class="col-12 mt-3">
-                        <label class="text-white small mb-1">Téléphone / WhatsApp</label>
-                        <input type="text" name="telephone" class="form-control" value="<?php echo htmlspecialchars($coiffeur['telephone']); ?>" placeholder="Ex: +22967000000" required>
-                    </div>
-                    <div class="col-md-6 mt-3">
-                        <label class="text-white small mb-1">Ville</label>
-                        <input type="text" name="ville" class="form-control" value="<?php echo htmlspecialchars($coiffeur['ville']); ?>" required>
-                    </div>
-                    <div class="col-md-6 mt-3">
-                        <label class="text-white small mb-1">Quartier</label>
-                        <input type="text" name="quartier" class="form-control" value="<?php echo htmlspecialchars($coiffeur['quartier']); ?>" required>
-                    </div>
+<!-- Toast message -->
+<?php if (!empty($message_text)):
+    $toast_type    = $message_type;
+    $toast_message = $message_text;
+    include __DIR__ . '/../views/components/toast.php';
+endif; ?>
+
+<div style="max-width:600px;margin:0 auto;">
+    <div class="glass-cct p-4">
+        <form method="POST" novalidate>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <?php
+                    $ff = ['type'=>'text','name'=>'nom','label'=>'Nom','value'=>$coiffeur['nom']??'','required'=>true];
+                    include __DIR__ . '/../views/components/form_field.php';
+                    ?>
                 </div>
+                <div class="col-md-6">
+                    <?php
+                    $ff = ['type'=>'text','name'=>'prenom','label'=>'Prénom','value'=>$coiffeur['prenom']??'','required'=>true];
+                    include __DIR__ . '/../views/components/form_field.php';
+                    ?>
+                </div>
+                <div class="col-12">
+                    <?php
+                    $ff = ['type'=>'email','name'=>'email','label'=>'Adresse e-mail','value'=>$coiffeur['email']??'','required'=>true,'icon_prefix'=>'bi-envelope'];
+                    include __DIR__ . '/../views/components/form_field.php';
+                    ?>
+                </div>
+                <div class="col-12">
+                    <?php
+                    $ff = ['type'=>'tel','name'=>'telephone','label'=>'Téléphone / WhatsApp','value'=>$coiffeur['telephone']??'','placeholder'=>'Ex: +22967000000','required'=>true,'icon_prefix'=>'bi-telephone'];
+                    include __DIR__ . '/../views/components/form_field.php';
+                    ?>
+                </div>
+                <div class="col-md-6">
+                    <?php
+                    $ff = ['type'=>'text','name'=>'ville','label'=>'Ville','value'=>$coiffeur['ville']??'','required'=>true,'icon_prefix'=>'bi-building'];
+                    include __DIR__ . '/../views/components/form_field.php';
+                    ?>
+                </div>
+                <div class="col-md-6">
+                    <?php
+                    $ff = ['type'=>'text','name'=>'quartier','label'=>'Quartier','value'=>$coiffeur['quartier']??'','required'=>true,'icon_prefix'=>'bi-geo-alt'];
+                    include __DIR__ . '/../views/components/form_field.php';
+                    ?>
+                </div>
+            </div>
 
-                <button type="submit" name="maj_profil" class="btn btn-gold w-100 py-2 fw-bold mt-4">
+            <div class="d-flex flex-column gap-2 mt-4">
+                <button type="submit"
+                        name="maj_profil"
+                        class="btn-gold w-100"
+                        style="padding:13px;">
+                    <i class="bi bi-check2-circle me-2" aria-hidden="true"></i>
                     ENREGISTRER LES MODIFICATIONS
                 </button>
-                
-                <a href="deconnexion.php" class="btn btn-outline-danger btn-sm w-100 mt-3">
-                    <i class="bi bi-power"></i> Déconnexion
+                <a href="/coiffons/deconnexion.php"
+                   class="btn-ghost w-100 text-center"
+                   style="padding:10px;color:var(--danger-text);">
+                    <i class="bi bi-box-arrow-right me-1" aria-hidden="true"></i>
+                    Déconnexion
                 </a>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
-</section>
+</div>
 
-<style>
-    .form-control { background-color: #fff; color: #000; border-radius: 8px; }
-    .btn-gold { background-color: var(--gold); color: black; border: none; border-radius: 8px; }
-    .btn-gold:hover { background-color: #c99b2c; }
-</style>
-
-<?php include __DIR__ . '/../layout/footer.php'; ?>
+<?php include __DIR__ . '/../layout/footer_coiffeur.php'; ?>
