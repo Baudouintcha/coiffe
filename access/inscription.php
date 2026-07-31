@@ -114,7 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         header("Cache-Control: no-store, no-cache, must-revalidate");
                         header("Pragma: no-cache");
                         if ($role === 'client') {
-                            header("Location: /coiffons/index.php?page=dashboard");
+                            $redirect_url = $_SESSION['redirect_url'] ?? '/coiffons/index.php?page=dashboard';
+                            unset($_SESSION['redirect_url']);
+                            header("Location: " . $redirect_url);
                         } elseif ($role === 'coiffeur') {
                             header("Location: /coiffons/index.php?page=dashboard_coiffeur");
                         } else {

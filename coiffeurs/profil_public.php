@@ -59,6 +59,24 @@ try {
     }
 
     // Note moyenne — SQL inchangé
+    // Avis publics — 5 derniers avis publics non rejetés
+    try {
+        $stmt_avis = $pdo->prepare("
+            SELECT c.*, u.nom as client_nom, u.prenom as client_prenom, u.photo_profil as client_photo
+            FROM commentaires c
+            JOIN users u ON c.id_client = u.id
+            WHERE c.id_coiffeur = ?
+              AND c.type_commentaire = 'public'
+              AND c.statut_moderation != 'rejete'
+            ORDER BY c.date_creation DESC
+            LIMIT 5
+        ");
+        $stmt_avis->execute([$id_coiffeur]);
+        $avis_publics = $stmt_avis->fetchAll();
+    } catch (Exception $e) {
+        $avis_publics = [];
+    }
+
     try {
         $stmt_note = $pdo->prepare("SELECT AVG(note) as moy, COUNT(*) as nb FROM commentaires WHERE id_coiffeur = ?");
         $stmt_note->execute([$id_coiffeur]);
@@ -235,14 +253,16 @@ include __DIR__ . '/../views/components/navbar_client.php';
         <div class="mb-3">
             <?php if ($note_moyenne): ?>
                 <span class="badge-gold" aria-label="Note : <?= $note_moyenne ?> sur 5, <?= $stats_avis['total'] ?> avis">
-                    <i class="bi bi-star-fill" aria-hidden="true"></i>
-                    <?= $note_moyenne ?> / 5
-                    <span style="opacity:.7;">(<?= $stats_avis['total'] ?> avis)</span>
+                    <?php for ($s = 1; $s <= 5; $s++): ?>
+                        <span style="color:<?= $s <= round($note_moyenne) ? '#D4AF37' : 'rgba(255,255,255,0.3)' ?>;" aria-hidden="true">★</span>
+                    <?php endfor; ?>
+                    <strong style="margin-left:5px;"><?= $note_moyenne ?></strong> / 5
+                    <span style="opacity:.7;margin-left:4px;">(<?= $stats_avis['total'] ?> avis)</span>
                 </span>
             <?php else: ?>
                 <span class="badge-note-muted" aria-label="Aucun avis pour le moment">
-                    <i class="bi bi-star" aria-hidden="true"></i>
-                    Aucun avis pour le moment
+                    <span aria-hidden="true">☆☆☆☆☆</span>
+                    <span style="margin-left:5px;">Aucun avis pour le moment</span>
                 </span>
             <?php endif; ?>
         </div>
@@ -374,6 +394,88 @@ include __DIR__ . '/../views/components/navbar_client.php';
                         ];
                         include __DIR__ . '/../views/components/gallery_card.php';
                         ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
+    </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     SECTION AVIS CLIENTS
+     ══════════════════════════════════════════ -->
+<section style="padding:4rem 0;background:var(--dark-2);" aria-labelledby="avis-heading">
+    <div class="container" style="max-width:var(--max-width);">
+
+        <h2 id="avis-heading" style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--text-primary);margin-bottom:.25rem;">
+            <i class="bi bi-star-half me-2" style="color:var(--gold);" aria-hidden="true"></i>
+            Avis clients
+        </h2>
+        <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:2rem;">
+            Ce que pensent les clients de ce coiffeur
+            <?php if ($note_moyenne && $stats_avis['total'] > 0): ?>
+                · <strong style="color:var(--gold);"><?= $note_moyenne ?> / 5</strong>
+                <?php for ($s = 1; $s <= 5; $s++): ?>
+                    <span style="color:<?= $s <= round($note_moyenne) ? '#D4AF37' : 'rgba(255,255,255,0.2)' ?>;" aria-hidden="true">★</span>
+                <?php endfor; ?>
+                · <?= $stats_avis['total'] ?> avis
+            <?php endif; ?>
+        </p>
+
+        <?php if (empty($avis_publics)): ?>
+            <!-- Empty state -->
+            <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:2.5rem;text-align:center;">
+                <i class="bi bi-chat-square-text" style="font-size:2.5rem;color:rgba(255,255,255,0.1);display:block;margin-bottom:1rem;" aria-hidden="true"></i>
+                <p style="color:var(--text-muted);font-size:.88rem;">Aucun avis pour l'instant. Soyez le premier à donner votre avis après votre coiffure !</p>
+            </div>
+        <?php else: ?>
+            <div class="row g-3">
+                <?php foreach ($avis_publics as $avis):
+                    $initiale_client = strtoupper(substr($avis['client_nom'] ?? 'C', 0, 1));
+                    $note_avis       = intval($avis['note'] ?? 0);
+                    // Date relative
+                    $date_avis = new DateTime($avis['date_creation'] ?? 'now');
+                    $now_avis  = new DateTime();
+                    $diff      = $now_avis->diff($date_avis);
+                    if ($diff->days === 0)         $date_relative = "Aujourd'hui";
+                    elseif ($diff->days === 1)     $date_relative = "Hier";
+                    elseif ($diff->days < 7)       $date_relative = "Il y a " . $diff->days . " jours";
+                    elseif ($diff->days < 30)      $date_relative = "Il y a " . floor($diff->days / 7) . " semaine(s)";
+                    elseif ($diff->days < 365)     $date_relative = "Il y a " . floor($diff->days / 30) . " mois";
+                    else                           $date_relative = "Il y a " . floor($diff->days / 365) . " an(s)";
+                ?>
+                    <div class="col-12 col-md-6">
+                        <div style="background:var(--dark-3);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:1.25rem;">
+                            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+                                <!-- Avatar initiale client -->
+                                <div style="width:38px;height:38px;border-radius:50%;background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.3);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--gold);font-size:.85rem;flex-shrink:0;">
+                                    <?= htmlspecialchars($initiale_client) ?>
+                                </div>
+                                <div style="flex:1;min-width:0;">
+                                    <div style="font-size:.82rem;font-weight:600;color:var(--text-primary);">
+                                        <?php
+                                        // Masquage du prénom client : "K***" (première lettre + 3 astérisques)
+                                        $prenom_masque = strtoupper(substr($avis['client_prenom'] ?? 'C', 0, 1)) . '***';
+                                        echo htmlspecialchars($prenom_masque);
+                                        ?>
+                                    </div>
+                                    <div style="font-size:.72rem;color:var(--text-muted);"><?= htmlspecialchars($date_relative) ?></div>
+                                </div>
+                                <!-- Étoiles -->
+                                <div style="font-size:.9rem;" aria-label="Note : <?= $note_avis ?> sur 5">
+                                    <?php for ($s = 1; $s <= 5; $s++): ?>
+                                        <span style="color:<?= $s <= $note_avis ? '#D4AF37' : 'rgba(255,255,255,0.15)' ?>;">★</span>
+                                    <?php endfor; ?>
+                                </div>
+                            </div>
+                            <!-- Commentaire -->
+                            <?php if (!empty($avis['message'])): ?>
+                                <p style="color:var(--text-secondary);font-size:.82rem;line-height:1.6;margin:0;">
+                                    "<?= htmlspecialchars($avis['message']) ?>"
+                                </p>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>

@@ -83,6 +83,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($erreur)) {
                 VALUES (?, ?, ?, ?, ?, 'en_attente', NOW())
             ")->execute([$id_client, $id_coiffeur, $id_prestation_post, $date_rdv, $heure_rdv]);
 
+            // Notification au coiffeur — INSERT dans notifications
+            $prenom_client_notif = $_SESSION['prenom'] ?? 'Un client';
+            $nom_client_notif    = $_SESSION['nom']    ?? '';
+            $msg_notif = "Nouvelle demande de RDV de " . $prenom_client_notif . " " . $nom_client_notif
+                       . " pour le " . $date_rdv . " à " . $heure_rdv . ".";
+            try {
+                $pdo->prepare("INSERT INTO notifications (id_user, message, type, statut_lecture, date_notification) VALUES (?, ?, 'info', 'non_lu', NOW())")
+                    ->execute([$id_coiffeur, $msg_notif]);
+            } catch (Exception $e) {
+                // Notification non bloquante
+            }
+
             if (!$mode_test) {
                 $nouveau_solde = $solde_client - $prix_prestation;
                 $pdo->prepare("UPDATE portefeuilles SET solde = ? WHERE user_id = ?")->execute([$nouveau_solde, $id_client]);

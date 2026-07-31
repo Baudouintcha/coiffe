@@ -17,15 +17,19 @@ $ville_filtre    = isset($_GET['ville'])       ? intval($_GET['ville'])       : 
 $quartier_filtre = isset($_GET['id_quartier']) ? intval($_GET['id_quartier']) : 0;
 $prix_filtre     = isset($_GET['prix_max'])    ? trim($_GET['prix_max'])      : '';
 $prix_saisie     = isset($_GET['prix_saisie']) ? intval($_GET['prix_saisie']) : 0;
-$a_recherche     = isset($_GET['ville']) || isset($_GET['prix_max']) || isset($_GET['prix_saisie']) || isset($_GET['id_quartier']);
+$q               = trim($_GET['q'] ?? '');
+$a_recherche     = isset($_GET['ville']) || isset($_GET['prix_max']) || isset($_GET['prix_saisie']) || isset($_GET['id_quartier']) || $q !== '';
 
-// Requête coiffeurs — SQL inchangé
-$sql    = "SELECT DISTINCT u.*, v.nom_ville, q.nom_quartier 
+// Requête coiffeurs — SQL inchangé + is_approved + recherche ?q= + note moyenne
+$sql    = "SELECT DISTINCT u.*, v.nom_ville, q.nom_quartier,
+               (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+               (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
            FROM users u
            LEFT JOIN villes v ON u.ville = v.id
            LEFT JOIN quartiers q ON u.id_quartier = q.id
            LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
-           WHERE u.role = 'coiffeur'";
+           WHERE u.role = 'coiffeur'
+           AND u.is_approved = 1";
 $params = [];
 
 if ($ville_filtre > 0) {
@@ -47,6 +51,11 @@ if ($prix_saisie > 0) {
     if ($prix_filtre === 'eco')     $sql .= " AND u.tarif_base <= 2000 ";
     elseif ($prix_filtre === 'moyen')   $sql .= " AND u.tarif_base BETWEEN 1500 AND 3500 ";
     elseif ($prix_filtre === 'premium') $sql .= " AND u.tarif_base > 3000 ";
+}
+if ($q !== '') {
+    $sql .= " AND (u.nom LIKE ? OR u.prenom LIKE ?) ";
+    $params[] = '%' . $q . '%';
+    $params[] = '%' . $q . '%';
 }
 $sql .= " ORDER BY u.created_at DESC";
 
@@ -251,8 +260,19 @@ include __DIR__ . '/../views/components/navbar_client.php';
                   aria-label="Filtrer les coiffeurs">
                 <div class="row g-3 align-items-end">
 
-                    <!-- Ville -->
+                    <!-- Recherche par nom -->
                     <div class="col-12 col-md-3">
+                        <label for="rechercheNomAnnuaire" class="form-label-cct">Nom du coiffeur</label>
+                        <input type="text"
+                               id="rechercheNomAnnuaire"
+                               name="q"
+                               class="fc-dark"
+                               value="<?= htmlspecialchars($q) ?>"
+                               placeholder="Nom du coiffeur...">
+                    </div>
+
+                    <!-- Ville -->
+                    <div class="col-12 col-md-2">
                         <label for="villeSelectAnnuaire" class="form-label-cct">Ville</label>
                         <select name="ville"
                                 id="villeSelectAnnuaire"
@@ -268,7 +288,7 @@ include __DIR__ . '/../views/components/navbar_client.php';
                     </div>
 
                     <!-- Quartier -->
-                    <div class="col-12 col-md-3">
+                    <div class="col-12 col-md-2">
                         <label for="quartierSelectAnnuaire" class="form-label-cct">Quartier</label>
                         <select name="id_quartier"
                                 id="quartierSelectAnnuaire"
@@ -290,7 +310,7 @@ include __DIR__ . '/../views/components/navbar_client.php';
                     </div>
 
                     <!-- Catégorie tarif -->
-                    <div class="col-12 col-md-3">
+                    <div class="col-12 col-md-2">
                         <label for="prixMaxSelect" class="form-label-cct">Catégorie</label>
                         <select name="prix_max"
                                 id="prixMaxSelect"
@@ -429,6 +449,26 @@ include __DIR__ . '/../views/components/navbar_client.php';
                                 <i class="bi bi-geo-alt" style="color:var(--gold);" aria-hidden="true"></i>
                                 <?= htmlspecialchars($nom_ville_affiche . ' · ' . $nom_quartier_affiche) ?>
                             </p>
+
+                            <!-- Note moyenne -->
+                            <?php
+                            $nm  = floatval($c['note_moyenne'] ?? 0);
+                            $nba = intval($c['nb_avis'] ?? 0);
+                            ?>
+                            <div style="margin-bottom:12px;font-size:.82rem;">
+                                <?php if ($nba > 0): ?>
+                                    <?php for ($star = 1; $star <= 5; $star++): ?>
+                                        <span style="color:<?= $star <= round($nm) ? '#D4AF37' : 'rgba(255,255,255,0.2)' ?>;font-size:.9rem;">★</span>
+                                    <?php endfor; ?>
+                                    <span style="color:var(--text-primary);font-weight:700;margin-left:4px;"><?= $nm ?></span>
+                                    <span style="color:var(--text-muted);">(<?= $nba ?> avis)</span>
+                                <?php else: ?>
+                                    <?php for ($star = 1; $star <= 5; $star++): ?>
+                                        <span style="color:rgba(255,255,255,0.15);font-size:.9rem;">★</span>
+                                    <?php endfor; ?>
+                                    <span style="color:var(--text-muted);margin-left:4px;">Aucun avis</span>
+                                <?php endif; ?>
+                            </div>
 
                             <!-- Prix -->
                             <div class="price-block">

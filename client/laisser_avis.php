@@ -24,24 +24,25 @@ if (!isset($_SESSION['id_user'])) {
 
 $id_client = $_SESSION['id_user'];
 
-// Vérification ID RDV — inchangée
-if (!isset($_GET['rdv']) || empty($_GET['rdv'])) {
+// Vérification ID RDV — accepte ?rdv= ou ?id_rdv=
+if (!isset($_GET['rdv']) && !isset($_GET['id_rdv'])) {
     header('Location: /coiffons/client/mes_rendezvous.php');
     exit();
 }
 
-$id_rdv = intval($_GET['rdv']);
+$id_rdv = intval($_GET['rdv'] ?? $_GET['id_rdv'] ?? 0);
 
-// Requête de sécurité — SQL inchangé
+// Requête de sécurité — SQL corrigé + vérification anti-doublon
 $query = "
-    SELECT r.id, r.id_coiffeur, u.nom AS nom_coiffeur
+    SELECT r.id, r.coiffeur_id AS id_coiffeur, u.nom AS nom_coiffeur
     FROM rendez_vous r
-    JOIN users u ON r.id_coiffeur = u.id
-    LEFT JOIN commentaires c ON r.id = c.id_rendez_vous
+    JOIN users u ON r.coiffeur_id = u.id
+    LEFT JOIN commentaires c ON r.id = c.id_rdv AND c.id_client = ? AND c.type_commentaire = 'public'
     WHERE r.id = ? AND r.client_id = ? AND CONCAT(r.date_rdv, ' ', r.heure_debut) < NOW()
+    AND c.id_commentaire IS NULL
 ";
 $stmt = $pdo->prepare($query);
-$stmt->execute([$id_rdv, $id_client]);
+$stmt->execute([$id_client, $id_rdv, $id_client]);
 $rdv = $stmt->fetch();
 
 if (!$rdv) {

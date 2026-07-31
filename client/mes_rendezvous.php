@@ -216,6 +216,13 @@ endif; ?>
                                                 aria-label="Gérer le RDV du <?= date('d/m/Y', strtotime($rdv['date_rdv'])) ?>">
                                             <i class="bi bi-gear me-1" aria-hidden="true"></i>Gérer
                                         </button>
+                                        <?php if ($rdv['statut_rdv'] === 'termine'): ?>
+                                        <a href="/coiffons/client/laisser_avis.php?id_rdv=<?= $rdv['id'] ?>&id_coiffeur=<?= $rdv['coiffeur_id'] ?>"
+                                           class="btn-gold btn-sm ms-1"
+                                           aria-label="Laisser un avis pour ce RDV">
+                                            <i class="bi bi-star me-1" aria-hidden="true"></i>Avis
+                                        </a>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -242,6 +249,13 @@ endif; ?>
                                 aria-label="Gérer le RDV">
                             <i class="bi bi-gear me-1" aria-hidden="true"></i>Gérer la réservation
                         </button>
+                        <?php if ($rdv['statut_rdv'] === 'termine'): ?>
+                        <a href="/coiffons/client/laisser_avis.php?id_rdv=<?= $rdv['id'] ?>&id_coiffeur=<?= $rdv['coiffeur_id'] ?>"
+                           class="btn-gold btn-sm w-100 mt-2 d-flex align-items-center justify-content-center gap-1"
+                           aria-label="Laisser un avis pour ce RDV">
+                            <i class="bi bi-star" aria-hidden="true"></i>Laisser un avis
+                        </a>
+                        <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
             </div>

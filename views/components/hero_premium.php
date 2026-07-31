@@ -47,7 +47,7 @@ $hp_show_roles          = $hp_show_roles          ?? true;
             <p class="hp-roles-label">Qui êtes-vous ?</p>
             <div class="hp-cta-row">
                 <a href="<?= htmlspecialchars($hp_role_client_href) ?>"
-                   class="btn-gold btn-lg">Je suis Client</a>
+                   class="btn-gold btn-lg">Trouver un coiffeur</a>
                 <a href="<?= htmlspecialchars($hp_role_coiffeur_href) ?>"
                    class="btn-outline-gold btn-lg">Je suis Coiffeur</a>
             </div>

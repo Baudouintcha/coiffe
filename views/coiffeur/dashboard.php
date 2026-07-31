@@ -163,6 +163,25 @@ try {
     // Silencieux en prod — erreurs logguées
 }
 
+// ── Avis récents reçus ──
+$avis_recents     = [];
+$note_moy_dashboard = null;
+try {
+    $q_avis = $pdo->prepare("
+        SELECT c.*, u.nom as client_nom, u.prenom as client_prenom
+        FROM commentaires c
+        JOIN users u ON c.id_client = u.id
+        WHERE c.id_coiffeur = ? AND c.type_commentaire = 'public'
+        ORDER BY c.date_creation DESC LIMIT 3
+    ");
+    $q_avis->execute([$coiffeur_id]);
+    $avis_recents = $q_avis->fetchAll();
+
+    $q_moy = $pdo->prepare("SELECT ROUND(AVG(note), 1) as moy FROM commentaires WHERE id_coiffeur = ? AND type_commentaire = 'public'");
+    $q_moy->execute([$coiffeur_id]);
+    $note_moy_dashboard = $q_moy->fetchColumn() ?: null;
+} catch (Exception $e) {}
+
 // ── Calcul complétude du profil ──
 $completude = 0;
 $checks = [
@@ -175,7 +194,7 @@ $checks = [
 ];
 
 try {
-    $dispo_count = $pdo->prepare("SELECT COUNT(*) FROM disponibilites WHERE prestataire_id = ?");
+    $dispo_count = $pdo->prepare("SELECT COUNT(*) FROM disponibilites WHERE coiffeur_id = ?");
     $dispo_count->execute([$coiffeur_id]);
     $checks['disponibilites'] = intval($dispo_count->fetchColumn()) > 0;
 
@@ -870,8 +889,6 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
         </div>
     </div>
 </div>
-
-<!-- BOTTOM NAV MOBILE -->
 <nav class="bottom-nav">
     <div class="bn-items">
         <a href="?page=dashboard_coiffeur" class="bn-item active"><i class="bi bi-grid-1x2"></i><span>Accueil</span></a>
@@ -1276,6 +1293,53 @@ document.addEventListener('click', function(e) {
                                 </a>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- MES AVIS RÉCENTS -->
+                <div class="g-card mt-3">
+                    <div class="g-card-header">
+                        <span class="g-card-title">
+                            <i class="bi bi-star-fill me-2" style="color:var(--gold)"></i>Mes avis récents
+                        </span>
+                        <?php if ($note_moy_dashboard): ?>
+                            <span style="background:var(--gold);color:#000;font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:20px;">
+                                ★ <?= $note_moy_dashboard ?> / 5
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="g-card-body">
+                        <?php if (empty($avis_recents)): ?>
+                            <p style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:12px 0;">
+                                <i class="bi bi-star" style="display:block;font-size:1.4rem;margin-bottom:6px;opacity:.2;"></i>
+                                Aucun avis pour l'instant
+                            </p>
+                        <?php else: ?>
+                            <?php foreach ($avis_recents as $av):
+                                $note_av = intval($av['note'] ?? 0);
+                                $extrait = mb_strimwidth($av['message'] ?? '', 0, 50, '…');
+                                $date_av = date('d/m/Y', strtotime($av['date_creation'] ?? 'now'));
+                            ?>
+                                <div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                        <span style="font-size:.75rem;font-weight:600;color:rgba(255,255,255,0.7);">
+                                            <?= htmlspecialchars($av['client_prenom'] . ' ' . substr($av['client_nom'], 0, 1) . '.') ?>
+                                        </span>
+                                        <span style="font-size:.68rem;color:rgba(255,255,255,0.3);"><?= $date_av ?></span>
+                                    </div>
+                                    <div style="font-size:.82rem;color:#D4AF37;margin-bottom:3px;">
+                                        <?php for ($s = 1; $s <= 5; $s++): ?>
+                                            <span style="opacity:<?= $s <= $note_av ? '1' : '0.2' ?>;">★</span>
+                                        <?php endfor; ?>
+                                    </div>
+                                    <?php if (!empty($extrait)): ?>
+                                        <p style="font-size:.75rem;color:rgba(255,255,255,0.45);margin:0;font-style:italic;">
+                                            "<?= htmlspecialchars($extrait) ?>"
+                                        </p>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
 

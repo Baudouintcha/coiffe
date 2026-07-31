@@ -63,18 +63,6 @@ if ($prestation && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm
     $heure_debut = htmlspecialchars($_POST['heure_debut']);
     $heure_fin   = htmlspecialchars($_POST['heure_fin']);
 
-    // Nettoyage FK — SQL inchangé
-    try {
-        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
-        $stmt_fk = $pdo->query("SHOW CREATE TABLE rendez_vous");
-        $row_fk  = $stmt_fk->fetch(PDO::FETCH_ASSOC);
-        if (preg_match('/CONSTRAINT `([^`]+)` FOREIGN KEY \(`coiffure_id`\)/', $row_fk['Create Table'], $matches)) {
-            $pdo->exec("ALTER TABLE rendez_vous DROP FOREIGN KEY `{$matches[1]}`;");
-        }
-        $pdo->exec("ALTER TABLE rendez_vous DROP INDEX IF EXISTS `coiffure_id`;");
-        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
-    } catch (Exception $e) { /* déjà nettoyé */ }
-
     // Calcul prix — inchangé
     $surcout_options = 0;
     if (isset($_POST['options_selectionnees']) && is_array($_POST['options_selectionnees'])) {
@@ -97,6 +85,19 @@ if ($prestation && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm
                 $pdo->prepare("UPDATE users SET solde = ? WHERE id = ?")->execute([$solde_actuel - $prix_total_calcule, $id_client]);
             }
             $solde_actuel  -= $prix_total_calcule;
+
+            // Notification au coiffeur — INSERT dans notifications
+            $prenom_client_notif = $_SESSION['prenom'] ?? 'Un client';
+            $nom_client_notif    = $_SESSION['nom']    ?? '';
+            $msg_notif = "Nouvelle demande de RDV de " . $prenom_client_notif . " " . $nom_client_notif
+                       . " pour le " . $date_rdv . " à " . $heure_debut . ".";
+            try {
+                $pdo->prepare("INSERT INTO notifications (id_user, message, type, statut_lecture, date_notification) VALUES (?, ?, 'info', 'non_lu', NOW())")
+                    ->execute([$id_coiffeur, $msg_notif]);
+            } catch (Exception $e) {
+                // Notification non bloquante — continuer même si l'INSERT échoue
+            }
+
             $msg_type       = 'msg-success';
             $msg_content    = '🎉 Demande de rendez-vous envoyée au coiffeur ! '
                             . number_format($prix_total_calcule, 0, ',', ' ')

@@ -11,6 +11,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../security/config.php';
+require_once __DIR__ . '/../security/notifications.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'coiffeur') {
     header("Location: /coiffons/index.php?page=login");
@@ -96,9 +97,11 @@ if (isset($_GET['action']) && isset($_GET['id_rdv'])) {
                 $ins_t = $pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif) VALUES (?, 'gain_prestation', ?, ?)");
                 $ins_t->execute([$coiffeur_id, $gain_coiffeur, "Gain prestation RDV #" . $id_rdv]);
 
-                $msg_notif = "Votre coiffeur a accepté votre rendez-vous !";
-                $ins_notif = $pdo->prepare("INSERT INTO notifications (user_id, message, type, statut) VALUES (?, ?, 'succes', 'non_lu')");
-                $ins_notif->execute([$rdv_valid['client_id'], $msg_notif]);
+                // Notifier le client — acceptation
+                $date_fmt   = date('d/m/Y', strtotime($rdv_valid['date_rdv'] ?? date('Y-m-d')));
+                $heure_fmt  = isset($rdv_valid['heure_debut']) ? substr($rdv_valid['heure_debut'], 0, 5) : '';
+                $msg_notif  = "Votre RDV du {$date_fmt}" . ($heure_fmt ? " à {$heure_fmt}" : '') . " a été accepté par votre coiffeur. À bientôt !";
+                notifier($pdo, (int)$rdv_valid['client_id'], $msg_notif, 'success');
 
                 $message_type = 'success';
                 $message_text = 'Rendez-vous validé avec succès !';
@@ -115,9 +118,10 @@ if (isset($_GET['action']) && isset($_GET['id_rdv'])) {
                     $ins_transac->execute([$rdv_valid['client_id'], $rdv_valid['prix'], "Rendez-vous refusé par le coiffeur (RDV #" . $id_rdv . ")"]);
                 }
 
-                $msg_notif = "Votre coiffeur a refusé votre demande de rendez-vous. Votre solde a été recrédité.";
-                $ins_notif = $pdo->prepare("INSERT INTO notifications (user_id, message, type, statut) VALUES (?, ?, 'danger', 'non_lu')");
-                $ins_notif->execute([$rdv_valid['client_id'], $msg_notif]);
+                // Notifier le client — refus
+                $date_fmt_r = date('d/m/Y', strtotime($rdv_valid['date_rdv'] ?? date('Y-m-d')));
+                $msg_notif_r = "Votre demande de RDV du {$date_fmt_r} a été refusée. Votre solde a été recrédité.";
+                notifier($pdo, (int)$rdv_valid['client_id'], $msg_notif_r, 'danger');
 
                 $message_type = 'danger';
                 $message_text = 'Rendez-vous refusé. Le client a été remboursé.';

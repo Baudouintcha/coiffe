@@ -5,6 +5,64 @@
 
 ---
 
+## ✅ PHASE 3 — ASSISTANT IA MÉTIER (TERMINÉE)
+> Date : 2025-07-21
+
+- `ia_controlleur.php` enrichi : contexte métier complet par rôle (visiteur / client / coiffeur / admin)
+- Données BDD injectées en temps réel dans le contexte Gemini (RDV, solde, stats plateforme, diplômes en attente)
+- Correction requêtes SQL : `rendezvous` → `rendez_vous` (table réelle)
+- Toutes les nouvelles requêtes SQL sont dans des blocs try/catch non-bloquants
+- `ia_assistant.php` vérifié et aligné DS v2.0 : glassmorphism, backdrop-filter, police Inter, animation slide-in, typing dots, close button amélioré, responsive mobile
+
+---
+
+## ✅ PHASE 5 — AVIS & RÉPUTATION (TERMINÉE)
+> Date : 2025-07-20
+
+- Note moyenne + nb avis dans l'annuaire (requête optimisée via sous-requête scalaire dans la SELECT principale)
+- `profil_public.php` : section 5 derniers avis publics avec étoiles, avatar initiale, commentaire, date relative
+- `views/coiffeur/dashboard.php` : section "Mes avis récents" dans la colonne latérale (3 avis + badge note globale)
+
+## ✅ PHASE 6 — PORTEFEUILLE & PAIEMENT SIMULATION (TERMINÉE)
+> Date : 2025-07-20
+
+- `payment/PaymentService.php` : couche d'abstraction complète (recharger, geler, activerAbonnement, squelette webhook)
+- `payment/kkiapay_callback.php` : squelette webhook documenté (prêt pour prod post-soutenance)
+- `payment/simuler_abonnement.php` : page souscription abonnement simulation (1 500 FCFA, solde affiché, confirmation CSRF)
+
+---
+
+## ✅ PHASE 1 — STABILISATION TECHNIQUE (TERMINÉE)
+> Date : 2025-07-14
+
+### Corrections effectuées — Coiffe Chez Toi V1.0
+
+1. **Audit imports CSS obsolètes** — Aucune référence active à `css/global.css`, `css/responsive-custom.css`, `css/style.css`, `layout/header.php` ou `layout/footer.php` trouvée dans les fichiers PHP (présences uniquement dans des commentaires documentaires — aucune action nécessaire).
+
+2. **`layout/header_coiffeur.php` — suppression `.btn-gold-cct`** — La définition CSS de la classe `.btn-gold-cct` (interdite en DS v2.0) a été supprimée du bloc `<style>` interne. Remplacée par un commentaire renvoyant vers `.btn-gold` du DS v2.0 (`css/components.css`).
+
+3. **`views/coiffeur/dashboard.php` — bug requête complétude** — Corrigé : `WHERE prestataire_id = ?` → `WHERE coiffeur_id = ?` dans la requête de vérification des disponibilités du calcul de complétude du profil.
+
+4. **`coiffeurs/sauvegarder_agenda.php` — vérification** — Fichier conforme : utilise `coiffeur_id` dans toutes ses requêtes SQL, dépendances présentes (`security/config.php`), logique transactionnelle correcte.
+
+5. **`client/traiter_recharge.php` — création** — Fichier créé (manquant). Gère la recharge simulée du portefeuille client : validation du montant (500 – 500 000 FCFA), mise à jour du solde via `UPDATE users SET solde = solde + ?`, insertion dans `transactions_portefeuille`, gestion des erreurs par rollback, flash messages session.
+
+6. **`client/reserver.php` — suppression `SET FOREIGN_KEY_CHECKS`** — Supprimé le bloc de nettoyage FK (`SET FOREIGN_KEY_CHECKS = 0/1`, `ALTER TABLE DROP FOREIGN KEY`, `DROP INDEX`) qui ne doit pas s'exécuter à chaque réservation.
+
+7. **`access/inscription.php` — redirections post-inscription** — Vérifiées et conformes : client → `/coiffons/index.php?page=dashboard`, coiffeur → `/coiffons/index.php?page=dashboard_coiffeur`. Aucune modification nécessaire.
+
+---
+
+## ✅ PHASE 4 — NOTIFICATIONS COMPLÈTES (TERMINÉE)
+> Date : 2025-07-23
+
+- `client/notifications.php` créé — centre de notifications complet (LIMIT 50, mark-all-read à l'ouverture, icônes colorées par type, dates relatives, bouton Retour)
+- `security/cron_notifications.php` créé — notifications automatiques (RDV demain, abonnement expirant, RDV du jour, diplômes en attente)
+- `security/notification_events.php` créé — architecture extensible (constantes NOTIF_*, `notifier_evenement()`, email/push/SMS/WhatsApp ready)
+- `coiffeurs/valider_rendezvous.php` : notifications acceptation/refus via helper `notifier()` centralisé (messages enrichis avec date/heure)
+
+---
+
 ## 🎯 VISION DU PROJET
 
 **Domizi** est une marketplace de services à domicile pensée pour l'Afrique de l'Ouest.
@@ -232,7 +290,28 @@ app.php (DOMIZI) → clic Beauté → métiers → clic Coiffure
 
 ---
 
-### 🚧 PHASE 2b — Correctifs & Améliorations UI (EN COURS)
+### ✅ PHASE 2 — PARCOURS UTILISATEUR (TERMINÉE)
+> Date : 2025-07-15
+
+### Corrections effectuées — Coiffe Chez Toi V1.0 — Parcours Complet
+
+1. **`filter/annuaire_coiffeurs.php`** — Ajout `AND u.is_approved = 1` dans la requête SQL principale + support du paramètre `?q=` (recherche par nom/prénom) avec champ `<input type="text" name="q">` dans le formulaire.
+
+2. **`coiffeurs/profil_public.php`** — Vérification effectuée : la note moyenne et le nombre d'avis sont déjà calculés depuis la vraie BDD via `AVG(note)` sur la table `commentaires`. Aucune modification nécessaire.
+
+3. **`client/mes_rendezvous.php`** — Ajout d'un bouton "Laisser un avis" pour tous les RDV avec `statut_rdv = 'termine'`, pointant vers `/coiffons/client/laisser_avis.php?id_rdv=X&id_coiffeur=Y`. Ajouté dans la vue tableau (desktop) et dans les cartes mobile.
+
+4. **`client/laisser_avis.php`** — Correction du paramètre GET (`?rdv=` ou `?id_rdv=` désormais acceptés) + correction de la requête de sécurité (`r.coiffeur_id` au lieu de `r.id_coiffeur`) + vérification anti-doublon intégrée dans la requête SQL (JOIN `commentaires c ON c.id IS NULL`).
+
+5. **`traitement_avis.php`** — Refactoring complet : `$_SESSION['id_client']` → `$_SESSION['id_user']`, suppression de la connexion PDO locale au profit de `security/config.php`, ajout vérification anti-doublon explicite avant INSERT, vérification que le RDV appartient au client, redirection vers `mes_rendezvous.php` (fichier existant).
+
+6. **`access/inscription.php`** — Exploitation de `$_SESSION['redirect_url']` après inscription client : si une URL de redirection est présente en session (ex. page de réservation), l'utilisateur est redirigé vers cette page après inscription, puis la clé est supprimée.
+
+7. **`client/reserver.php`** — Ajout d'un INSERT dans `notifications` après création du RDV pour notifier le coiffeur : `INSERT INTO notifications (id_user, message, type, statut_lecture, date_notification) VALUES (id_coiffeur, 'Nouvelle demande...', 'info', 'non_lu', NOW())`. Non-bloquant (try/catch).
+
+8. **`client/creer_rendezvous.php`** — Même notification ajoutée après l'INSERT du RDV. Non-bloquante.
+
+---
 
 - [x] Hero annuaire réduit (35vh glassmorphism)
 - [x] Commentaires logo dans dashboard + navbar
@@ -243,7 +322,7 @@ app.php (DOMIZI) → clic Beauté → métiers → clic Coiffure
 
 ### 🚧 PHASE 3 — Module Prestataire/Coiffeur (EN COURS)
 **Objectif : Dashboard premium + gestion activité quotidienne**
-
+ 
 **Flux validé :**
 ```
 Inscription coiffeur → Dashboard coiffeur
@@ -291,7 +370,7 @@ rendez_vous          →  rendez_vous (même structure)
 - [x] `coiffeurs/profil_public.php` — fix URL `?id=` + `?id_coiffeur=` acceptés
 - [x] Requêtes SQL optimisées (AVG direct, filtrage par ID coiffeur)
 - [x] Header/footer standalone premium (sans ancien layout)
-- [ ] Note moyenne + avis affichés depuis vraies données BDD
+- [x] Note moyenne + avis affichés depuis vraies données BDD
 - [ ] Calendrier créneaux avec intervalles configurables
 
 **🔜 Reporté après soutenance :**
@@ -311,8 +390,8 @@ rendez_vous          →  rendez_vous (même structure)
   - [ ] Stockage dans `rendez_vous.client_gps_lat/lng`
   - [ ] Fix code en double
   - [ ] Suppression `SET FOREIGN_KEY_CHECKS=0`
-- [ ] `client/mes_rendezvous.php` — rebrand Dark/Gold
-- [ ] `filter/annuaire_coiffeurs.php` — support `?q=` recherche par nom
+- [x] `client/mes_rendezvous.php` — bouton "Laisser un avis" post-RDV terminé
+- [x] `filter/annuaire_coiffeurs.php` — support `?q=` recherche par nom + filtre `is_approved`
 - [ ] Portefeuille client (solde + dépôt Kkiapay)
 
 **🔜 Reporté après soutenance :**

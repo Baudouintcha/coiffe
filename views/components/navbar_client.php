@@ -21,6 +21,44 @@ $photo_url = null;
 if ($photo_profil && file_exists($_SERVER['DOCUMENT_ROOT'] . $page_root . '/' . $photo_profil)) {
     $photo_url = $page_root . '/' . htmlspecialchars($photo_profil);
 }
+
+// Charger les 5 dernières notifications non lues pour le dropdown
+$_navbar_notifs = [];
+if (isset($pdo) && isset($_SESSION['id_user'])) {
+    try {
+        $stmt_nav = $pdo->prepare(
+            "SELECT id_notif, message, type, date_notification
+             FROM notifications
+             WHERE id_user = ? AND statut_lecture = 'non_lu'
+             ORDER BY date_notification DESC
+             LIMIT 5"
+        );
+        $stmt_nav->execute([(int)$_SESSION['id_user']]);
+        foreach ($stmt_nav->fetchAll() as $row) {
+            $type_n = $row['type'];
+            $icon_map = [
+                'info'    => 'bi-info-circle',
+                'success' => 'bi-check-circle',
+                'danger'  => 'bi-exclamation-circle',
+                'warning' => 'bi-exclamation-triangle',
+            ];
+            $_navbar_notifs[] = [
+                'id'      => $row['id_notif'],
+                'type'    => $type_n,
+                'message' => $row['message'],
+                'icone'   => $icon_map[$type_n] ?? 'bi-bell',
+                'lien'    => $page_root . '/client/notifications.php',
+                'date'    => date('d/m H:i', strtotime($row['date_notification'])),
+            ];
+        }
+        // Mettre à jour le compteur avec la vraie valeur BDD
+        if ((int)$nb_notifs === 0 && !empty($_navbar_notifs)) {
+            $nb_notifs = count($_navbar_notifs);
+        }
+    } catch (Exception $e) {
+        // Non-bloquant
+    }
+}
 ?>
 <nav class="cct-nav" role="navigation" aria-label="Navigation principale">
     <a href="<?= $page_root ?>/index.php" class="cct-brand">
@@ -38,15 +76,18 @@ if ($photo_profil && file_exists($_SERVER['DOCUMENT_ROOT'] . $page_root . '/' . 
            class="nav-icon-btn"
            title="Mes rendez-vous"
            aria-label="Mes rendez-vous">
-            <?php if ($nb_notifs > 0): ?>
-                <span class="position-relative">
-                    <i class="bi bi-calendar3" aria-hidden="true"></i>
-                    <span class="t-notif-dot" aria-hidden="true"></span>
-                </span>
-            <?php else: ?>
-                <i class="bi bi-calendar3" aria-hidden="true"></i>
-            <?php endif; ?>
+            <i class="bi bi-calendar3" aria-hidden="true"></i>
         </a>
+
+        <!-- ── Cloche notifications (dropdown CL §17) ── -->
+        <?php
+        $nd_count         = (int)$nb_notifs;
+        $nd_notifications = $_navbar_notifs;
+        $nd_mark_read_url = $page_root . '/security/marquer_notifs_lu.php';
+        $nd_trigger_id    = 'navbarNotifDropdown';
+        include __DIR__ . '/notification_dropdown.php';
+        ?>
+
         <a href="<?= $page_root ?>/profil.php"
            class="nav-avatar-link"
            title="Mon profil"
@@ -64,6 +105,43 @@ if ($photo_profil && file_exists($_SERVER['DOCUMENT_ROOT'] . $page_root . '/' . 
         </a>
     </div>
 </nav>
+
+<!-- AJAX — marquer comme lu au clic sur le bouton du dropdown -->
+<script>
+(function () {
+    document.addEventListener('DOMContentLoaded', function () {
+        // Lien "Tout lire" du dropdown (ancre a.text-decoration-none dans nd-panel)
+        const markReadLinks = document.querySelectorAll('.nd-panel a[href$="marquer_notifs_lu.php"]');
+        markReadLinks.forEach(function (link) {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                fetch(link.getAttribute('href'), { method: 'GET', credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.status === 'ok') {
+                            // Masquer le badge
+                            const dots = document.querySelectorAll('.t-notif-dot.animate-pulse');
+                            dots.forEach(function (d) { d.style.display = 'none'; });
+                            // Vider la liste
+                            const items = document.querySelectorAll('.nd-panel li.p-2');
+                            items.forEach(function (i) { i.remove(); });
+                            // Mettre "Rien à signaler"
+                            const list = document.querySelector('.nd-panel ul, .nd-panel');
+                            if (list) {
+                                const empty = document.createElement('li');
+                                empty.className = 'text-center py-2 small';
+                                empty.style.color = 'var(--text-muted)';
+                                empty.textContent = 'Rien à signaler';
+                                list.appendChild(empty);
+                            }
+                        }
+                    })
+                    .catch(function () {});
+            });
+        });
+    });
+})();
+</script>
 
 <style>
 /* TopNavigation client — DS §10, CL §21 */
@@ -101,4 +179,4 @@ if ($photo_profil && file_exists($_SERVER['DOCUMENT_ROOT'] . $page_root . '/' . 
 .t-notif-dot      { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); border: 2px solid #000; }
 @media (max-width: 768px) { .cct-nav { padding: 0 1rem; } }
 </style>
-<?php unset($prenom_client, $photo_profil, $nb_notifs, $page_root, $initiale, $photo_url); ?>
+<?php unset($prenom_client, $photo_profil, $nb_notifs, $page_root, $initiale, $photo_url, $_navbar_notifs, $nd_count, $nd_notifications, $nd_mark_read_url, $nd_trigger_id, $stmt_nav, $row, $type_n, $icon_map); ?>

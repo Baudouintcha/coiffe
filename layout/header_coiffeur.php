@@ -149,13 +149,7 @@ try {
         .fc-dark::placeholder { color: rgba(255,255,255,0.25) !important; }
         .fc-dark option { background: #111; color: #fff; }
 
-        /* ── BTN GOLD ── */
-        .btn-gold-cct {
-            background: var(--gold); color: #000;
-            font-weight: 700; border: none;
-            border-radius: 10px; transition: all 0.2s;
-        }
-        .btn-gold-cct:hover { background: #c9a227; color: #000; transform: translateY(-1px); }
+        /* ── BTN GOLD : utiliser .btn-gold du DS v2.0 (components.css) ── */
 
         /* ── GLASS CARD ── */
         .glass-cct {
