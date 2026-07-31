@@ -1,410 +1,198 @@
 <?php
+/**
+ * client/catalogue.php — Catalogue global des styles
+ * Migration Design System v2.0 — Parcours Client — Page 3
+ *
+ * ⚠️  LOGIQUE MÉTIER INTACTE — SQL, logique propriétaire, liens inchangés.
+ *     Correction : lien profil unifié sur ?id= (était ?id_coiffeur= dans les anciennes copies).
+ */
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../security/config.php';
-include __DIR__ . '/../layout/header.php';
 
-// Récupération de l'éventuel coiffeur connecté pour la comparaison de sécurité
-$id_coiffeur_connecte = isset($_SESSION['id_user']) && isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur' ? intval($_SESSION['id_user']) : null;
+// Identification du rôle courant — inchangé
+$id_coiffeur_connecte = (isset($_SESSION['id_user']) && isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur')
+    ? intval($_SESSION['id_user'])
+    : null;
 
-// Récupération de toutes les prestations avec le nom de la ville et du quartier en clair
-$stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone, 
-                            v.nom_ville AS ville, 
-                            q.nom_quartier AS quartier 
-                     FROM prestations p 
-                     JOIN users u ON p.id_coiffeur = u.id 
+// Requête SQL — inchangée
+$stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone,
+                            v.nom_ville AS ville,
+                            q.nom_quartier AS quartier
+                     FROM prestations p
+                     JOIN users u ON p.id_coiffeur = u.id
                      LEFT JOIN villes v ON u.ville = v.id
                      LEFT JOIN quartiers q ON u.id_quartier = q.id
                      ORDER BY p.id_prestation DESC");
 $prestations = $stmt->fetchAll();
 ?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catalogue des styles — Coiffe Chez Toi</title>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh;">
-    <div class="container mt-4">
-        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">CATALOGUE DES STYLES</h2>
+    <!-- Design System v2.0 -->
+    <link rel="stylesheet" href="/coiffons/css/variables.css">
+    <link rel="stylesheet" href="/coiffons/css/animations.css">
+    <link rel="stylesheet" href="/coiffons/css/components.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-        <div class="row g-4">
-            <?php if (empty($prestations)): ?>
-                <p class="text-secondary text-center py-5">Aucune coiffure n'a été ajoutée pour le moment.</p>
-            <?php else: ?>
-                <?php foreach ($prestations as $p): 
-                    // Extraction de la description de base seule pour l'affichage propre
-                    $explode_desc = explode("|||", $p['description']);
-                    $description_affichage = $explode_desc[0] ?? '';
-                    
-                    // Vérification propriété
-                    $est_le_proprietaire = ($id_coiffeur_connecte !== null && $id_coiffeur_connecte === intval($p['id_coiffeur']));
-                    
-                    // 🎯 CORRIGÉ : LIGNE 36 — Le chemin pointe désormais vers le sous-dossier coiffeurs
-                    $lien_profil = "/coiffons/coiffeurs/profil_public.php?id_coiffeur=" . $p['id_coiffeur'];
-                ?>
-                    <div class="col-md-4">
-                        <div class="card h-100 shadow-lg position-relative catalogue-card-js" 
-                             style="background-color: #111; border-radius: 20px; overflow: hidden; border: 1px solid var(--gold); cursor: pointer;"
-                             data-href="<?php echo !$est_le_proprietaire ? $lien_profil : '#'; ?>">
+    <style>
+    /* ── Styles spécifiques au catalogue ── */
+    .catalogue-page     { padding-top:calc(var(--navbar-height) + 2rem); padding-bottom:calc(var(--bottomnav-height) + 2rem); min-height:100vh; background:var(--dark); }
+    .catalogue-title    { font-family:var(--font-display); font-size:clamp(1.4rem,3vw,2rem); font-weight:700; color:var(--text-primary); text-align:center; letter-spacing:2px; margin-bottom:2rem; }
 
-                            <?php if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])): ?>
-                                <img src="/coiffons/<?php echo $p['photo_style']; ?>" class="card-img-top" style="height: 230px; object-fit: cover;" alt="Style de coiffure">
-                            <?php else: ?>
-                                <div class="bg-secondary text-center py-5 text-white">
-                                    <i class="bi bi-image" style="font-size: 3rem;"></i>
-                                </div>
-                            <?php endif; ?>
+    /* Catalogue card — utilise gallery-card DS §13 avec couche info */
+    .catalogue-card     { background:var(--dark-2); border:1px solid rgba(212,175,55,0.25); border-radius:var(--radius-lg); overflow:hidden; cursor:pointer; transition:var(--transition-spring),border-color .3s; height:100%; display:flex; flex-direction:column; }
+    .catalogue-card:hover { transform:translateY(-6px); border-color:rgba(212,175,55,0.50); box-shadow:var(--shadow-lg); }
+    .catalogue-card-img { width:100%; height:220px; object-fit:cover; display:block; }
+    .catalogue-card-img-placeholder { width:100%; height:220px; background:linear-gradient(135deg,#151515,#252525); display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:2.5rem; }
+    .catalogue-card-body{ padding:1.25rem 1.25rem 0; flex:1; }
+    .catalogue-card-style{ font-family:var(--font-body); font-size:.95rem; font-weight:700; color:var(--text-primary); margin-bottom:4px; }
+    .catalogue-card-prix { font-size:1rem; font-weight:700; color:var(--success-text); margin-bottom:8px; }
+    .catalogue-card-desc { font-size:.8rem; color:var(--text-muted); margin-bottom:10px; line-height:1.5; }
+    .catalogue-card-sep  { border:none; border-top:1px solid var(--glass-border); margin:10px 0; }
+    .catalogue-card-coif { font-size:.8rem; color:var(--text-muted); margin-bottom:3px; }
+    .catalogue-card-footer { padding:.75rem 1.25rem 1.25rem; }
 
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div>
-                                    <h5 class="text-warning mb-1"><?php echo htmlspecialchars($p['nom_style']); ?></h5>
-                                    <p class="text-success fw-bold fs-5 mb-2"><?php echo number_format($p['prix'], 0, ',', ' '); ?> FCFA</p>
-                                    <p class="text-light small mb-3"><?php echo htmlspecialchars($description_affichage); ?></p>
+    /* Boutons owner (éditer/supprimer) */
+    .btn-edit-owner  { background:rgba(25,135,84,0.20); color:var(--success-text); border:1px solid rgba(25,135,84,0.30); border-radius:var(--radius-sm); padding:6px 14px; font-size:.78rem; font-weight:700; cursor:pointer; text-decoration:none; flex:1; text-align:center; transition:var(--transition-fast); }
+    .btn-edit-owner:hover  { background:rgba(25,135,84,0.35); }
+    .btn-del-owner   { background:rgba(220,53,69,0.15); color:var(--danger-text); border:1px solid var(--danger-border); border-radius:var(--radius-sm); padding:6px 12px; font-size:.78rem; font-weight:700; cursor:pointer; text-decoration:none; transition:var(--transition-fast); }
+    .btn-del-owner:hover   { background:rgba(220,53,69,0.30); }
+    </style>
+</head>
+<body>
 
-                                    <hr class="border-warning my-2">
-
-                                    <p class="text-secondary small mb-1">
-                                        <i class="bi bi-person-fill text-warning"></i> Coiffeur : <strong><?php echo htmlspecialchars(strtoupper($p['nom'] . ' ' . $p['prenom'])); ?></strong>
-                                    </p>
-                                    <p class="text-secondary small mb-0">
-                                        <i class="bi bi-geo-alt-fill text-warning"></i> Localisation : <?php echo htmlspecialchars($p['ville'] . ' - ' . $p['quartier']); ?>
-                                    </p>
-                                </div>
-
-                                <?php if ($est_le_proprietaire): ?>
-                                    <div class="d-flex gap-2 mt-4 pt-2 border-top border-secondary-zone">
-                                        <a href="gestion_catalogue.php?ouvrir_modifier=<?php echo $p['id_prestation']; ?>" class="btn btn-success btn-sm flex-grow-1 fw-bold text-white py-2 action-btn-js">
-                                            <i class="bi bi-pencil-square"></i> Éditer
-                                        </a>
-                                        <a href="gestion_catalogue.php?supprimer=<?php echo $p['id_prestation']; ?>" class="btn btn-danger btn-sm px-3 py-2 fw-bold action-btn-js" onclick="return confirm('Voulez-vous vraiment supprimer définitivement cette coiffure de votre catalogue ?');">
-                                            <i class="bi bi-trash3-fill"></i>
-                                        </a>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-
-                            <?php if (!$est_le_proprietaire): ?>
-                                <div class="card-footer bg-dark border-top border-warning text-center">
-                                    <a href="<?php echo $lien_profil; ?>&presta_id=<?php echo $p['id_prestation']; ?>" class="btn btn-warning btn-sm w-100 py-2 fw-bold text-dark action-btn-js">
-                                        <i class="bi bi-eye-fill"></i> Voir le profil & Réserver
-                                    </a>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </div>
-</section>
-
-<script>
-// JavaScript malin : rend la carte cliquable sans casser le comportement des boutons internes (Éditer / Supprimer)
-document.querySelectorAll('.catalogue-card-js').forEach(card => {
-    card.addEventListener('click', function(e) {
-        if (e.target.closest('.action-btn-js')) {
-            return;
-        }
-        
-        const url = this.getAttribute('data-href');
-        if (url && url !== '#') {
-            window.location.href = url;
-        }
-    });
-});
-</script>
-
-<style>
-    .card {
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 10px 20px rgba(255, 193, 7, 0.2) !important;
-    }
-    .btn-success {
-        background-color: #198754 !important;
-        border-color: #198754 !important;
-    }
-    .btn-success:hover {
-        background-color: #157347 !important;
-    }
-    .btn-danger {
-        background-color: #dc3545 !important;
-        border-color: #dc3545 !important;
-    }
-    .btn-danger:hover {
-        background-color: #bb2d3b !important;
-    }
-</style>
-
-<?php include __DIR__ . '/../layout/footer.php'; ?><?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-require_once __DIR__ . '/../security/config.php';
-include __DIR__ . '/../layout/header.php';
-
-// Récupération de l'éventuel coiffeur connecté pour la comparaison de sécurité
-$id_coiffeur_connecte = isset($_SESSION['id_user']) && isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur' ? intval($_SESSION['id_user']) : null;
-
-// Récupération de toutes les prestations avec le nom de la ville et du quartier en clair
-$stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone, 
-                            v.nom_ville AS ville, 
-                            q.nom_quartier AS quartier 
-                     FROM prestations p 
-                     JOIN users u ON p.id_coiffeur = u.id 
-                     LEFT JOIN villes v ON u.ville = v.id
-                     LEFT JOIN quartiers q ON u.id_quartier = q.id
-                     ORDER BY p.id_prestation DESC");
-$prestations = $stmt->fetchAll();
+<!-- Navbar -->
+<?php
+$page_root = '/coiffons';
+include __DIR__ . '/../views/components/navbar_client.php';
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh;">
-    <div class="container mt-4">
-        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">CATALOGUE DES STYLES</h2>
+<main class="catalogue-page page-transition" id="main-content">
+    <div class="container" style="max-width:var(--max-width);">
 
-        <div class="row g-4">
-            <?php if (empty($prestations)): ?>
-                <p class="text-secondary text-center py-5">Aucune coiffure n'a été ajoutée pour le moment.</p>
-            <?php else: ?>
-                <?php foreach ($prestations as $p): 
-                    // Extraction de la description de base seule pour l'affichage propre
-                    $explode_desc = explode("|||", $p['description']);
+        <h1 class="catalogue-title">CATALOGUE DES STYLES</h1>
+
+        <?php if (empty($prestations)): ?>
+            <!-- Empty State DS §17 -->
+            <?php
+            $es = [
+                'icon'      => 'bi-scissors',
+                'message'   => 'Aucun style n\'a encore été publié.',
+                'cta_label' => 'Trouver un coiffeur',
+                'cta_href'  => '/coiffons/filter/annuaire_coiffeurs.php',
+            ];
+            include __DIR__ . '/../views/components/empty_state.php';
+            ?>
+        <?php else: ?>
+            <div class="row g-4">
+                <?php foreach ($prestations as $p):
+                    $explode_desc         = explode("|||", $p['description']);
                     $description_affichage = $explode_desc[0] ?? '';
-                    
-                    // Vérification propriété
-                    $est_le_proprietaire = ($id_coiffeur_connecte !== null && $id_coiffeur_connecte === intval($p['id_coiffeur']));
-                    
-                    // 🎯 LA CORRECTION EST ICI : On change le chemin pour aller dans /coiffeurs/
-                    $lien_profil = "/coiffons/coiffeurs/profil_public.php?id_coiffeur=" . $p['id_coiffeur'];
+                    $est_le_proprietaire  = ($id_coiffeur_connecte !== null && $id_coiffeur_connecte === intval($p['id_coiffeur']));
+                    // Lien unifié sur ?id= (conforme à profil_public.php migré)
+                    $lien_profil = '/coiffons/coiffeurs/profil_public.php?id=' . $p['id_coiffeur'];
+                    $photo_url   = (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style']))
+                                   ? '/coiffons/' . $p['photo_style']
+                                   : null;
                 ?>
-                    <div class="col-md-4">
-                        <div class="card h-100 shadow-lg position-relative catalogue-card-js" 
-                             style="background-color: #111; border-radius: 20px; overflow: hidden; border: 1px solid var(--gold); cursor: pointer;"
-                             data-href="<?php echo !$est_le_proprietaire ? $lien_profil : '#'; ?>">
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <article class="catalogue-card catalogue-card-js"
+                                 data-href="<?= !$est_le_proprietaire ? htmlspecialchars($lien_profil) : '#' ?>"
+                                 aria-label="<?= htmlspecialchars($p['nom_style']) ?> — <?= htmlspecialchars($p['nom'] . ' ' . $p['prenom']) ?>">
 
-                            <?php if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])): ?>
-                                <img src="/coiffons/<?php echo $p['photo_style']; ?>" class="card-img-top" style="height: 230px; object-fit: cover;" alt="Style de coiffure">
+                            <!-- Image -->
+                            <?php if ($photo_url): ?>
+                                <img src="<?= htmlspecialchars($photo_url) ?>"
+                                     class="catalogue-card-img"
+                                     alt="<?= htmlspecialchars($p['nom_style']) ?>"
+                                     loading="lazy">
                             <?php else: ?>
-                                <div class="bg-secondary text-center py-5 text-white">
-                                    <i class="bi bi-image" style="font-size: 3rem;"></i>
+                                <div class="catalogue-card-img-placeholder" aria-hidden="true">
+                                    <i class="bi bi-scissors"></i>
                                 </div>
                             <?php endif; ?>
 
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div>
-                                    <h5 class="text-warning mb-1"><?php echo htmlspecialchars($p['nom_style']); ?></h5>
-                                    <p class="text-success fw-bold fs-5 mb-2"><?php echo number_format($p['prix'], 0, ',', ' '); ?> FCFA</p>
-                                    <p class="text-light small mb-3"><?php echo htmlspecialchars($description_affichage); ?></p>
+                            <!-- Body -->
+                            <div class="catalogue-card-body">
+                                <div class="catalogue-card-style"><?= htmlspecialchars($p['nom_style']) ?></div>
+                                <div class="catalogue-card-prix"><?= number_format($p['prix'], 0, ',', ' ') ?> FCFA</div>
+                                <?php if (!empty($description_affichage)): ?>
+                                    <p class="catalogue-card-desc"><?= htmlspecialchars($description_affichage) ?></p>
+                                <?php endif; ?>
+                                <hr class="catalogue-card-sep">
+                                <p class="catalogue-card-coif">
+                                    <i class="bi bi-person-fill" style="color:var(--gold);" aria-hidden="true"></i>
+                                    <strong><?= htmlspecialchars(strtoupper($p['nom'] . ' ' . $p['prenom'])) ?></strong>
+                                </p>
+                                <p class="catalogue-card-coif">
+                                    <i class="bi bi-geo-alt-fill" style="color:var(--gold);" aria-hidden="true"></i>
+                                    <?= htmlspecialchars($p['ville'] . ' — ' . $p['quartier']) ?>
+                                </p>
+                            </div>
 
-                                    <hr class="border-warning my-2">
-
-                                    <p class="text-secondary small mb-1">
-                                        <i class="bi bi-person-fill text-warning"></i> Coiffeur : <strong><?php echo htmlspecialchars(strtoupper($p['nom'] . ' ' . $p['prenom'])); ?></strong>
-                                    </p>
-                                    <p class="text-secondary small mb-0">
-                                        <i class="bi bi-geo-alt-fill text-warning"></i> Localisation : <?php echo htmlspecialchars($p['ville'] . ' - ' . $p['quartier']); ?>
-                                    </p>
-                                </div>
-
+                            <!-- Footer -->
+                            <div class="catalogue-card-footer">
                                 <?php if ($est_le_proprietaire): ?>
-                                    <div class="d-flex gap-2 mt-4 pt-2 border-top border-secondary-zone">
-                                        <a href="gestion_catalogue.php?ouvrir_modifier=<?php echo $p['id_prestation']; ?>" class="btn btn-success btn-sm flex-grow-1 fw-bold text-white py-2 action-btn-js">
-                                            <i class="bi bi-pencil-square"></i> Éditer
+                                    <div class="d-flex gap-2">
+                                        <a href="/coiffons/coiffeurs/gestion_catalogue.php?ouvrir_modifier=<?= $p['id_prestation'] ?>"
+                                           class="btn-edit-owner action-btn-js"
+                                           aria-label="Modifier <?= htmlspecialchars($p['nom_style']) ?>">
+                                            <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Éditer
                                         </a>
-                                        <a href="gestion_catalogue.php?supprimer=<?php echo $p['id_prestation']; ?>" class="btn btn-danger btn-sm px-3 py-2 fw-bold action-btn-js" onclick="return confirm('Voulez-vous vraiment supprimer définitivement cette coiffure de votre catalogue ?');">
-                                            <i class="bi bi-trash3-fill"></i>
+                                        <a href="/coiffons/coiffeurs/gestion_catalogue.php?supprimer=<?= $p['id_prestation'] ?>"
+                                           class="btn-del-owner action-btn-js"
+                                           onclick="return confirm('Supprimer définitivement ce style ?')"
+                                           aria-label="Supprimer <?= htmlspecialchars($p['nom_style']) ?>">
+                                            <i class="bi bi-trash3-fill" aria-hidden="true"></i>
                                         </a>
                                     </div>
+                                <?php else: ?>
+                                    <a href="<?= htmlspecialchars($lien_profil) ?>&presta_id=<?= $p['id_prestation'] ?>"
+                                       class="btn-gold w-100 action-btn-js"
+                                       style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;"
+                                       aria-label="Voir le profil et réserver <?= htmlspecialchars($p['nom_style']) ?>">
+                                        <i class="bi bi-eye-fill" aria-hidden="true"></i>
+                                        Voir le profil &amp; Réserver
+                                    </a>
                                 <?php endif; ?>
                             </div>
 
-                            <?php if (!$est_le_proprietaire): ?>
-                                <div class="card-footer bg-dark border-top border-warning text-center">
-                                    <a href="<?php echo $lien_profil; ?>&presta_id=<?php echo $p['id_prestation']; ?>" class="btn btn-warning btn-sm w-100 py-2 fw-bold text-dark action-btn-js">
-                                        <i class="bi bi-eye-fill"></i> Voir le profil & Réserver
-                                    </a>
-                                </div>
-                            <?php endif; ?>
-                        </div>
+                        </article>
                     </div>
                 <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
+            </div>
+        <?php endif; ?>
+
     </div>
-</section>
+</main>
 
-<script>
-document.querySelectorAll('.catalogue-card-js').forEach(card => {
-    card.addEventListener('click', function(e) {
-        if (e.target.closest('.action-btn-js')) {
-            return;
-        }
-        
-        const url = this.getAttribute('data-href');
-        if (url && url !== '#') {
-            window.location.href = url;
-        }
-    });
-});
-</script>
-
-<style>
-    .card {
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 10px 20px rgba(255, 193, 7, 0.2) !important;
-    }
-    .btn-success {
-        background-color: #198754 !important;
-        border-color: #198754 !important;
-    }
-    .btn-success:hover {
-        background-color: #157347 !important;
-    }
-    .btn-danger {
-        background-color: #dc3545 !important;
-        border-color: #dc3545 !important;
-    }
-    .btn-danger:hover {
-        background-color: #bb2d3b !important;
-    }
-</style>
-
-<?php include __DIR__ . '/../layout/footer.php'; ?><?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-require_once __DIR__ . '/../security/config.php';
-include __DIR__ . '/../layout/header.php';
-
-// Récupération de l'éventuel coiffeur connecté pour la comparaison de sécurité
-$id_coiffeur_connecte = isset($_SESSION['id_user']) && isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur' ? intval($_SESSION['id_user']) : null;
-
-// Récupération de toutes les prestations avec le nom de la ville et du quartier en clair
-$stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone, 
-                            v.nom_ville AS ville, 
-                            q.nom_quartier AS quartier 
-                     FROM prestations p 
-                     JOIN users u ON p.id_coiffeur = u.id 
-                     LEFT JOIN villes v ON u.ville = v.id
-                     LEFT JOIN quartiers q ON u.id_quartier = q.id
-                     ORDER BY p.id_prestation DESC");
-$prestations = $stmt->fetchAll();
+<!-- Footer + Bottom Nav -->
+<?php
+include __DIR__ . '/../views/components/footer_global.php';
+$current_page = 'catalogue.php';
+include __DIR__ . '/../views/components/bottom_nav_client.php';
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh;">
-    <div class="container mt-4">
-        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">CATALOGUE DES STYLES</h2>
-
-        <div class="row g-4">
-            <?php if (empty($prestations)): ?>
-                <p class="text-secondary text-center py-5">Aucune coiffure n'a été ajoutée pour le moment.</p>
-            <?php else: ?>
-                <?php foreach ($prestations as $p): 
-                    // Extraction de la description de base seule pour l'affichage propre
-                    $explode_desc = explode("|||", $p['description']);
-                    $description_affichage = $explode_desc[0] ?? '';
-                    
-                    // Vérification propriété
-                    $est_le_proprietaire = ($id_coiffeur_connecte !== null && $id_coiffeur_connecte === intval($p['id_coiffeur']));
-                    
-                    // 🎯 FIX ICI : On utilise ?id= au lieu de ?id_coiffeur= pour correspondre au profil public
-                    $lien_profil = "/coiffons/coiffeurs/profil_public.php?id=" . $p['id_coiffeur'];
-                ?>
-                    <div class="col-md-4">
-                        <div class="card h-100 shadow-lg position-relative catalogue-card-js" 
-                             style="background-color: #111; border-radius: 20px; overflow: hidden; border: 1px solid var(--gold); cursor: pointer;"
-                             data-href="<?php echo !$est_le_proprietaire ? $lien_profil : '#'; ?>">
-
-                            <?php if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])): ?>
-                                <img src="/coiffons/<?php echo $p['photo_style']; ?>" class="card-img-top" style="height: 230px; object-fit: cover;" alt="Style de coiffure">
-                            <?php else: ?>
-                                <div class="bg-secondary text-center py-5 text-white">
-                                    <i class="bi bi-image" style="font-size: 3rem;"></i>
-                                </div>
-                            <?php endif; ?>
-
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div>
-                                    <h5 class="text-warning mb-1"><?php echo htmlspecialchars($p['nom_style']); ?></h5>
-                                    <p class="text-success fw-bold fs-5 mb-2"><?php echo number_format($p['prix'], 0, ',', ' '); ?> FCFA</p>
-                                    <p class="text-light small mb-3"><?php echo htmlspecialchars($description_affichage); ?></p>
-
-                                    <hr class="border-warning my-2">
-
-                                    <p class="text-secondary small mb-1">
-                                        <i class="bi bi-person-fill text-warning"></i> Coiffeur : <strong><?php echo htmlspecialchars(strtoupper($p['nom'] . ' ' . $p['prenom'])); ?></strong>
-                                    </p>
-                                    <p class="text-secondary small mb-0">
-                                        <i class="bi bi-geo-alt-fill text-warning"></i> Localisation : <?php echo htmlspecialchars($p['ville'] . ' - ' . $p['quartier']); ?>
-                                    </p>
-                                </div>
-
-                                <?php if ($est_le_proprietaire): ?>
-                                    <div class="d-flex gap-2 mt-4 pt-2 border-top border-secondary-zone">
-                                        <a href="gestion_catalogue.php?ouvrir_modifier=<?php echo $p['id_prestation']; ?>" class="btn btn-success btn-sm flex-grow-1 fw-bold text-white py-2 action-btn-js">
-                                            <i class="bi bi-pencil-square"></i> Éditer
-                                        </a>
-                                        <a href="gestion_catalogue.php?supprimer=<?php echo $p['id_prestation']; ?>" class="btn btn-danger btn-sm px-3 py-2 fw-bold action-btn-js" onclick="return confirm('Voulez-vous vraiment supprimer définitivement cette coiffure de votre catalogue ?');">
-                                            <i class="bi bi-trash3-fill"></i>
-                                        </a>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-
-                            <?php if (!$est_le_proprietaire): ?>
-                                <div class="card-footer bg-dark border-top border-warning text-center">
-                                    <a href="<?php echo $lien_profil; ?>&presta_id=<?php echo $p['id_prestation']; ?>" class="btn btn-warning btn-sm w-100 py-2 fw-bold text-dark action-btn-js">
-                                        <i class="bi bi-eye-fill"></i> Voir le profil & Réserver
-                                    </a>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </div>
-</section>
-
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// JS UI — rend la carte cliquable sans interférer avec les boutons action (inchangé)
 document.querySelectorAll('.catalogue-card-js').forEach(card => {
     card.addEventListener('click', function(e) {
-        if (e.target.closest('.action-btn-js')) {
-            return;
-        }
-        
+        if (e.target.closest('.action-btn-js')) return;
         const url = this.getAttribute('data-href');
-        if (url && url !== '#') {
-            window.location.href = url;
-        }
+        if (url && url !== '#') window.location.href = url;
     });
 });
 </script>
 
-<style>
-    .card {
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 10px 20px rgba(255, 193, 7, 0.2) !important;
-    }
-    .btn-success {
-        background-color: #198754 !important;
-        border-color: #198754 !important;
-    }
-    .btn-success:hover {
-        background-color: #157347 !important;
-    }
-    .btn-danger {
-        background-color: #dc3545 !important;
-        border-color: #dc3545 !important;
-    }
-    .btn-danger:hover {
-        background-color: #bb2d3b !important;
-    }
-</style>
-
-<?php include __DIR__ . '/../layout/footer.php'; ?>
+</body>
+</html>

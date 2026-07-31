@@ -1,113 +1,88 @@
 <?php
-// 1. TOUT EN HAUT : Sécurité et Session (AVANT d'inclure le header)
+/**
+ * client/mes_rendezvous.php — Liste et gestion des rendez-vous client
+ * Migration Design System v2.0 — Parcours Client — Page 2
+ *
+ * ⚠️  LOGIQUE MÉTIER INTACTE — Seuls HTML/CSS/composants ont été modifiés.
+ *     SQL, CSRF, calculs d'annulation, transactions BDD : strictement inchangés.
+ */
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Sécurité : Si l'utilisateur n'est pas connecté ou n'est pas un client, redirection radicale
 if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
-    echo "<script>window.location.href='connexion.php';</script>";
+    echo "<script>window.location.href='/coiffons/index.php?page=login';</script>";
     exit();
 }
 
-// Génération d'un jeton CSRF pour sécuriser l'annulation automatique
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Inclusion de la configuration et de la connexion BDD
 require_once __DIR__ . '/../security/config.php';
 
-$id_client = $_SESSION['id_user'];
+$id_client     = $_SESSION['id_user'];
 $message_flash = null;
 
-// =========================================================================
-// LE ROBOT AUTOMATIQUE D'ANNULATION (TRAITEMENT DU FORMULAIRE)
-// =========================================================================
+// ── ROBOT D'ANNULATION — logique métier inchangée ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_annuler'])) {
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         $message_flash = ['type' => 'danger', 'text' => 'Erreur de sécurité (CSRF invalide).'];
     } else {
         $id_rdv = intval($_POST['id_rdv']);
-        
         if (isset($pdo)) {
             try {
-                // Récupérer les détails précis du rendez-vous pour le calcul financier
-                $stmt = $pdo->prepare("SELECT r.*, p.prix 
-                                       FROM rendez_vous r 
-                                       JOIN prestations p ON r.coiffure_id = p.id_prestation 
-                                       WHERE r.id = ? AND r.client_id = ?");
+                $stmt = $pdo->prepare("SELECT r.*, p.prix FROM rendez_vous r JOIN prestations p ON r.coiffure_id = p.id_prestation WHERE r.id = ? AND r.client_id = ?");
                 $stmt->execute([$id_rdv, $id_client]);
                 $rdv = $stmt->fetch();
 
                 if ($rdv) {
-                    $date_heure_rdv = new DateTime($rdv['date_rdv'] . ' ' . $rdv['heure_debut']);
-                    $maintenant = new DateTime(); // Année courante 2026
-                    
-                    // Calcul de l'intervalle de temps
-                    $interval = $maintenant->diff($date_heure_rdv);
+                    $date_heure_rdv  = new DateTime($rdv['date_rdv'] . ' ' . $rdv['heure_debut']);
+                    $maintenant      = new DateTime();
+                    $interval        = $maintenant->diff($date_heure_rdv);
                     $heures_restantes = ($interval->days * 24) + $interval->h;
-                    
-                    if ($interval->invert) {
-                        $heures_restantes = -1; // Le rendez-vous est déjà passé
-                    }
+                    if ($interval->invert) $heures_restantes = -1;
 
-                    $prix_total = $rdv['prix'];
-                    $remboursement_client = 0;
+                    $prix_total             = $rdv['prix'];
+                    $remboursement_client   = 0;
                     $dedommagement_coiffeur = 0;
-                    $cas_regle = "";
+                    $cas_regle              = "";
 
-                    // Application stricte des règles du robot PHP
                     if ($heures_restantes >= 24) {
                         $remboursement_client = $prix_total;
                         $cas_regle = "Plus de 24h à l'avance : Remboursement intégral (100%).";
                     } elseif ($heures_restantes >= 2 && $heures_restantes < 24) {
-                        $remboursement_client = $prix_total * 0.5;
+                        $remboursement_client   = $prix_total * 0.5;
                         $dedommagement_coiffeur = $prix_total * 0.5;
-                        $cas_regle = "Moins de 24h à l'avance : Remboursement de 50%. Les 50% restants reviennent au coiffeur.";
+                        $cas_regle = "Moins de 24h : Remboursement de 50%. Les 50% restants reviennent au coiffeur.";
                     } else {
                         $dedommagement_coiffeur = $prix_total;
-                        $cas_regle = "Dernière minute ou RDV passé : Aucun remboursement. L'intégralité est versée au coiffeur.";
+                        $cas_regle = "Dernière minute ou RDV passé : Aucun remboursement.";
                     }
 
-                    // DÉBUT DE LA TRANSACTION BDD BANCAIRE
                     $pdo->beginTransaction();
-
-                    // 1. Annulation du créneau
-                    $update_rdv = $pdo->prepare("UPDATE rendez_vous SET statut_rdv = 'annule' WHERE id = ?");
-                    $update_rdv->execute([$id_rdv]);
-
-                    // 2. Crédit Client
-                    if ($remboursement_client > 0) {
-                        $update_client = $pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?");
-                        $update_client->execute([$remboursement_client, $id_client]);
-                    }
-
-                    // 3. Crédit Coiffeur
-                    if ($dedommagement_coiffeur > 0) {
-                        $update_coiffeur = $pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?");
-                        $update_coiffeur->execute([$dedommagement_coiffeur, $rdv['coiffeur_id']]);
-                    }
-
+                    $pdo->prepare("UPDATE rendez_vous SET statut_rdv = 'annule' WHERE id = ?")->execute([$id_rdv]);
+                    if ($remboursement_client > 0)   $pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?")->execute([$remboursement_client, $id_client]);
+                    if ($dedommagement_coiffeur > 0) $pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?")->execute([$dedommagement_coiffeur, $rdv['coiffeur_id']]);
                     $pdo->commit();
 
                     $message_flash = [
                         'type' => 'success',
-                        'text' => "<strong>Rendez-vous annulé avec succès !</strong><br>Règle appliquée : $cas_regle<br>• Recrédité sur votre solde : " . number_format($remboursement_client, 0, ',', ' ') . " FCFA"
+                        'text' => 'Rendez-vous annulé. ' . $cas_regle . ' Recrédité : ' . number_format($remboursement_client, 0, ',', ' ') . ' FCFA.',
                     ];
-
                 } else {
                     $message_flash = ['type' => 'danger', 'text' => 'Rendez-vous introuvable.'];
                 }
             } catch (Exception $e) {
-                if ($pdo->inTransaction()) { $pdo->rollBack(); }
+                if ($pdo->inTransaction()) $pdo->rollBack();
                 $message_flash = ['type' => 'danger', 'text' => 'Une erreur technique est survenue.'];
             }
         }
     }
 }
 
-// Récupération de l'historique réel depuis la BDD
+// ── Récupération des RDV — SQL inchangé ──
 $rendezvous = [];
 if (isset($pdo)) {
     try {
@@ -122,203 +97,294 @@ if (isset($pdo)) {
     } catch (Exception $e) {}
 }
 
-include __DIR__ . '/../layout/header.php';
+// Helper local pour le badge statut
+function badge_rdv(string $statut): string {
+    return match($statut) {
+        'en_attente'         => '<span class="badge-pending">En attente</span>',
+        'confirme','accepte' => '<span class="badge-confirmed">Confirmé</span>',
+        'termine'            => '<span class="badge-done">Terminé</span>',
+        default              => '<span class="badge-cancelled">Annulé</span>',
+    };
+}
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes réservations — Coiffe Chez Toi</title>
+
+    <!-- Design System v2.0 -->
+    <link rel="stylesheet" href="/coiffons/css/variables.css">
+    <link rel="stylesheet" href="/coiffons/css/animations.css">
+    <link rel="stylesheet" href="/coiffons/css/components.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+    /* ── Styles spécifiques à mes_rendezvous.php ── */
+    .rdv-page           { padding-top:calc(var(--navbar-height) + 2rem); padding-bottom:calc(var(--bottomnav-height) + 2rem); min-height:100vh; background:var(--dark); }
+    .rdv-page-title     { font-family:var(--font-display); font-size:clamp(1.4rem,3vw,2rem); font-weight:700; color:var(--text-primary); text-align:center; letter-spacing:2px; margin-bottom:2rem; }
+
+    /* Table dark DS §16 */
+    .rdv-table-wrap     { border-radius:var(--radius-lg); overflow:hidden; border:1px solid var(--glass-border); }
+
+    /* Carte RDV mobile */
+    .rdv-card           { background:var(--dark-2); border:1px solid rgba(212,175,55,0.25); border-radius:var(--radius-lg); padding:1rem 1.25rem; margin-bottom:12px; }
+    .rdv-card-date      { color:var(--gold); font-weight:700; font-size:.88rem; }
+    .rdv-card-style     { font-weight:700; color:var(--text-primary); font-size:.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rdv-card-prix      { color:var(--success-text); font-weight:700; font-size:.85rem; }
+
+    /* Modal DS règles annulation */
+    .rules-block        { background:var(--dark-3); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; border-left:3px solid; }
+    .rules-block.success{ border-color:var(--success-text); }
+    .rules-block.warning{ border-color:var(--warning-color); }
+    .rules-block.danger { border-color:var(--danger-icon); }
+    .countdown-box      { background:var(--dark-2); border:1px solid var(--glass-border); border-radius:var(--radius-md); padding:12px; text-align:center; margin-bottom:1rem; }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<?php
+$page_root = '/coiffons';
+include __DIR__ . '/../views/components/navbar_client.php';
 ?>
 
-<section class="py-5" style="background-color: #000; min-height: 90vh;">
-    <div class="container mt-4">
-        <h2 class="text-center text-warning mb-5" style="letter-spacing: 2px;">MES RESERVATIONS</h2>
+<!-- Toast message flash -->
+<?php if ($message_flash):
+    $toast_type    = $message_flash['type'];
+    $toast_message = $message_flash['text'];
+    $toast_duration = 6000;
+    include __DIR__ . '/../views/components/toast.php';
+endif; ?>
 
-        <?php if ($message_flash): ?>
-            <div class="alert alert-<?php echo $message_flash['type']; ?> alert-dismissible fade show text-center border-0 mb-4" role="alert">
-                <?php echo $message_flash['text']; ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
+<main class="rdv-page page-transition" id="main-content">
+    <div class="container" style="max-width:960px;">
+
+        <h1 class="rdv-page-title">MES RÉSERVATIONS</h1>
 
         <?php if (empty($rendezvous)): ?>
-            <div class="alert alert-secondary text-center py-4 border-0">
-                <i class="bi bi-calendar-x fs-3 d-block mb-2"></i> Vous n'avez aucun rendez-vous enregistré.
-            </div>
+            <!-- Empty State DS §17 -->
+            <?php
+            $es = [
+                'icon'      => 'bi-calendar-x',
+                'message'   => 'Vous n\'avez aucun rendez-vous enregistré.',
+                'cta_label' => 'Trouver un coiffeur',
+                'cta_href'  => '/coiffons/filter/annuaire_coiffeurs.php',
+            ];
+            include __DIR__ . '/../views/components/empty_state.php';
+            ?>
         <?php else: ?>
-            <div class="table-responsive d-none d-md-block">
-                <table class="table table-dark table-hover table-bordered border-warning align-middle text-center">
-                    <thead>
-                        <tr class="text-warning">
-                            <th>Date & Heure</th>
-                            <th>Prestation</th>
-                            <th>Statut</th>
-                            <th>Gestion</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($rendezvous as $rdv): ?>
+
+            <!-- ── Tableau desktop — DataTable DS §16 ── -->
+            <div class="d-none d-md-block mb-4">
+                <div class="rdv-table-wrap">
+                    <table class="table-dark-cct" style="width:100%;border-collapse:collapse;">
+                        <thead>
                             <tr>
-                                <td>
-                                    <strong class="text-white"><?php echo date('d/m/Y', strtotime($rdv['date_rdv'])); ?></strong><br>
-                                    <span class="text-warning font-monospace"><?php echo substr($rdv['heure_debut'], 0, 5); ?></span>
-                                </td>
-                                <td class="text-start ps-3">
-                                    <span class="fw-bold"><?php echo htmlspecialchars($rdv['nom_style']); ?></span><br>
-                                    <small class="text-success fw-bold"><?php echo number_format($rdv['prix'], 0, ',', ' '); ?> FCFA</small>
-                                </td>
-                                <td>
-                                    <?php if ($rdv['statut_rdv'] == 'en_attente'): ?>
-                                        <span class="badge bg-warning text-dark px-3 py-2">En attente</span>
-                                    <?php elseif (in_array($rdv['statut_rdv'], ['confirme', 'accepte'])): ?>
-                                        <span class="badge bg-primary px-3 py-2">Confirmé</span>
-                                    <?php elseif ($rdv['statut_rdv'] == 'termine'): ?>
-                                        <span class="badge bg-success px-3 py-2">Terminé</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-secondary px-3 py-2">Annulé</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <button class="btn btn-outline-warning btn-sm px-4" data-bs-toggle="modal" data-bs-target="#modalRdv<?php echo $rdv['id']; ?>">
-                                        <i class="bi bi-gear"></i> Gérer
-                                    </button>
-                                </td>
+                                <th>Date &amp; Heure</th>
+                                <th>Prestation</th>
+                                <th>Coiffeur</th>
+                                <th>Statut</th>
+                                <th style="text-align:right;">Action</th>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($rendezvous as $rdv): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= date('d/m/Y', strtotime($rdv['date_rdv'])) ?></strong><br>
+                                        <span style="color:var(--gold);font-family:monospace;font-size:.82rem;">
+                                            <?= substr($rdv['heure_debut'], 0, 5) ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span style="font-weight:700;"><?= htmlspecialchars($rdv['nom_style']) ?></span><br>
+                                        <small style="color:var(--success-text);font-weight:700;">
+                                            <?= number_format($rdv['prix'], 0, ',', ' ') ?> FCFA
+                                        </small>
+                                    </td>
+                                    <td style="color:var(--text-secondary);">
+                                        <?= htmlspecialchars(strtoupper($rdv['coiffeur_nom'] . ' ' . $rdv['coiffeur_prenom'])) ?>
+                                    </td>
+                                    <td><?= badge_rdv($rdv['statut_rdv']) ?></td>
+                                    <td style="text-align:right;">
+                                        <button class="btn-outline-gold btn-sm"
+                                                onclick="openModal('modal-rdv-<?= $rdv['id'] ?>')"
+                                                aria-label="Gérer le RDV du <?= date('d/m/Y', strtotime($rdv['date_rdv'])) ?>">
+                                            <i class="bi bi-gear me-1" aria-hidden="true"></i>Gérer
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <div class="d-md-none">
+            <!-- ── Cartes mobile ── -->
+            <div class="d-md-none mb-4">
                 <?php foreach ($rendezvous as $rdv): ?>
-                    <div class="card bg-dark border border-warning mb-3 text-white">
-                        <div class="card-body p-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-warning fw-bold"><?php echo date('d/m/Y', strtotime($rdv['date_rdv'])); ?> - <?php echo substr($rdv['heure_debut'], 0, 5); ?></span>
-                                <span class="badge <?php echo ($rdv['statut_rdv'] == 'en_attente') ? 'bg-warning text-dark' : (in_array($rdv['statut_rdv'], ['confirme','accepte']) ? 'bg-primary' : (($rdv['statut_rdv'] == 'termine') ? 'bg-success' : 'bg-secondary')); ?>">
-                                    <?php echo ($rdv['statut_rdv'] == 'en_attente') ? 'En attente' : (in_array($rdv['statut_rdv'], ['confirme','accepte']) ? 'Confirmé' : (($rdv['statut_rdv'] == 'termine') ? 'Terminé' : 'Annulé')); ?>
-                                </span>
-                            </div>
-                            <h6 class="mb-1 text-truncate"><?php echo htmlspecialchars($rdv['nom_style']); ?></h6>
-                            <p class="text-success fw-bold mb-3"><?php echo number_format($rdv['prix'], 0, ',', ' '); ?> FCFA</p>
-                            <button class="btn btn-outline-warning btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modalRdv<?php echo $rdv['id']; ?>">
-                                <i class="bi bi-gear"></i> Gérer la réservation
-                            </button>
+                    <div class="rdv-card">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="rdv-card-date">
+                                <?= date('d/m/Y', strtotime($rdv['date_rdv'])) ?> —
+                                <?= substr($rdv['heure_debut'], 0, 5) ?>
+                            </span>
+                            <?= badge_rdv($rdv['statut_rdv']) ?>
                         </div>
+                        <div class="rdv-card-style mb-1"><?= htmlspecialchars($rdv['nom_style']) ?></div>
+                        <div class="rdv-card-prix mb-3"><?= number_format($rdv['prix'], 0, ',', ' ') ?> FCFA</div>
+                        <button class="btn-outline-gold btn-sm w-100"
+                                onclick="openModal('modal-rdv-<?= $rdv['id'] ?>')"
+                                aria-label="Gérer le RDV">
+                            <i class="bi bi-gear me-1" aria-hidden="true"></i>Gérer la réservation
+                        </button>
                     </div>
                 <?php endforeach; ?>
             </div>
+
         <?php endif; ?>
 
-        <div class="text-center mt-5">
-            <a href="/coiffons/client/catalogue.php" class="btn btn-gold px-5 py-2 fw-bold">
-                <i class="bi bi-scissors"></i> Retour au catalogue
+        <!-- CTA retour -->
+        <div class="text-center mt-4">
+            <a href="/coiffons/filter/annuaire_coiffeurs.php"
+               class="btn-ghost btn-sm d-inline-flex align-items-center gap-2">
+                <i class="bi bi-scissors" aria-hidden="true"></i>
+                Trouver un nouveau coiffeur
             </a>
         </div>
+
     </div>
-</section>
+</main>
 
-<?php foreach ($rendezvous as $rdv): 
-    // Calcul PHP préparatoire pour injecter le compte à rebours réel
-    $datetime_rdv_brut = $rdv['date_rdv'] . ' ' . $rdv['heure_debut'];
-    $dt_rdv = new DateTime($datetime_rdv_brut);
-    $dt_now = new DateTime();
-    $diff = $dt_now->diff($dt_rdv);
-    
-    // Calcul global précis du nombre d'heures totales restantes
-    $total_heures_restantes = ($diff->days * 24) + $diff->h;
-    if ($diff->invert) { 
-        $total_heures_restantes = -1; 
-    }
-?>
-<div class="modal fade" id="modalRdv<?php echo $rdv['id']; ?>" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark text-white border border-warning">
-            <div class="modal-header border-bottom border-warning">
-                <h5 class="modal-title text-warning"><i class="bi bi-info-circle"></i> Détails du Rendez-vous</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- ══════════════════════════════════════════
+     MODALES — une par RDV (Modal CL §18)
+     ══════════════════════════════════════════ -->
+<?php foreach ($rendezvous as $rdv):
+    $dt_rdv  = new DateTime($rdv['date_rdv'] . ' ' . $rdv['heure_debut']);
+    $dt_now  = new DateTime();
+    $diff    = $dt_now->diff($dt_rdv);
+    $total_heures = ($diff->days * 24) + $diff->h;
+    if ($diff->invert) $total_heures = -1;
+
+    ob_start(); ?>
+        <!-- Infos RDV -->
+        <div class="mb-4">
+            <div style="border-bottom:1px solid var(--glass-border);padding-bottom:10px;margin-bottom:10px;">
+                <small style="color:var(--text-muted);display:block;">Style choisi</small>
+                <span style="font-weight:700;color:var(--gold);"><?= htmlspecialchars($rdv['nom_style']) ?></span>
             </div>
-            
-            <div class="modal-body" id="body-principal-<?php echo $rdv['id']; ?>">
-                <ul class="list-group list-group-flush mb-4">
-                    <li class="list-group-item bg-dark text-white border-secondary px-0">
-                        <small class="text-secondary d-block">Style choisi</small>
-                        <span class="fw-bold text-warning"><?php echo htmlspecialchars($rdv['nom_style']); ?></span>
-                    </li>
-                    <li class="list-group-item bg-dark text-white border-secondary px-0">
-                        <small class="text-secondary d-block">Artisan Coiffeur</small>
-                        <span><?php echo htmlspecialchars(strtoupper($rdv['coiffeur_nom'] . ' ' . $rdv['coiffeur_prenom'])); ?></span>
-                    </li>
-                    <li class="list-group-item bg-dark text-white border-secondary px-0">
-                        <small class="text-secondary d-block">Lieu fixé</small>
-                        <span><i class="bi bi-geo-alt text-danger"></i> <?php echo htmlspecialchars($rdv['adresse_prestation'] ?? 'À domicile'); ?></span>
-                    </li>
-                    <li class="list-group-item bg-dark text-white border-none px-0 pb-0">
-                        <small class="text-secondary d-block">Montant payé (Gelé sur la plateforme)</small>
-                        <span class="text-success fw-bold fs-5"><?php echo number_format($rdv['prix'], 0, ',', ' '); ?> FCFA</span>
-                    </li>
-                </ul>
+            <div style="border-bottom:1px solid var(--glass-border);padding-bottom:10px;margin-bottom:10px;">
+                <small style="color:var(--text-muted);display:block;">Artisan Coiffeur</small>
+                <span><?= htmlspecialchars(strtoupper($rdv['coiffeur_nom'] . ' ' . $rdv['coiffeur_prenom'])) ?></span>
+            </div>
+            <div style="border-bottom:1px solid var(--glass-border);padding-bottom:10px;margin-bottom:10px;">
+                <small style="color:var(--text-muted);display:block;">Date &amp; Heure</small>
+                <span><?= date('d/m/Y', strtotime($rdv['date_rdv'])) ?> à <?= substr($rdv['heure_debut'], 0, 5) ?></span>
+            </div>
+            <div>
+                <small style="color:var(--text-muted);display:block;">Montant (gelé)</small>
+                <span style="color:var(--success-text);font-weight:700;font-size:1.1rem;">
+                    <?= number_format($rdv['prix'], 0, ',', ' ') ?> FCFA
+                </span>
+            </div>
+        </div>
 
-                <button type="button" class="btn btn-danger w-100 py-2 fw-bold" onclick="afficherPrevention(<?php echo $rdv['id']; ?>)">
-                    <i class="bi bi-x-circle"></i> Annuler mon rendez-vous
+        <!-- Bouton annuler — affiché seulement si RDV annulable -->
+        <?php if (!in_array($rdv['statut_rdv'], ['annule', 'termine'])): ?>
+            <div id="body-principal-<?= $rdv['id'] ?>">
+                <button type="button"
+                        class="btn-danger-cct w-100"
+                        style="padding:12px;"
+                        onclick="afficherPrevention(<?= $rdv['id'] ?>)">
+                    <i class="bi bi-x-circle me-2" aria-hidden="true"></i>
+                    Annuler ce rendez-vous
                 </button>
             </div>
 
-            <div class="modal-body d-none" id="prevention-box-<?php echo $rdv['id']; ?>" style="background-color: #0c0c0c;">
-                <h5 class="text-center text-danger fw-bold mb-3"><i class="bi bi-shield-exclamation"></i> RÈGLES DE DÉSISTEMENT</h5>
-                
-                <div class="small mb-4">
-                    <div class="p-2 mb-2 rounded border-start border-success border-3 bg-dark">
-                        <strong class="text-success">1. Plus de 24h à l'avance :</strong><br>
-                        <span class="text-secondary">L'annulation est entièrement gratuite. Vous êtes remboursé à 100%.</span>
-                    </div>
-                    <div class="p-2 mb-2 rounded border-start border-warning border-3 bg-dark">
-                        <strong class="text-warning">2. Entre 2h et 24h à l'avance :</strong><br>
-                        <span class="text-secondary">Le coiffeur a bloqué sa journée. 50% du montant est conservé pour le dédommager.</span>
-                    </div>
-                    <div class="p-2 mb-3 rounded border-start border-danger border-3 bg-dark">
-                        <strong class="text-danger">3. Moins de 2h à l'avance :</strong><br>
-                        <span class="text-secondary">Abus de dernière minute ou RDV passé. Aucun remboursement ne sera effectué (0%).</span>
-                    </div>
+            <!-- Zone de prévention -->
+            <div id="prevention-box-<?= $rdv['id'] ?>" class="d-none">
+                <h6 style="text-align:center;color:var(--danger-icon);font-weight:700;margin-bottom:1rem;">
+                    <i class="bi bi-shield-exclamation me-1" aria-hidden="true"></i>
+                    RÈGLES DE DÉSISTEMENT
+                </h6>
+
+                <div class="rules-block success mb-2">
+                    <strong style="color:var(--success-text);">1. Plus de 24h à l'avance :</strong><br>
+                    <small style="color:var(--text-muted);">Remboursement intégral (100%).</small>
+                </div>
+                <div class="rules-block warning mb-2">
+                    <strong style="color:var(--warning-color);">2. Entre 2h et 24h :</strong><br>
+                    <small style="color:var(--text-muted);">50% remboursé. 50% au coiffeur.</small>
+                </div>
+                <div class="rules-block danger mb-3">
+                    <strong style="color:var(--danger-icon);">3. Moins de 2h :</strong><br>
+                    <small style="color:var(--text-muted);">Aucun remboursement.</small>
                 </div>
 
-                <div class="p-3 text-center rounded mb-4" style="background-color: #1a1a1a; border: 1px solid #333;">
-                    <span class="text-secondary d-block small mb-1">Temps restant calculé par le robot :</span>
-                    <?php if ($total_heures_restantes >= 0): ?>
-                        <span class="fs-4 fw-bold text-white font-monospace"><?php echo $total_heures_restantes; ?> heure(s)</span>
+                <div class="countdown-box">
+                    <small style="color:var(--text-muted);display:block;margin-bottom:4px;">Temps restant :</small>
+                    <?php if ($total_heures >= 0): ?>
+                        <span style="font-size:1.4rem;font-weight:800;color:var(--text-primary);font-family:monospace;">
+                            <?= $total_heures ?> heure<?= $total_heures > 1 ? 's' : '' ?>
+                        </span>
                     <?php else: ?>
-                        <span class="fs-5 fw-bold text-danger">Rendez-vous imminent ou expiré</span>
+                        <span style="color:var(--danger-icon);font-weight:700;">Rendez-vous imminent ou passé</span>
                     <?php endif; ?>
                 </div>
 
                 <form method="POST" class="d-flex gap-2">
-                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                    <input type="hidden" name="id_rdv" value="<?php echo $rdv['id']; ?>">
-                    
-                    <button type="button" class="btn btn-secondary w-50" onclick="annulerPrevention(<?php echo $rdv['id']; ?>)">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    <input type="hidden" name="id_rdv"    value="<?= $rdv['id'] ?>">
+                    <button type="button"
+                            class="btn-ghost w-50"
+                            onclick="annulerPrevention(<?= $rdv['id'] ?>)">
                         Retour
                     </button>
-                    <button type="submit" name="action_annuler" class="btn btn-danger w-50 fw-bold">
-                        Accepter & Annuler
+                    <button type="submit"
+                            name="action_annuler"
+                            class="btn-danger-cct w-50"
+                            style="padding:10px;">
+                        Confirmer l'annulation
                     </button>
                 </form>
             </div>
-        </div>
-    </div>
-</div>
-<?php endforeach; ?>
+        <?php else: ?>
+            <p style="color:var(--text-muted);font-size:.82rem;text-align:center;margin-top:.5rem;">
+                Ce rendez-vous est <?= $rdv['statut_rdv'] === 'termine' ? 'terminé' : 'annulé' ?> et ne peut plus être modifié.
+            </p>
+        <?php endif; ?>
 
+    <?php $modal_content = ob_get_clean();
+
+    $modal_id    = 'modal-rdv-' . $rdv['id'];
+    $modal_title = 'Rendez-vous — ' . date('d/m/Y', strtotime($rdv['date_rdv']));
+    $modal_width = '520px';
+    include __DIR__ . '/../views/components/modal.php';
+endforeach; ?>
+
+<!-- Footer + Bottom Nav -->
+<?php
+$page_root = '/coiffons';
+include __DIR__ . '/../views/components/footer_global.php';
+$current_page = 'mes_rendezvous.php';
+include __DIR__ . '/../views/components/bottom_nav_client.php';
+?>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function afficherPrevention(id) {
     document.getElementById('body-principal-' + id).classList.add('d-none');
     document.getElementById('prevention-box-' + id).classList.remove('d-none');
 }
-
 function annulerPrevention(id) {
     document.getElementById('prevention-box-' + id).classList.add('d-none');
     document.getElementById('body-principal-' + id).classList.remove('d-none');
 }
 </script>
 
-<style>
-    .btn-gold { background-color: #ffc107; color: black; border: none; border-radius: 8px; }
-    .btn-gold:hover { background-color: #c99b2c; color: black; }
-    .border-none { border: none !important; }
-</style>
-
-<?php include __DIR__ . '/../layout/footer.php'; ?>
+</body>
+</html>
