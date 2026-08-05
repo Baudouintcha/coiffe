@@ -38,6 +38,10 @@ try {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Design System v2.0 — Ordre officiel -->
+    <link rel="stylesheet" href="/coiffons/css/variables.css">
+    <link rel="stylesheet" href="/coiffons/css/animations.css">
+    <link rel="stylesheet" href="/coiffons/css/components.css">
     <style>
         :root {
             --gold: #D4AF37;
@@ -229,6 +233,10 @@ try {
         <a href="/coiffons/coiffeurs/valider_rendezvous.php"
            class="cbn-item <?= $current_page === 'valider_rendezvous.php' ? 'active' : '' ?>">
             <i class="bi bi-check2-circle"></i>RDV
+        </a>
+        <a href="/coiffons/coiffeurs/mes_avis.php"
+           class="cbn-item <?= $current_page === 'mes_avis.php' ? 'active' : '' ?>">
+            <i class="bi bi-star-half"></i>Avis
         </a>
         <a href="/coiffons/deconnexion.php" class="cbn-item">
             <i class="bi bi-box-arrow-right"></i>Quitter

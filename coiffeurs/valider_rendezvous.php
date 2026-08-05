@@ -65,11 +65,21 @@ foreach ($rdvs_en_attente as $rdv) {
 }
 
 // =================================================================
-// 2. TRAITEMENT DES CLICS MANUELS (SQL inchangé)
+// 2. TRAITEMENT DES CLICS MANUELS — POST + CSRF (B3 fix)
 // =================================================================
-if (isset($_GET['action']) && isset($_GET['id_rdv'])) {
-    $action = htmlspecialchars($_GET['action']);
-    $id_rdv = intval($_GET['id_rdv']);
+// Génération token CSRF si absent
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_rdv'], $_POST['id_rdv'])) {
+    // Vérification CSRF
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        $message_type = 'danger';
+        $message_text = 'Action non autorisée (token CSRF invalide).';
+    } else {
+    $action = htmlspecialchars($_POST['action_rdv']);
+    $id_rdv = intval($_POST['id_rdv']);
 
     $verif = $pdo->prepare("SELECT r.*, p.prix FROM rendez_vous r JOIN prestations p ON r.coiffure_id = p.id_prestation WHERE r.id = ? AND p.id_coiffeur = ?");
     $verif->execute([$id_rdv, $coiffeur_id]);
@@ -133,6 +143,7 @@ if (isset($_GET['action']) && isset($_GET['id_rdv'])) {
             $message_text = 'Une erreur est survenue.';
         }
     }
+    } // fin vérification CSRF
 }
 
 // =================================================================
@@ -152,10 +163,6 @@ $mes_rendezvous = $stmt->fetchAll();
 include __DIR__ . '/../layout/header_coiffeur.php';
 ?>
 
-<!-- Design System v2.0 -->
-<link rel="stylesheet" href="/coiffons/css/variables.css">
-<link rel="stylesheet" href="/coiffons/css/animations.css">
-<link rel="stylesheet" href="/coiffons/css/components.css">
 
 <!-- ActionBar -->
 <?php
@@ -246,17 +253,27 @@ endif; ?>
                             <td class="text-end">
                                 <?php if ($rdv['statut_rdv'] === 'en_attente'): ?>
                                     <div class="d-flex gap-2 justify-content-end">
-                                        <a href="valider_rendezvous.php?action=accepter&id_rdv=<?= $rdv['id'] ?>"
-                                           class="btn-outline-gold btn-sm"
-                                           aria-label="Accepter le RDV #<?= $rdv['id'] ?>">
-                                            <i class="bi bi-check-lg me-1" aria-hidden="true"></i>Accepter
-                                        </a>
-                                        <a href="valider_rendezvous.php?action=refuser&id_rdv=<?= $rdv['id'] ?>"
-                                           class="btn-danger-cct btn-sm"
-                                           onclick="return confirm('Refuser ce rendez-vous ?')"
-                                           aria-label="Refuser le RDV #<?= $rdv['id'] ?>">
-                                            <i class="bi bi-x-lg" aria-hidden="true"></i>
-                                        </a>
+                                        <form method="POST" style="display:inline;">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+                                            <input type="hidden" name="action_rdv" value="accepter">
+                                            <input type="hidden" name="id_rdv" value="<?= $rdv['id'] ?>">
+                                            <button type="submit"
+                                                    class="btn-outline-gold btn-sm"
+                                                    aria-label="Accepter le RDV #<?= $rdv['id'] ?>">
+                                                <i class="bi bi-check-lg me-1" aria-hidden="true"></i>Accepter
+                                            </button>
+                                        </form>
+                                        <form method="POST" style="display:inline;">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+                                            <input type="hidden" name="action_rdv" value="refuser">
+                                            <input type="hidden" name="id_rdv" value="<?= $rdv['id'] ?>">
+                                            <button type="submit"
+                                                    class="btn-danger-cct btn-sm"
+                                                    onclick="return confirm('Refuser ce rendez-vous ?')"
+                                                    aria-label="Refuser le RDV #<?= $rdv['id'] ?>">
+                                                <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                            </button>
+                                        </form>
                                     </div>
                                 <?php else: ?>
                                     <span style="color:var(--text-disabled);font-size:0.75rem;">
@@ -321,17 +338,27 @@ endif; ?>
                 </div>
                 <?php if ($rdv['statut_rdv'] === 'en_attente'): ?>
                     <div class="d-flex gap-2">
-                        <a href="valider_rendezvous.php?action=accepter&id_rdv=<?= $rdv['id'] ?>"
-                           class="btn-outline-gold btn-sm flex-grow-1 text-center"
-                           aria-label="Accepter">
-                            <i class="bi bi-check-lg me-1" aria-hidden="true"></i>Accepter
-                        </a>
-                        <a href="valider_rendezvous.php?action=refuser&id_rdv=<?= $rdv['id'] ?>"
-                           class="btn-danger-cct btn-sm"
-                           onclick="return confirm('Refuser ce rendez-vous ?')"
-                           aria-label="Refuser">
-                            <i class="bi bi-x-lg" aria-hidden="true"></i>
-                        </a>
+                        <form method="POST" style="display:contents;">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+                            <input type="hidden" name="action_rdv" value="accepter">
+                            <input type="hidden" name="id_rdv" value="<?= $rdv['id'] ?>">
+                            <button type="submit"
+                                    class="btn-outline-gold btn-sm flex-grow-1 text-center"
+                                    aria-label="Accepter">
+                                <i class="bi bi-check-lg me-1" aria-hidden="true"></i>Accepter
+                            </button>
+                        </form>
+                        <form method="POST" style="display:contents;">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+                            <input type="hidden" name="action_rdv" value="refuser">
+                            <input type="hidden" name="id_rdv" value="<?= $rdv['id'] ?>">
+                            <button type="submit"
+                                    class="btn-danger-cct btn-sm"
+                                    onclick="return confirm('Refuser ce rendez-vous ?')"
+                                    aria-label="Refuser">
+                                <i class="bi bi-x-lg" aria-hidden="true"></i>
+                            </button>
+                        </form>
                     </div>
                 <?php endif; ?>
             </div>

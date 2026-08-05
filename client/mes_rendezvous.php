@@ -25,6 +25,15 @@ require_once __DIR__ . '/../security/config.php';
 $id_client     = $_SESSION['id_user'];
 $message_flash = null;
 
+// ── Flash messages depuis traitement_avis.php et autres redirections ──
+if (!empty($_SESSION['success'])) {
+    $message_flash = ['type' => 'success', 'text' => $_SESSION['success']];
+    unset($_SESSION['success']);
+} elseif (!empty($_SESSION['error'])) {
+    $message_flash = ['type' => 'danger', 'text' => $_SESSION['error']];
+    unset($_SESSION['error']);
+}
+
 // ── ROBOT D'ANNULATION — logique métier inchangée ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_annuler'])) {
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {

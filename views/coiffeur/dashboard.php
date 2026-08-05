@@ -582,6 +582,7 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
         <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="nav-item"><i class="bi bi-calendar3"></i> Mon agenda</a>
         <a href="/coiffons/coiffeurs/mes_zones.php" class="nav-item"><i class="bi bi-geo-alt"></i> Mes zones</a>
         <a href="/coiffons/coiffeurs/portefeuille.php" class="nav-item"><i class="bi bi-wallet2"></i> Portefeuille</a>
+        <a href="/coiffons/coiffeurs/mes_avis.php" class="nav-item"><i class="bi bi-star-half"></i> Mes avis</a>
         <a href="/coiffons/coiffeurs/profil_public.php?id=<?= $coiffeur_id ?>" class="nav-item"><i class="bi bi-person-badge"></i> Mon profil public</a>
     </nav>
     <div class="sidebar-footer">
@@ -617,20 +618,43 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
 
     <div class="page-body">
 
-        <!-- BANNIÈRES -->
+        <!-- BANNIÈRES — flow progressif : payer → vérification → visible -->
         <?php if (!$abonnement_actif): ?>
-        <div class="banner banner-danger">
-            <i class="bi bi-exclamation-triangle-fill"></i>
-            <span>Votre abonnement est inactif — vous n'apparaissez pas dans l'annuaire.
-                <a href="/coiffons/coiffeurs/portefeuille.php">Souscrire maintenant →</a>
-            </span>
+        <!-- Étape 1 : Pas encore payé -->
+        <div class="banner banner-danger" style="flex-direction:column;align-items:flex-start;gap:8px;padding:16px 20px;">
+            <div style="display:flex;align-items:center;gap:10px;width:100%;">
+                <i class="bi bi-lock-fill" style="font-size:1.1rem;flex-shrink:0;"></i>
+                <strong style="font-size:.9rem;">Votre profil n'est pas encore visible dans l'annuaire</strong>
+            </div>
+            <p style="font-size:.82rem;color:rgba(255,255,255,0.65);margin:0;padding-left:2rem;">
+                Pour devenir visible et recevoir des clients, payez votre abonnement mensuel (1 500 FCFA).
+                L'approbation de votre diplôme sera effectuée dans les heures suivant votre paiement.
+                En attendant, vous pouvez déjà configurer votre catalogue, agenda et zones d'intervention.
+            </p>
+            <div style="padding-left:2rem;">
+                <a href="/coiffons/paiement/simuler_abonnement.php"
+                   style="background:var(--gold);color:#000;font-weight:700;font-size:.82rem;padding:8px 20px;border-radius:20px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+                    <i class="bi bi-credit-card-fill"></i>
+                    Payer mon abonnement — 1 500 FCFA
+                </a>
+            </div>
         </div>
-        <?php endif; ?>
-        <?php if (!$diplome_approuve): ?>
-        <div class="banner banner-warning">
-            <i class="bi bi-shield-exclamation"></i>
-            <span>Votre diplôme est en cours de vérification — votre profil est moins visible jusqu'à l'approbation.</span>
+
+        <?php elseif (!$diplome_approuve): ?>
+        <!-- Étape 2 : Payé mais diplôme en attente de validation -->
+        <div class="banner banner-warning" style="flex-direction:column;align-items:flex-start;gap:6px;padding:14px 20px;">
+            <div style="display:flex;align-items:center;gap:10px;width:100%;">
+                <i class="bi bi-hourglass-split" style="font-size:1rem;flex-shrink:0;"></i>
+                <strong style="font-size:.88rem;">Vérification du diplôme en cours</strong>
+            </div>
+            <p style="font-size:.8rem;color:rgba(255,255,255,0.6);margin:0;padding-left:1.75rem;">
+                Votre abonnement est actif. Notre équipe vérifie votre diplôme — vous serez notifié(e) dès la validation.
+                Profitez-en pour finaliser votre catalogue et votre agenda.
+            </p>
         </div>
+
+        <?php else: ?>
+        <!-- Étape 3 : Tout est bon — aucune bannière bloquante -->
         <?php endif; ?>
 
         <!-- HERO STATS -->

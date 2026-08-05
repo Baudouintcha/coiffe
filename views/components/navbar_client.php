@@ -14,7 +14,7 @@ $prenom_client = $prenom_client ?? ($_SESSION['prenom'] ?? 'Client');
 $photo_profil  = $photo_profil  ?? ($_SESSION['photo_profil'] ?? null);
 $nb_notifs     = $nb_notifs     ?? 0;
 $page_root     = $page_root     ?? '/coiffons';
-$initiale      = strtoupper(substr($prenom_client, 0, 1));
+$_nav_initiale = strtoupper(substr($prenom_client, 0, 1));
 
 // Vérifier si la photo existe physiquement
 $photo_url = null;
@@ -99,7 +99,7 @@ if (isset($pdo) && isset($_SESSION['id_user'])) {
             <?php else: ?>
                 <div class="nav-avatar-placeholder avatar-placeholder avatar-xs"
                      aria-hidden="true">
-                    <?= htmlspecialchars($initiale) ?>
+                    <?= htmlspecialchars($_nav_initiale) ?>
                 </div>
             <?php endif; ?>
         </a>
@@ -179,4 +179,4 @@ if (isset($pdo) && isset($_SESSION['id_user'])) {
 .t-notif-dot      { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); border: 2px solid #000; }
 @media (max-width: 768px) { .cct-nav { padding: 0 1rem; } }
 </style>
-<?php unset($prenom_client, $photo_profil, $nb_notifs, $page_root, $initiale, $photo_url, $_navbar_notifs, $nd_count, $nd_notifications, $nd_mark_read_url, $nd_trigger_id, $stmt_nav, $row, $type_n, $icon_map); ?>
+<?php unset($prenom_client, $photo_profil, $nb_notifs, $page_root, $_nav_initiale, $photo_url, $_navbar_notifs, $nd_count, $nd_notifications, $nd_mark_read_url, $nd_trigger_id, $stmt_nav, $row, $type_n, $icon_map); ?>

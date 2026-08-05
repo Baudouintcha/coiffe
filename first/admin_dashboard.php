@@ -33,51 +33,139 @@ function formaterBeninWhatsApp($telephone) {
     return $num;
 }
 
-// 4. RÉCUPÉRATION DES STATISTIQUES FINANCIÈRES RÉELLES
-$stat_commission = $bdd->query("SELECT SUM(montant_commission) FROM transactions_site WHERE type_transaction = 'gain'")->fetchColumn() ?? 0;
-$stat_abonnements = $bdd->query("SELECT SUM(montant) FROM abonnements_paiements WHERE statut = 'actif'")->fetchColumn() ?? 0;
-$nb_coiffeurs = $bdd->query("SELECT COUNT(*) FROM users WHERE role = 'coiffeur'")->fetchColumn();
-$tresorerie_sequestre = $bdd->query("SELECT SUM(solde) FROM users")->fetchColumn() ?? 0;
+// 4. RÉCUPÉRATION DES STATISTIQUES — tables réelles BDD
+try {
+    $stat_commission = (float)($bdd->query("SELECT COALESCE(SUM(ABS(montant)), 0) FROM transactions_portefeuille WHERE type_transaction = 'gain_prestation'")->fetchColumn() ?? 0);
+    $stat_commission = $stat_commission * 0.05; // 5% de commission plateforme
+} catch (Exception $e) { $stat_commission = 0; }
+
+try {
+    $stat_abonnements = (float)($bdd->query("SELECT COUNT(*) * 1500 FROM users WHERE role = 'coiffeur' AND abonnement_status = 1")->fetchColumn() ?? 0);
+} catch (Exception $e) { $stat_abonnements = 0; }
+
+try {
+    $nb_coiffeurs = (int)($bdd->query("SELECT COUNT(*) FROM users WHERE role = 'coiffeur'")->fetchColumn());
+} catch (Exception $e) { $nb_coiffeurs = 0; }
+
+try {
+    $tresorerie_sequestre = (float)($bdd->query("SELECT COALESCE(SUM(solde), 0) FROM users")->fetchColumn() ?? 0);
+} catch (Exception $e) { $tresorerie_sequestre = 0; }
+
+// 4b. DIPLÔMES EN ATTENTE (section critique admin)
+try {
+    $diplomes_attente = $bdd->query("
+        SELECT id, nom, prenom, telephone, diplome, created_at
+        FROM users
+        WHERE role = 'coiffeur'
+          AND is_approved = 0
+          AND diplome IS NOT NULL
+          AND diplome != ''
+        ORDER BY created_at ASC
+        LIMIT 20
+    ")->fetchAll();
+} catch (Exception $e) { $diplomes_attente = []; }
+
+// 4c. NOTIFICATIONS ADMIN non lues
+try {
+    $admin_id = $_SESSION['id_user'] ?? 0;
+    $nb_notifs_admin = 0;
+    if ($admin_id > 0) {
+        $nb_notifs_admin = (int)$bdd->query("SELECT COUNT(*) FROM notifications WHERE id_user = $admin_id AND statut_lecture = 'non_lu'")->fetchColumn();
+    }
+} catch (Exception $e) { $nb_notifs_admin = 0; }
 
 // 5. DATA POUR LES GRAPHIQUES (CHART.JS)
-$data_sexe = $bdd->query("SELECT sexe, COUNT(*) as total FROM users WHERE role IN ('client', 'coiffeur') GROUP BY sexe")->fetchAll(PDO::FETCH_ASSOC);
-$top_coiffeurs = $bdd->query("SELECT u.nom, u.prenom, COUNT(r.id) as total_rdv FROM rendez_vous r JOIN users u ON r.coiffeur_id = u.id GROUP BY r.coiffeur_id ORDER BY total_rdv DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
-$top_prestations = $bdd->query("SELECT p.nom_style, COUNT(r.id) as nb_demandes FROM rendez_vous r JOIN prestations p ON r.coiffure_id = p.id_prestation GROUP BY r.coiffure_id ORDER BY nb_demandes DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $data_sexe = $bdd->query("SELECT sexe, COUNT(*) as total FROM users WHERE role IN ('client', 'coiffeur') GROUP BY sexe")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { $data_sexe = []; }
+
+try {
+    $top_coiffeurs = $bdd->query("SELECT u.nom, u.prenom, COUNT(r.id) as total_rdv FROM rendez_vous r JOIN users u ON r.coiffeur_id = u.id GROUP BY r.coiffeur_id ORDER BY total_rdv DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { $top_coiffeurs = []; }
+
+try {
+    $top_prestations = $bdd->query("SELECT p.nom_style, COUNT(r.id) as nb_demandes FROM rendez_vous r JOIN prestations p ON r.coiffure_id = p.id_prestation GROUP BY r.coiffure_id ORDER BY nb_demandes DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { $top_prestations = []; }
 
 // 6. MODULES WHATSAPP & DIAGNOSTICS RÉELS
-// Coiffeurs en retard (Abonnement payé / RDV en attente)
-$relances_coiffeurs = $bdd->query("
-    SELECT r.*, uc.nom as nom_coiffeur, uc.prenom as prenom_coiffeur, uc.telephone as tel_coiffeur, ucl.nom as nom_client, ucl.prenom as prenom_client
-    FROM rendez_vous r
-    JOIN users uc ON r.coiffeur_id = uc.id
-    JOIN users ucl ON r.client_id = ucl.id
-    WHERE r.statut_rdv = 'en_attente' AND r.paiement_statut = 'SUCCESS'
-    ORDER BY r.date_demande ASC
-")->fetchAll();
+try {
+    $relances_coiffeurs = $bdd->query("
+        SELECT r.*, uc.nom as nom_coiffeur, uc.prenom as prenom_coiffeur, uc.telephone as tel_coiffeur, ucl.nom as nom_client, ucl.prenom as prenom_client
+        FROM rendez_vous r
+        JOIN users uc ON r.coiffeur_id = uc.id
+        JOIN users ucl ON r.client_id = ucl.id
+        WHERE r.statut_rdv = 'en_attente'
+        ORDER BY r.date_demande ASC
+        LIMIT 20
+    ")->fetchAll();
+} catch (Exception $e) { $relances_coiffeurs = []; }
 
-// Paniers Abandonnés (Transactions échouées ou en attente depuis +30 minutes)
-$paniers_abandonnes = $bdd->query("
-    SELECT r.*, ucl.nom as nom_client, ucl.prenom as prenom_client, ucl.telephone as tel_client, uc.nom as nom_coiffeur, uc.prenom as prenom_coiffeur
-    FROM rendez_vous r
-    JOIN users ucl ON r.client_id = ucl.id
-    JOIN users uc ON r.coiffeur_id = uc.id
-    WHERE r.paiement_statut IN ('FAILED', 'PENDING', 'echoue', 'en_attente') 
-    AND r.date_demande < DATE_SUB(NOW(), INTERVAL 30 MINUTE)
-    ORDER BY r.date_demande DESC
-")->fetchAll();
+// Paniers abandonnés — RDV en attente depuis +30 min
+try {
+    $paniers_abandonnes = $bdd->query("
+        SELECT r.*, ucl.nom as nom_client, ucl.prenom as prenom_client, ucl.telephone as tel_client,
+               uc.nom as nom_coiffeur, uc.prenom as prenom_coiffeur
+        FROM rendez_vous r
+        JOIN users ucl ON r.client_id = ucl.id
+        JOIN users uc ON r.coiffeur_id = uc.id
+        WHERE r.statut_rdv = 'en_attente'
+          AND r.date_demande < DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+        ORDER BY r.date_demande DESC
+        LIMIT 20
+    ")->fetchAll();
+} catch (Exception $e) { $paniers_abandonnes = []; }
 
-// Diagnostics d'activité
-$coiffeurs_inactifs = $bdd->query("SELECT nom, prenom, telephone FROM users WHERE role = 'coiffeur' AND id NOT IN (SELECT DISTINCT coiffeur_id FROM rendez_vous)")->fetchAll();
-$bugs_transactions = $bdd->query("SELECT COUNT(*) FROM transactions_site WHERE type_transaction = 'echoue' OR type_transaction = 'annule'")->fetchColumn() ?? 0;
-$clients_sans_rdv = $bdd->query("SELECT COUNT(*) FROM users WHERE role = 'client' AND id NOT IN (SELECT DISTINCT client_id FROM rendez_vous)")->fetchColumn() ?? 0;
+// Diagnostics d'activité — tables réelles
+try {
+    $coiffeurs_inactifs = $bdd->query("SELECT nom, prenom, telephone FROM users WHERE role = 'coiffeur' AND id NOT IN (SELECT DISTINCT coiffeur_id FROM rendez_vous)")->fetchAll();
+} catch (Exception $e) { $coiffeurs_inactifs = []; }
 
-// 7. COMPTES & SIGNALEMENTS DE CONTOURNEMENT
-$users_list = $bdd->query("SELECT * FROM users ORDER BY id DESC")->fetchAll();
-$commentaires = $bdd->query("SELECT c.*, u.nom, u.prenom FROM commentaires c JOIN users u ON c.id_client = u.id ORDER BY c.date_creation DESC")->fetchAll();
+try {
+    $bugs_transactions = (int)$bdd->query("SELECT COUNT(*) FROM transactions_portefeuille WHERE type_transaction IN ('erreur', 'annule')")->fetchColumn();
+} catch (Exception $e) { $bugs_transactions = 0; }
 
-// 8. ABONNEMENTS & RETRAITS EN ATTENTE
-$abonnements_attente = $bdd->query("SELECT a.*, u.nom, u.prenom, u.telephone FROM abonnements_paiements a JOIN users u ON a.id = u.id WHERE a.statut = 'en_attente'")->fetchAll();
-$retraits_attente = $bdd->query("SELECT t.*, u.nom, u.prenom, u.telephone FROM transactions_portefeuille t JOIN users u ON t.user_id = u.id WHERE t.type_transaction = 'retrait'")->fetchAll();
+try {
+    $clients_sans_rdv = (int)$bdd->query("SELECT COUNT(*) FROM users WHERE role = 'client' AND id NOT IN (SELECT DISTINCT client_id FROM rendez_vous)")->fetchColumn();
+} catch (Exception $e) { $clients_sans_rdv = 0; }
+
+// 7. COMPTES & AVIS SIGNALÉS
+try {
+    $users_list = $bdd->query("SELECT id, nom, prenom, role, email, telephone, statut, created_at FROM users ORDER BY id DESC LIMIT 50")->fetchAll();
+} catch (Exception $e) { $users_list = []; }
+
+try {
+    $commentaires = $bdd->query("
+        SELECT c.*, u.nom, u.prenom
+        FROM commentaires c
+        JOIN users u ON c.id_client = u.id
+        WHERE c.type_commentaire IN ('plainte', 'public')
+        ORDER BY c.date_creation DESC
+        LIMIT 30
+    ")->fetchAll();
+} catch (Exception $e) { $commentaires = []; }
+
+// 8. COIFFEURS EN ATTENTE D'ABONNEMENT + RETRAITS
+try {
+    $abonnements_attente = $bdd->query("
+        SELECT id, nom, prenom, telephone, date_expiration_abo
+        FROM users
+        WHERE role = 'coiffeur'
+          AND (abonnement_status = 0 OR date_expiration_abo < CURDATE() OR date_expiration_abo IS NULL)
+        ORDER BY created_at DESC
+        LIMIT 20
+    ")->fetchAll();
+} catch (Exception $e) { $abonnements_attente = []; }
+
+try {
+    $retraits_attente = $bdd->query("
+        SELECT t.*, u.nom, u.prenom, u.telephone
+        FROM transactions_portefeuille t
+        JOIN users u ON t.user_id = u.id
+        WHERE t.type_transaction = 'retrait'
+        ORDER BY t.date_creation DESC
+        LIMIT 20
+    ")->fetchAll();
+} catch (Exception $e) { $retraits_attente = []; }
 ?>
 
 <!doctype html>

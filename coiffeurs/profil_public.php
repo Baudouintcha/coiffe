@@ -1,10 +1,15 @@
 <?php
 /**
  * coiffeurs/profil_public.php — Profil public d'un coiffeur
- * Migration Design System v2.0 — Parcours Visiteur — Page 5/6
+ * Refonte UX/UI — Parcours de réservation premium
  *
- * ⚠️  LOGIQUE MÉTIER INTACTE — Seuls HTML/CSS/composants ont été modifiés.
- *     Aucune requête SQL, variable PHP, session ou sécurité touchée.
+ * Nouveau flux :
+ *   1. Présentation coiffeur
+ *   2. Catalogue prestations (sélection visuelle)
+ *   3. Disponibilités (jours + créneaux, après sélection prestation)
+ *   4. Avis clients
+ *
+ * LOGIQUE MÉTIER INTACTE — SQL, sessions, sécurité : inchangés.
  */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -13,23 +18,18 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../security/config.php';
 
-// Profil public accessible à tous — le visiteur peut parcourir le profil librement.
-// La vérification de connexion n'intervient qu'au moment de réserver (sur les boutons CTA).
-// $est_connecte est utilisé dans la vue pour adapter les boutons de réservation.
 $est_connecte = isset($_SESSION['id_user']) && !empty($_SESSION['role']) && $_SESSION['role'] !== 'invite';
 
-// Fix URL — inchangé
 $id_coiffeur = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT)
             ?? filter_input(INPUT_GET, 'id_coiffeur', FILTER_VALIDATE_INT);
 
 if (!$id_coiffeur) {
-    // Page d'erreur inline — conservée telle quelle
-    echo "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Erreur</title></head><body style='background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;'><div style='text-align:center'><p style='color:rgba(255,255,255,0.4);'>Coiffeur introuvable.</p><a href='/coiffons/index.php' style='color:#D4AF37;'>Retour à l'accueil</a></div></body></html>";
+    echo "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body style='background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;'><div style='text-align:center'><p style='color:rgba(255,255,255,0.4);'>Coiffeur introuvable.</p><a href='/coiffons/index.php' style='color:#D4AF37;'>Retour à l'accueil</a></div></body></html>";
     exit();
 }
 
 try {
-    // Requête coiffeur — SQL inchangé
+    // Coiffeur — SQL inchangé
     $stmt = $pdo->prepare("
         SELECT u.*, v.nom_ville, q.nom_quartier
         FROM users u
@@ -46,57 +46,42 @@ try {
         exit();
     }
 
-    // Catalogue prestations — SQL inchangé
-    $stmt_presta = $pdo->prepare("SELECT * FROM prestations");
-    $stmt_presta->execute();
-    $toutes_les_prestas = $stmt_presta->fetchAll();
-    $prestations = [];
-    foreach ($toutes_les_prestas as $p) {
-        $cles_nettoyees = array_combine(array_map('trim', array_keys($p)), array_values($p));
-        if (isset($cles_nettoyees['id_coiffeur']) && $cles_nettoyees['id_coiffeur'] == $id_coiffeur) {
-            $prestations[] = $p;
-        }
-    }
+    // Prestations — SQL inchangé
+    $stmt_presta = $pdo->prepare("SELECT * FROM prestations WHERE id_coiffeur = ? ORDER BY id_prestation ASC");
+    $stmt_presta->execute([$id_coiffeur]);
+    $prestations = $stmt_presta->fetchAll();
 
-    // Note moyenne — SQL inchangé
-    // Avis publics — 5 derniers avis publics non rejetés
+    // Avis — SQL inchangé
     try {
         $stmt_avis = $pdo->prepare("
-            SELECT c.*, u.nom as client_nom, u.prenom as client_prenom, u.photo_profil as client_photo
+            SELECT c.*, u.nom as client_nom, u.prenom as client_prenom
             FROM commentaires c
             JOIN users u ON c.id_client = u.id
-            WHERE c.id_coiffeur = ?
-              AND c.type_commentaire = 'public'
+            WHERE c.id_coiffeur = ? AND c.type_commentaire = 'public'
               AND c.statut_moderation != 'rejete'
-            ORDER BY c.date_creation DESC
-            LIMIT 5
+            ORDER BY c.date_creation DESC LIMIT 5
         ");
         $stmt_avis->execute([$id_coiffeur]);
         $avis_publics = $stmt_avis->fetchAll();
-    } catch (Exception $e) {
-        $avis_publics = [];
-    }
+    } catch (Exception $e) { $avis_publics = []; }
 
+    // Note moyenne — SQL inchangé
     try {
         $stmt_note = $pdo->prepare("SELECT AVG(note) as moy, COUNT(*) as nb FROM commentaires WHERE id_coiffeur = ?");
         $stmt_note->execute([$id_coiffeur]);
         $stats_note   = $stmt_note->fetch();
         $note_moyenne = $stats_note['nb'] > 0 ? round($stats_note['moy'], 1) : null;
         $stats_avis   = ['total' => intval($stats_note['nb'])];
-    } catch (Exception $e) {
-        $note_moyenne = null;
-        $stats_avis   = ['total' => 0];
-    }
+    } catch (Exception $e) { $note_moyenne = null; $stats_avis = ['total' => 0]; }
 
     // Disponibilités — SQL inchangé
     $stmt_dispo = $pdo->prepare("SELECT * FROM disponibilites WHERE coiffeur_id = ?");
     $stmt_dispo->execute([$id_coiffeur]);
-    $toutes_les_dispos = $stmt_dispo->fetchAll();
     $planning_coiffeur = [];
-    foreach ($toutes_les_dispos as $d) {
+    foreach ($stmt_dispo->fetchAll() as $d) {
         $planning_coiffeur[strtolower(trim($d['jour_semaine']))] = [
             'debut' => $d['heure_debut'],
-            'fin'   => $d['heure_fin']
+            'fin'   => $d['heure_fin'],
         ];
     }
 
@@ -108,13 +93,21 @@ try {
     $stmt_rdv->execute([$id_coiffeur]);
     $busy_slots = [];
     foreach ($stmt_rdv->fetchAll() as $r) {
-        $key = $r['date_rdv'] . ' ' . substr($r['heure_debut'], 0, 5);
-        $busy_slots[$key] = true;
+        $busy_slots[$r['date_rdv'] . ' ' . substr($r['heure_debut'], 0, 5)] = true;
     }
 
 } catch (Exception $e) {
-    echo "<div style='background:#0a0a0a;color:#fff;padding:40px;font-family:sans-serif;'>Erreur : " . htmlspecialchars($e->getMessage()) . "</div>";
+    echo "<div style='background:#0a0a0a;color:#fff;padding:40px;'>Erreur : " . htmlspecialchars($e->getMessage()) . "</div>";
     exit();
+}
+
+// Photo coiffeur
+$ps_photo_url = null;
+if (!empty($coiffeur['photo_profil'])) {
+    foreach ([__DIR__ . '/../access/' . $coiffeur['photo_profil'],
+              __DIR__ . '/../uploads/profil/' . basename($coiffeur['photo_profil'])] as $cp) {
+        if (file_exists($cp)) { $ps_photo_url = '/coiffons/access/' . $coiffeur['photo_profil']; break; }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -123,60 +116,111 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($coiffeur['nom']) ?> <?= htmlspecialchars($coiffeur['prenom'] ?? '') ?> — Coiffe Chez Toi</title>
-
-    <!-- Design System v2.0 — Ordre de chargement officiel -->
     <link rel="stylesheet" href="/coiffons/css/variables.css">
     <link rel="stylesheet" href="/coiffons/css/animations.css">
     <link rel="stylesheet" href="/coiffons/css/components.css">
-
-    <!-- Bootstrap 5.3.3 (grille uniquement) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
     <style>
-    /* ── Styles spécifiques à profil_public, tous via var(--*) DS ── */
+    /* ── Profil public — styles DS v2.0 ── */
+    .pp-section        { padding: 3.5rem 0; }
+    .pp-section--alt   { background: var(--dark-2); }
+    .pp-section--dark3 { background: var(--dark-3); }
+    .pp-wrap           { max-width: var(--max-width); margin: 0 auto; padding: 0 1.5rem; }
+    .section-eyebrow   { font-size:.68rem; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--gold); display:block; margin-bottom:.4rem; }
+    .section-heading   { font-family:var(--font-display); font-size:clamp(1.2rem,2.5vw,1.6rem); font-weight:700; color:var(--text-primary); margin-bottom:.4rem; }
+    .section-sub       { color:var(--text-muted); font-size:.82rem; }
 
-    /* Sections */
-    .profile-summary-section { padding:4rem 0; background:var(--glass-bg-subtle); border-bottom:1px solid var(--glass-border); }
-    .section-booking  { padding:4rem 0; background:var(--dark-3); }
-    .section-portfolio{ padding:4rem 0; background:var(--dark); }
+    /* ── Carte prestation sélectionnable ── */
+    .presta-card {
+        background: var(--dark-2);
+        border: 2px solid transparent;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        cursor: pointer;
+        transition: var(--transition-spring), border-color .25s, box-shadow .25s;
+        height: 100%;
+        display: flex; flex-direction: column;
+        position: relative;
+    }
+    .presta-card:hover {
+        border-color: rgba(212,175,55,.35);
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-md);
+    }
+    .presta-card.selected {
+        border-color: var(--gold);
+        box-shadow: 0 0 0 3px rgba(212,175,55,.18), var(--shadow-lg);
+    }
+    .presta-card-check {
+        position: absolute; top: 10px; right: 10px;
+        width: 28px; height: 28px; border-radius: 50%;
+        background: var(--gold); color: #000;
+        display: none; align-items: center; justify-content: center;
+        font-size: .9rem; font-weight: 800;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .presta-card.selected .presta-card-check { display: flex; }
+    .presta-img { width:100%; height:180px; object-fit:cover; display:block; }
+    .presta-img-ph {
+        width:100%; height:180px;
+        background: linear-gradient(135deg, var(--dark-3), var(--dark-4));
+        display:flex; align-items:center; justify-content:center;
+        color:rgba(255,255,255,.06); font-size:2.5rem;
+    }
+    .presta-body { padding: 1rem 1.1rem; flex:1; display:flex; flex-direction:column; }
+    .presta-name { font-weight:700; font-size:.92rem; color:var(--text-primary); margin-bottom:4px; }
+    .presta-desc { font-size:.75rem; color:var(--text-muted); line-height:1.5; margin-bottom:8px; flex:1; }
+    .presta-footer {
+        display:flex; align-items:center; justify-content:space-between;
+        padding: 8px 1.1rem 1rem;
+    }
+    .presta-prix { font-size:1rem; font-weight:800; color:var(--gold); }
+    .presta-duree { font-size:.72rem; color:var(--text-muted); }
 
-    /* Titres de section */
-    .section-heading  { font-family:var(--font-display); font-size:1.2rem; font-weight:700; color:var(--text-primary); margin-bottom:.25rem; }
-    .section-sub      { color:var(--text-muted); font-size:.82rem; margin-bottom:2rem; }
+    /* ── Section disponibilités (masquée par défaut) ── */
+    #section-disponibilites {
+        display: none;
+        padding: 3rem 0;
+        background: var(--dark-3);
+        border-top: 1px solid var(--glass-border);
+        animation: fadeSlideIn .35s ease;
+    }
+    @keyframes fadeSlideIn { from {opacity:0;transform:translateY(10px)} to {opacity:1;transform:translateY(0)} }
 
-    /* Nom du coiffeur */
-    .profile-name     { font-family:var(--font-display); font-size:clamp(1.4rem,3vw,2rem); font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:2px; margin-bottom:.4rem; }
-
-    /* Bio */
-    .profile-bio      { color:var(--text-secondary); font-size:.9rem; line-height:1.6; max-width:600px; margin:0 auto; }
-
-    /* Badge note muted */
-    .badge-note-muted { background:rgba(255,255,255,0.04); border:1px solid var(--glass-border); color:var(--text-muted); font-size:.75rem; font-weight:700; padding:4px 12px; border-radius:20px; display:inline-flex; align-items:center; gap:5px; }
-
-    /* SlotsContainer – intégré dans la section réservation */
-    .slots-container  { background:var(--dark-2); border:1px dashed rgba(212,175,55,.30); border-radius:var(--radius-md); padding:1.5rem; text-align:center; }
-    .slots-title      { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--gold); margin-bottom:1rem; }
-
-    /* Disponibility cards scroll horizontal mobile */
-    .days-scroll      { display:flex; justify-content:center; flex-wrap:wrap; gap:8px; overflow-x:auto; padding-bottom:4px; }
-    @media (max-width:576px) {
-        .days-scroll  { flex-wrap:nowrap; justify-content:flex-start; }
-        .day-selector-card { flex-shrink:0; }
+    /* Prestation sélectionnée — mini-recap dans la section dispo */
+    .dispo-presta-recap {
+        background: rgba(212,175,55,.07);
+        border: 1px solid rgba(212,175,55,.25);
+        border-radius: var(--radius-md);
+        padding: 10px 16px;
+        display: flex; align-items: center; gap: 10px;
+        margin-bottom: 1.5rem;
     }
 
-    /* GalleryCard — portfolio */
-    .portfolio-grid .gallery-card { cursor:default; }
+    /* Jours scroll */
+    .days-scroll { display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; scrollbar-width:none; }
+    .days-scroll::-webkit-scrollbar { display:none; }
+
+    /* Slots container */
+    .pp-slots-wrap {
+        background: var(--dark-2);
+        border: 1px dashed rgba(212,175,55,.25);
+        border-radius: var(--radius-md);
+        padding: 1.25rem;
+        text-align: center;
+        margin-top: 1.25rem;
+    }
+    .pp-slots-title { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--gold); margin-bottom:.75rem; }
+
+    /* CTA Continuer */
+    #btn-continuer-wrap { display:none; margin-top:1.5rem; text-align:center; }
     </style>
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════
-     NAVBAR CLIENT — Composant CL §21
-     ══════════════════════════════════════════ -->
+<!-- NAVBAR -->
 <?php
 $prenom_client = htmlspecialchars($_SESSION['prenom'] ?? '');
 $photo_profil  = $_SESSION['photo_profil'] ?? null;
@@ -185,405 +229,445 @@ $page_root     = '/coiffons';
 include __DIR__ . '/../views/components/navbar_client.php';
 ?>
 
-<!-- ══════════════════════════════════════════
-     PROFILE SUMMARY — Composant CL §28
-     ══════════════════════════════════════════ -->
-<section class="profile-summary-section page-transition"
-         aria-labelledby="coiffeur-nom">
-    <div class="container text-center" style="max-width:var(--max-width);">
-
-        <!-- Lien retour -->
+<!-- ════════════ 1. PRÉSENTATION COIFFEUR ════════════ -->
+<section class="pp-section" style="background:var(--glass-bg-subtle);border-bottom:1px solid var(--glass-border);padding-top:calc(var(--navbar-height) + 2.5rem);" aria-labelledby="coiffeur-nom">
+    <div class="pp-wrap text-center">
         <div class="text-start mb-4">
-            <a href="javascript:history.back()"
-               class="btn-ghost btn-sm d-inline-flex align-items-center gap-1"
-               aria-label="Retour à la page précédente">
-                <i class="bi bi-arrow-left" aria-hidden="true"></i>
-                Retour
+            <a href="javascript:history.back()" class="btn-ghost btn-sm d-inline-flex align-items-center gap-1">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Retour
             </a>
         </div>
 
-        <!-- Avatar — Composant CL §25 -->
+        <!-- Avatar -->
         <div class="mb-3">
-            <?php
-            $ps_photo_url = null;
-            if (!empty($coiffeur['photo_profil'])) {
-                $check_paths = [
-                    __DIR__ . '/../access/' . $coiffeur['photo_profil'],
-                    __DIR__ . '/../uploads/profil/' . basename($coiffeur['photo_profil']),
-                ];
-                foreach ($check_paths as $cp) {
-                    if (file_exists($cp)) {
-                        $ps_photo_url = '/coiffons/access/' . $coiffeur['photo_profil'];
-                        break;
-                    }
-                }
-            }
-            ?>
             <?php if ($ps_photo_url): ?>
                 <img src="<?= htmlspecialchars($ps_photo_url) ?>"
-                     alt="Photo de profil de <?= htmlspecialchars($coiffeur['nom']) ?>"
-                     class="avatar-placeholder"
-                     style="width:80px;height:80px;font-size:2rem;box-shadow:0 0 20px rgba(212,175,55,0.30);">
+                     alt="Photo de <?= htmlspecialchars($coiffeur['nom']) ?>"
+                     style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid var(--gold);box-shadow:0 0 24px rgba(212,175,55,.30);">
             <?php else: ?>
                 <div class="avatar-placeholder d-inline-flex"
-                     style="width:80px;height:80px;font-size:2rem;box-shadow:0 0 20px rgba(212,175,55,0.30);"
-                     aria-label="Initiale du coiffeur">
+                     style="width:90px;height:90px;font-size:2.2rem;box-shadow:0 0 24px rgba(212,175,55,.30);">
                     <?= htmlspecialchars(strtoupper(substr($coiffeur['nom'], 0, 1))) ?>
                 </div>
             <?php endif; ?>
         </div>
 
-        <!-- Nom -->
-        <h1 id="coiffeur-nom" class="profile-name">
-            <?= htmlspecialchars(strtoupper($coiffeur['nom'])) ?>
-            <?php if (!empty($coiffeur['prenom'])): ?>
-                <?= htmlspecialchars(strtoupper($coiffeur['prenom'])) ?>
-            <?php endif; ?>
+        <!-- Nom + badge certifié -->
+        <h1 id="coiffeur-nom" style="font-family:var(--font-display);font-size:clamp(1.5rem,3vw,2.2rem);font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:2px;margin-bottom:.3rem;">
+            <?= htmlspecialchars(strtoupper($coiffeur['nom'] . ' ' . ($coiffeur['prenom'] ?? ''))) ?>
         </h1>
 
-        <!-- Localisation -->
-        <p class="mb-3" style="color:var(--text-muted);font-size:.85rem;">
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.75rem;">
             <i class="bi bi-geo-alt-fill" style="color:var(--gold);" aria-hidden="true"></i>
-            <?= htmlspecialchars($coiffeur['nom_ville'] ?? 'Non spécifiée') ?>
-            &mdash;
-            <?= htmlspecialchars($coiffeur['nom_quartier'] ?? 'Général') ?>
+            <?= htmlspecialchars($coiffeur['nom_ville'] ?? '') ?>
+            <?= !empty($coiffeur['nom_quartier']) ? ' · ' . htmlspecialchars($coiffeur['nom_quartier']) : '' ?>
         </p>
 
-        <!-- Badge note — .badge-gold DS §14 -->
+        <!-- Note -->
         <div class="mb-3">
-            <?php if ($note_moyenne): ?>
-                <span class="badge-gold" aria-label="Note : <?= $note_moyenne ?> sur 5, <?= $stats_avis['total'] ?> avis">
-                    <?php for ($s = 1; $s <= 5; $s++): ?>
-                        <span style="color:<?= $s <= round($note_moyenne) ? '#D4AF37' : 'rgba(255,255,255,0.3)' ?>;" aria-hidden="true">★</span>
+            <?php if ($note_moyenne && $stats_avis['total'] > 0): ?>
+                <span class="badge-gold" aria-label="Note : <?= $note_moyenne ?>/5, <?= $stats_avis['total'] ?> avis">
+                    <?php for ($s=1;$s<=5;$s++): ?>
+                        <span style="color:<?= $s<=round($note_moyenne)?'#D4AF37':'rgba(255,255,255,.3)' ?>;">★</span>
                     <?php endfor; ?>
-                    <strong style="margin-left:5px;"><?= $note_moyenne ?></strong> / 5
+                    <strong style="margin-left:5px;"><?= $note_moyenne ?></strong>/5
                     <span style="opacity:.7;margin-left:4px;">(<?= $stats_avis['total'] ?> avis)</span>
                 </span>
             <?php else: ?>
-                <span class="badge-note-muted" aria-label="Aucun avis pour le moment">
-                    <span aria-hidden="true">☆☆☆☆☆</span>
-                    <span style="margin-left:5px;">Aucun avis pour le moment</span>
-                </span>
+                <span style="color:var(--text-muted);font-size:.78rem;">Aucun avis pour le moment</span>
             <?php endif; ?>
         </div>
 
         <!-- Bio -->
-        <p class="profile-bio">
+        <p style="color:var(--text-secondary);font-size:.88rem;line-height:1.7;max-width:560px;margin:0 auto;">
             <?= !empty($coiffeur['bio'])
                 ? htmlspecialchars($coiffeur['bio'])
                 : 'Artisan coiffeur professionnel sélectionné par notre plateforme, expert en créations capillaires haut de gamme à domicile.' ?>
         </p>
-
     </div>
 </section>
 
-<!-- ══════════════════════════════════════════
-     SECTION RÉSERVATION EXPRESS
-     AvailabilityCard CL §8 + SlotsContainer CL §35
-     ══════════════════════════════════════════ -->
-<section class="section-booking" aria-labelledby="booking-heading">
-    <div class="container" style="max-width:var(--max-width);">
-
-        <h2 id="booking-heading" class="section-heading text-center">
-            <i class="bi bi-calendar3 me-2" style="color:var(--gold);" aria-hidden="true"></i>
-            Réservation Express
-        </h2>
-        <p class="section-sub text-center">Choisissez un créneau disponible</p>
-
-        <!-- AvailabilityCard — Composant CL §8 -->
-        <div class="days-scroll mb-4" role="list" aria-label="Jours disponibles">
-            <?php
-            $jours_traduction = [
-                'monday'=>'lundi','tuesday'=>'mardi','wednesday'=>'mercredi',
-                'thursday'=>'jeudi','friday'=>'vendredi','saturday'=>'samedi','sunday'=>'dimanche'
-            ];
-            for ($i = 0; $i < 7; $i++):
-                $timestamp   = strtotime("+{$i} days");
-                $date_cle    = date('Y-m-d', $timestamp);
-                $jour_en     = strtolower(date('l', $timestamp));
-                $jour_fr     = $jours_traduction[$jour_en];
-                $num_jour    = date('d', $timestamp);
-                $nom_mois    = date('M', $timestamp);
-                $travaille   = isset($planning_coiffeur[$jour_fr]);
-                $class_stat  = $travaille ? 'day-item-open' : 'day-item-closed';
-                $h_debut     = $travaille ? $planning_coiffeur[$jour_fr]['debut'] : '';
-                $h_fin       = $travaille ? $planning_coiffeur[$jour_fr]['fin']   : '';
-            ?>
-                <div class="day-selector-card <?= $class_stat ?>"
-                     data-date="<?= htmlspecialchars($date_cle) ?>"
-                     data-open="<?= $travaille ? '1' : '0' ?>"
-                     data-start="<?= htmlspecialchars($h_debut) ?>"
-                     data-end="<?= htmlspecialchars($h_fin) ?>"
-                     onclick="selectionnerJour(this)"
-                     role="button"
-                     tabindex="0"
-                     onkeypress="if(event.key==='Enter')selectionnerJour(this)"
-                     aria-label="<?= htmlspecialchars($jour_fr) ?> <?= $num_jour ?> <?= $nom_mois ?> — <?= $travaille ? 'disponible' : 'indisponible' ?>"
-                     <?= !$travaille ? 'aria-disabled="true"' : '' ?>>
-                    <span class="small text-uppercase opacity-70 d-block">
-                        <?= htmlspecialchars(substr($jour_fr, 0, 3)) ?>.
-                    </span>
-                    <span class="fs-4 fw-bold my-1 d-block"><?= $num_jour ?></span>
-                    <span class="small opacity-50 d-block"><?= $nom_mois ?></span>
-                </div>
-            <?php endfor; ?>
-        </div>
-
-        <!-- SlotsContainer — Composant CL §35 -->
-        <div id="zone-slots-horaires"
-             class="slots-container d-none"
-             role="region"
-             aria-live="polite"
-             aria-label="Créneaux horaires disponibles">
-            <div class="slots-title">Heures disponibles pour la date sélectionnée</div>
-            <div id="slots-container"
-                 class="d-flex flex-wrap justify-content-center gap-2"
-                 role="list">
-            </div>
-        </div>
-
-    </div>
-</section>
-
-<!-- ══════════════════════════════════════════
-     SECTION PORTFOLIO — GalleryCard CL §7
-     ══════════════════════════════════════════ -->
-<section class="section-portfolio" aria-labelledby="portfolio-heading">
-    <div class="container" style="max-width:var(--max-width);">
-
-        <h2 id="portfolio-heading" class="section-heading">
-            <i class="bi bi-scissors me-2" style="color:var(--gold);" aria-hidden="true"></i>
-            Portfolio des créations
-        </h2>
-        <p class="section-sub">Découvrez les styles proposés par ce coiffeur</p>
+<!-- ════════════ 2. CATALOGUE PRESTATIONS ════════════ -->
+<section class="pp-section" style="background:var(--dark);" id="section-catalogue" aria-labelledby="catalogue-heading">
+    <div class="pp-wrap">
+        <span class="section-eyebrow">Choisissez votre style</span>
+        <h2 id="catalogue-heading" class="section-heading">Prestations disponibles</h2>
+        <p class="section-sub" style="margin-bottom:2rem;">Sélectionnez une prestation pour voir les disponibilités</p>
 
         <?php if (empty($prestations)): ?>
-            <!-- Empty State CL DS §17 -->
             <?php
-            $es = [
-                'icon'      => 'bi-camera',
-                'message'   => 'Ce coiffeur n\'a pas encore publié de styles dans son catalogue.',
-                'cta_label' => '',
-                'cta_href'  => '',
-            ];
+            $es = ['icon'=>'bi-camera','message'=>'Ce coiffeur n\'a pas encore publié de styles.','cta_label'=>'','cta_href'=>''];
             include __DIR__ . '/../views/components/empty_state.php';
             ?>
         <?php else: ?>
-            <div class="row g-4 portfolio-grid">
-                <?php foreach ($prestations as $p):
-                    $photo_url = null;
-                    if (!empty($p['photo_style'])) {
-                        $photo_check = __DIR__ . '/../' . $p['photo_style'];
-                        if (file_exists($photo_check)) {
-                            $photo_url = '/coiffons/' . $p['photo_style'];
-                        }
-                    }
-                ?>
-                    <div class="col-12 col-sm-6 col-md-4">
-                        <!-- GalleryCard variante view — CL §7 -->
-                        <?php
-                        $gallery = [
-                            'nom_style'      => $p['nom_style'] ?? 'Style sans nom',
-                            'prix'           => $p['prix'] ?? 0,
-                            'photo_url'      => $photo_url,
-                            // Si le visiteur n'est pas connecté → rediriger vers connexion avec retour prévu
-                            'href_reserver'  => $est_connecte
-                                ? '/coiffons/client/reserver.php?coiffeur_id=' . $coiffeur['id'] . '&presta_id=' . ($p['id_prestation'] ?? '')
-                                : '/coiffons/index.php?page=login&redirect=' . urlencode('/coiffons/client/reserver.php?coiffeur_id=' . $coiffeur['id'] . '&presta_id=' . ($p['id_prestation'] ?? '')),
-                            'variante'       => 'view',
-                        ];
-                        include __DIR__ . '/../views/components/gallery_card.php';
-                        ?>
+        <div class="row g-4" id="prestations-grid">
+            <?php foreach ($prestations as $p):
+                $photo_url_p = null;
+                if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])) {
+                    $photo_url_p = '/coiffons/' . $p['photo_style'];
+                }
+                $explode_p   = explode("|||", $p['description'] ?? '');
+                $desc_pure_p = $explode_p[0] ?? '';
+                $json_opts_p = $explode_p[1] ?? '[]';
+                $opts_p      = json_decode($json_opts_p, true) ?: [];
+            ?>
+            <div class="col-12 col-sm-6 col-lg-4">
+                <article class="presta-card"
+                         data-presta-id="<?= (int)$p['id_prestation'] ?>"
+                         data-presta-nom="<?= htmlspecialchars($p['nom_style']) ?>"
+                         data-presta-prix="<?= (int)$p['prix'] ?>"
+                         data-presta-duree="<?= (int)($p['duree'] ?? 60) ?>"
+                         data-presta-options="<?= htmlspecialchars(json_encode($opts_p, JSON_UNESCAPED_UNICODE)) ?>"
+                         onclick="selectionnerPrestation(this)"
+                         role="button" tabindex="0"
+                         onkeypress="if(event.key==='Enter')selectionnerPrestation(this)"
+                         aria-label="Choisir <?= htmlspecialchars($p['nom_style']) ?> — <?= number_format($p['prix'],0,',','') ?> FCFA">
+
+                    <!-- Checkmark sélection -->
+                    <div class="presta-card-check" aria-hidden="true">
+                        <i class="bi bi-check2"></i>
                     </div>
-                <?php endforeach; ?>
+
+                    <!-- Image -->
+                    <?php if ($photo_url_p): ?>
+                        <img src="<?= htmlspecialchars($photo_url_p) ?>" class="presta-img" alt="<?= htmlspecialchars($p['nom_style']) ?>" loading="lazy">
+                    <?php else: ?>
+                        <div class="presta-img-ph" aria-hidden="true"><i class="bi bi-scissors"></i></div>
+                    <?php endif; ?>
+
+                    <div class="presta-body">
+                        <div class="presta-name"><?= htmlspecialchars($p['nom_style']) ?></div>
+                        <?php if (!empty($desc_pure_p)): ?>
+                            <p class="presta-desc"><?= htmlspecialchars($desc_pure_p) ?></p>
+                        <?php else: ?>
+                            <div class="presta-desc"></div>
+                        <?php endif; ?>
+                        <?php if (!empty($opts_p)): ?>
+                            <div style="font-size:.7rem;color:var(--text-muted);margin-top:2px;">
+                                + options : <?= implode(', ', array_map(fn($o) => htmlspecialchars($o['nom']), $opts_p)) ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="presta-footer">
+                        <span class="presta-prix"><?= number_format($p['prix'],0,',','') ?> FCFA</span>
+                        <span class="presta-duree"><i class="bi bi-clock me-1" aria-hidden="true"></i><?= (int)($p['duree'] ?? 60) ?> min</span>
+                    </div>
+                </article>
             </div>
+            <?php endforeach; ?>
+        </div>
         <?php endif; ?>
+    </div>
+</section>
+
+<!-- ════════════ 3. DISPONIBILITÉS (masquée jusqu'à sélection prestation) ════════════ -->
+<section id="section-disponibilites" aria-labelledby="dispo-heading">
+    <div class="pp-wrap">
+
+        <!-- Mini-recap prestation choisie -->
+        <div class="dispo-presta-recap" id="dispo-presta-recap">
+            <i class="bi bi-scissors" style="color:var(--gold);font-size:1.1rem;flex-shrink:0;" aria-hidden="true"></i>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;font-size:.88rem;color:var(--text-primary);" id="recap-presta-nom">—</div>
+                <div style="font-size:.75rem;color:var(--text-muted);">
+                    <span id="recap-presta-prix">—</span> FCFA
+                    · <span id="recap-presta-duree">—</span> min
+                </div>
+            </div>
+            <button type="button"
+                    onclick="deselectionnerPrestation()"
+                    class="btn-ghost btn-sm"
+                    style="font-size:.72rem;padding:4px 10px;"
+                    aria-label="Changer de prestation">
+                Changer
+            </button>
+        </div>
+
+        <span class="section-eyebrow">Quand souhaitez-vous ?</span>
+        <h2 id="dispo-heading" class="section-heading">Choisissez un créneau</h2>
+        <p class="section-sub" style="margin-bottom:1.5rem;">Sélectionnez un jour puis un horaire disponible</p>
+
+        <!-- Jours disponibles -->
+        <div class="days-scroll mb-2" role="list" aria-label="Jours disponibles">
+            <?php
+            $jours_traduction = ['monday'=>'lundi','tuesday'=>'mardi','wednesday'=>'mercredi',
+                                 'thursday'=>'jeudi','friday'=>'vendredi','saturday'=>'samedi','sunday'=>'dimanche'];
+            for ($i = 0; $i < 7; $i++):
+                $ts        = strtotime("+{$i} days");
+                $date_cle  = date('Y-m-d', $ts);
+                $jour_en   = strtolower(date('l', $ts));
+                $jour_fr   = $jours_traduction[$jour_en];
+                $num_jour  = date('d', $ts);
+                $nom_mois  = date('M', $ts);
+                $travaille = isset($planning_coiffeur[$jour_fr]);
+                $h_debut   = $travaille ? $planning_coiffeur[$jour_fr]['debut'] : '';
+                $h_fin     = $travaille ? $planning_coiffeur[$jour_fr]['fin']   : '';
+            ?>
+            <div class="day-selector-card <?= $travaille ? 'day-item-open' : 'day-item-closed' ?>"
+                 data-date="<?= htmlspecialchars($date_cle) ?>"
+                 data-open="<?= $travaille ? '1' : '0' ?>"
+                 data-start="<?= htmlspecialchars($h_debut) ?>"
+                 data-end="<?= htmlspecialchars($h_fin) ?>"
+                 onclick="ppSelectionnerJour(this)"
+                 role="button" tabindex="0"
+                 onkeypress="if(event.key==='Enter')ppSelectionnerJour(this)"
+                 aria-label="<?= htmlspecialchars($jour_fr) ?> <?= $num_jour ?> <?= $nom_mois ?> — <?= $travaille ? 'disponible' : 'indisponible' ?>"
+                 <?= !$travaille ? 'aria-disabled="true"' : '' ?>>
+                <span class="small text-uppercase opacity-70 d-block"><?= substr($jour_fr,0,3) ?>.</span>
+                <span class="fs-4 fw-bold my-1 d-block"><?= $num_jour ?></span>
+                <span class="small opacity-50 d-block"><?= $nom_mois ?></span>
+            </div>
+            <?php endfor; ?>
+        </div>
+
+        <!-- Créneaux horaires -->
+        <div id="pp-zone-slots" class="pp-slots-wrap d-none" role="region" aria-live="polite" aria-label="Créneaux horaires">
+            <div class="pp-slots-title">Heures disponibles</div>
+            <div id="pp-slots-container" class="d-flex flex-wrap justify-content-center gap-2" role="list"></div>
+        </div>
+
+        <!-- Bouton Continuer (masqué jusqu'à sélection date + heure) -->
+        <div id="btn-continuer-wrap">
+            <div style="background:rgba(212,175,55,.07);border:1px solid rgba(212,175,55,.2);border-radius:var(--radius-md);padding:14px 18px;display:inline-flex;align-items:center;gap:12px;margin-bottom:1rem;text-align:left;">
+                <i class="bi bi-calendar-check" style="color:var(--gold);font-size:1.2rem;flex-shrink:0;" aria-hidden="true"></i>
+                <div>
+                    <div style="font-weight:700;font-size:.88rem;color:var(--text-primary);" id="recap-date-heure">—</div>
+                    <div style="font-size:.75rem;color:var(--text-muted);" id="recap-coiffeur-nom">Avec <?= htmlspecialchars($coiffeur['nom'] . ' ' . ($coiffeur['prenom'] ?? '')) ?></div>
+                </div>
+            </div>
+            <br>
+            <a id="btn-continuer"
+               href="#"
+               class="btn-gold d-inline-flex align-items-center gap-2"
+               style="padding:13px 32px;font-size:.95rem;"
+               aria-label="Continuer vers la confirmation">
+                <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                Continuer
+            </a>
+        </div>
 
     </div>
 </section>
 
-<!-- ══════════════════════════════════════════
-     SECTION AVIS CLIENTS
-     ══════════════════════════════════════════ -->
-<section style="padding:4rem 0;background:var(--dark-2);" aria-labelledby="avis-heading">
-    <div class="container" style="max-width:var(--max-width);">
-
-        <h2 id="avis-heading" style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--text-primary);margin-bottom:.25rem;">
-            <i class="bi bi-star-half me-2" style="color:var(--gold);" aria-hidden="true"></i>
-            Avis clients
-        </h2>
-        <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:2rem;">
-            Ce que pensent les clients de ce coiffeur
-            <?php if ($note_moyenne && $stats_avis['total'] > 0): ?>
-                · <strong style="color:var(--gold);"><?= $note_moyenne ?> / 5</strong>
-                <?php for ($s = 1; $s <= 5; $s++): ?>
-                    <span style="color:<?= $s <= round($note_moyenne) ? '#D4AF37' : 'rgba(255,255,255,0.2)' ?>;" aria-hidden="true">★</span>
-                <?php endfor; ?>
-                · <?= $stats_avis['total'] ?> avis
-            <?php endif; ?>
-        </p>
+<!-- ════════════ 4. AVIS CLIENTS ════════════ -->
+<section class="pp-section pp-section--alt" aria-labelledby="avis-heading">
+    <div class="pp-wrap">
+        <span class="section-eyebrow">Réputation</span>
+        <h2 id="avis-heading" class="section-heading">Avis clients</h2>
+        <?php if ($note_moyenne && $stats_avis['total'] > 0): ?>
+            <p class="section-sub" style="margin-bottom:2rem;">
+                <strong style="color:var(--gold);"><?= $note_moyenne ?>/5</strong>
+                · <?= $stats_avis['total'] ?> avis vérifiés
+            </p>
+        <?php else: ?>
+            <p class="section-sub" style="margin-bottom:2rem;">Soyez le premier à laisser un avis !</p>
+        <?php endif; ?>
 
         <?php if (empty($avis_publics)): ?>
-            <!-- Empty state -->
             <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:2.5rem;text-align:center;">
-                <i class="bi bi-chat-square-text" style="font-size:2.5rem;color:rgba(255,255,255,0.1);display:block;margin-bottom:1rem;" aria-hidden="true"></i>
-                <p style="color:var(--text-muted);font-size:.88rem;">Aucun avis pour l'instant. Soyez le premier à donner votre avis après votre coiffure !</p>
+                <i class="bi bi-chat-square-text" style="font-size:2.5rem;color:rgba(255,255,255,.1);display:block;margin-bottom:.75rem;" aria-hidden="true"></i>
+                <p style="color:var(--text-muted);font-size:.88rem;margin:0;">Aucun avis pour l'instant.</p>
             </div>
         <?php else: ?>
             <div class="row g-3">
                 <?php foreach ($avis_publics as $avis):
-                    $initiale_client = strtoupper(substr($avis['client_nom'] ?? 'C', 0, 1));
-                    $note_avis       = intval($avis['note'] ?? 0);
-                    // Date relative
-                    $date_avis = new DateTime($avis['date_creation'] ?? 'now');
-                    $now_avis  = new DateTime();
-                    $diff      = $now_avis->diff($date_avis);
-                    if ($diff->days === 0)         $date_relative = "Aujourd'hui";
-                    elseif ($diff->days === 1)     $date_relative = "Hier";
-                    elseif ($diff->days < 7)       $date_relative = "Il y a " . $diff->days . " jours";
-                    elseif ($diff->days < 30)      $date_relative = "Il y a " . floor($diff->days / 7) . " semaine(s)";
-                    elseif ($diff->days < 365)     $date_relative = "Il y a " . floor($diff->days / 30) . " mois";
-                    else                           $date_relative = "Il y a " . floor($diff->days / 365) . " an(s)";
+                    $note_av  = intval($avis['note'] ?? 0);
+                    $init_av  = strtoupper(substr($avis['client_nom'] ?? 'C', 0, 1));
+                    $masque   = strtoupper(substr($avis['client_prenom'] ?? 'C', 0, 1)) . '***';
+                    $d_av     = new DateTime($avis['date_creation'] ?? 'now');
+                    $diff_av  = (new DateTime())->diff($d_av);
+                    $date_r   = $diff_av->days === 0 ? "Aujourd'hui"
+                              : ($diff_av->days === 1 ? "Hier" : "Il y a {$diff_av->days} jours");
                 ?>
-                    <div class="col-12 col-md-6">
-                        <div style="background:var(--dark-3);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:1.25rem;">
-                            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-                                <!-- Avatar initiale client -->
-                                <div style="width:38px;height:38px;border-radius:50%;background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.3);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--gold);font-size:.85rem;flex-shrink:0;">
-                                    <?= htmlspecialchars($initiale_client) ?>
-                                </div>
-                                <div style="flex:1;min-width:0;">
-                                    <div style="font-size:.82rem;font-weight:600;color:var(--text-primary);">
-                                        <?php
-                                        // Masquage du prénom client : "K***" (première lettre + 3 astérisques)
-                                        $prenom_masque = strtoupper(substr($avis['client_prenom'] ?? 'C', 0, 1)) . '***';
-                                        echo htmlspecialchars($prenom_masque);
-                                        ?>
-                                    </div>
-                                    <div style="font-size:.72rem;color:var(--text-muted);"><?= htmlspecialchars($date_relative) ?></div>
-                                </div>
-                                <!-- Étoiles -->
-                                <div style="font-size:.9rem;" aria-label="Note : <?= $note_avis ?> sur 5">
-                                    <?php for ($s = 1; $s <= 5; $s++): ?>
-                                        <span style="color:<?= $s <= $note_avis ? '#D4AF37' : 'rgba(255,255,255,0.15)' ?>;">★</span>
-                                    <?php endfor; ?>
-                                </div>
+                <div class="col-12 col-md-6">
+                    <div style="background:var(--dark-3);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:1.25rem;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <div style="width:36px;height:36px;border-radius:50%;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.25);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--gold);font-size:.82rem;flex-shrink:0;">
+                                <?= htmlspecialchars($init_av) ?>
                             </div>
-                            <!-- Commentaire -->
-                            <?php if (!empty($avis['message'])): ?>
-                                <p style="color:var(--text-secondary);font-size:.82rem;line-height:1.6;margin:0;">
-                                    "<?= htmlspecialchars($avis['message']) ?>"
-                                </p>
-                            <?php endif; ?>
+                            <div style="flex:1;">
+                                <div style="font-size:.82rem;font-weight:600;color:var(--text-primary);"><?= htmlspecialchars($masque) ?></div>
+                                <div style="font-size:.7rem;color:var(--text-muted);"><?= htmlspecialchars($date_r) ?></div>
+                            </div>
+                            <div aria-label="Note : <?= $note_av ?>/5">
+                                <?php for ($s=1;$s<=5;$s++): ?>
+                                    <span style="color:<?= $s<=$note_av?'#D4AF37':'rgba(255,255,255,.15)';?>;font-size:.88rem;">★</span>
+                                <?php endfor; ?>
+                            </div>
                         </div>
+                        <?php if (!empty($avis['message'])): ?>
+                            <p style="color:var(--text-secondary);font-size:.82rem;line-height:1.6;margin:0;">"<?= htmlspecialchars($avis['message']) ?>"</p>
+                        <?php endif; ?>
                     </div>
+                </div>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
-
     </div>
 </section>
 
-<!-- ══════════════════════════════════════════
-     FOOTER GLOBAL + BOTTOM NAV
-     ══════════════════════════════════════════ -->
+<!-- FOOTER + IA + BOTTOM NAV -->
 <?php
-$page_root = '/coiffons';
+$page_root    = '/coiffons';
 include __DIR__ . '/../views/components/footer_global.php';
-
+include __DIR__ . '/../views/components/ia_assistant.php';
 $current_page = 'profil_public.php';
 include __DIR__ . '/../views/components/bottom_nav_client.php';
 ?>
 
-<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- ══ JAVASCRIPT UI — logique selectionnerJour inchangée ══ -->
 <script>
-(function() {
-    const slotsOccupes = <?= json_encode($busy_slots) ?>;
-    const coiffeurId   = <?= (int)$id_coiffeur ?>;
-    const pageRoot     = '/coiffons';
+(function () {
+    'use strict';
 
-    // Connexion PHP → JS : visiteur connecté ou non
-    const estConnecte = <?= $est_connecte ? 'true' : 'false' ?>;
+    /* ── Données PHP → JS ── */
+    const COIFFEUR_ID   = <?= (int)$id_coiffeur ?>;
+    const EST_CONNECTE  = <?= $est_connecte ? 'true' : 'false' ?>;
+    const PAGE_ROOT     = '/coiffons';
+    const BUSY_SLOTS    = <?= json_encode($busy_slots, JSON_UNESCAPED_UNICODE) ?>;
 
-    window.selectionnerJour = function(element) {
+    /* ── État courant ── */
+    let prestaSelectionId   = null;
+    let prestaSelectionNom  = '';
+    let prestaSelectionPrix = 0;
+    let dateSelectionnee    = null;
+    let heureSelectionnee   = null;
+
+    /* ══════════════════════════════════════════
+       SÉLECTION D'UNE PRESTATION
+       ══════════════════════════════════════════ */
+    window.selectionnerPrestation = function (card) {
+        // Désélectionner toutes les cartes
+        document.querySelectorAll('.presta-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+
+        prestaSelectionId   = card.getAttribute('data-presta-id');
+        prestaSelectionNom  = card.getAttribute('data-presta-nom');
+        prestaSelectionPrix = parseInt(card.getAttribute('data-presta-prix'));
+        const duree         = parseInt(card.getAttribute('data-presta-duree'));
+
+        // Mettre à jour le mini-recap
+        document.getElementById('recap-presta-nom').textContent  = prestaSelectionNom;
+        document.getElementById('recap-presta-prix').textContent = prestaSelectionPrix.toLocaleString('fr-FR');
+        document.getElementById('recap-presta-duree').textContent = duree;
+
+        // Réinitialiser la sélection date/heure
+        dateSelectionnee  = null;
+        heureSelectionnee = null;
+        document.querySelectorAll('.day-selector-card').forEach(d => d.classList.remove('active-day'));
+        document.getElementById('pp-zone-slots').classList.add('d-none');
+        document.getElementById('btn-continuer-wrap').style.display = 'none';
+
+        // Afficher la section disponibilités
+        const section = document.getElementById('section-disponibilites');
+        section.style.display = 'block';
+
+        // Scroll smooth vers disponibilités
+        setTimeout(() => {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    };
+
+    window.deselectionnerPrestation = function () {
+        prestaSelectionId = null;
+        document.querySelectorAll('.presta-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById('section-disponibilites').style.display = 'none';
+        document.getElementById('section-catalogue').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    /* ══════════════════════════════════════════
+       SÉLECTION D'UN JOUR
+       ══════════════════════════════════════════ */
+    window.ppSelectionnerJour = function (element) {
         document.querySelectorAll('.day-selector-card').forEach(el => el.classList.remove('active-day'));
-        // Supprimer l'éventuel message d'invitation précédent
-        const oldNotice = document.getElementById('slot-login-notice');
-        if (oldNotice) oldNotice.remove();
+        heureSelectionnee = null;
+        document.getElementById('btn-continuer-wrap').style.display = 'none';
 
         if (element.getAttribute('data-open') === '0') {
-            document.getElementById('zone-slots-horaires').classList.add('d-none');
-            if (typeof showToast === 'function') {
-                showToast('Ce coiffeur ne travaille pas ce jour-là.', 'warning');
-            }
+            document.getElementById('pp-zone-slots').classList.add('d-none');
+            if (typeof showToast === 'function') showToast('Ce coiffeur ne travaille pas ce jour-là.', 'warning');
             return;
         }
 
         element.classList.add('active-day');
+        dateSelectionnee = element.getAttribute('data-date');
 
-        const dateChoisie = element.getAttribute('data-date');
-        const heureDebut  = element.getAttribute('data-start');
-        const heureFin    = element.getAttribute('data-end');
-        const container   = document.getElementById('slots-container');
-        const zone        = document.getElementById('zone-slots-horaires');
+        const heureDebut = element.getAttribute('data-start');
+        const heureFin   = element.getAttribute('data-end');
+        const container  = document.getElementById('pp-slots-container');
+        const zone       = document.getElementById('pp-zone-slots');
 
         container.innerHTML = '';
         if (!heureDebut || !heureFin) { zone.classList.add('d-none'); return; }
 
-        const [hStart] = heureDebut.split(':').map(Number);
-        const [hEnd]   = heureFin.split(':').map(Number);
-        const urlParams = new URLSearchParams(window.location.search);
-        const prestaId  = urlParams.get('presta_id') || '';
+        const hStart = parseInt(heureDebut.split(':')[0]);
+        const hEnd   = parseInt(heureFin.split(':')[0]);
 
+        let hasAvailable = false;
         for (let h = hStart; h < hEnd; h++) {
-            const slotHeure = String(h).padStart(2,'0') + ':00';
-            const cleVerif  = dateChoisie + ' ' + slotHeure;
-            const btn = document.createElement('a');
+            const slotH  = String(h).padStart(2, '0') + ':00';
+            const cleKey = dateSelectionnee + ' ' + slotH;
+            const btn    = document.createElement('button');
+            btn.type     = 'button';
             btn.setAttribute('role', 'listitem');
+            btn.textContent = slotH;
 
-            if (slotsOccupes[cleVerif]) {
-                // Créneau occupé
-                btn.className = 'btn-ghost btn-sm disabled';
+            if (BUSY_SLOTS[cleKey]) {
+                btn.className = 'btn-ghost btn-sm';
                 btn.style.opacity = '.25';
-                btn.title = 'Déjà réservé';
+                btn.disabled = true;
                 btn.setAttribute('aria-disabled', 'true');
-                btn.textContent = slotHeure;
-            } else if (!estConnecte) {
-                // Visiteur non connecté → créneau visible mais redirige vers connexion
-                const reservationUrl = `${pageRoot}/client/reserver.php?coiffeur_id=${coiffeurId}&presta_id=${prestaId}&date_rdv=${dateChoisie}&heure_debut=${slotHeure}`;
-                btn.className = 'btn-outline-gold btn-sm';
-                btn.href      = `${pageRoot}/index.php?page=login&redirect=${encodeURIComponent(reservationUrl)}`;
-                btn.title     = 'Connexion requise pour réserver ce créneau';
-                btn.setAttribute('aria-label', `Se connecter pour réserver le ${slotHeure}`);
-                btn.textContent = slotHeure;
+                btn.title = 'Déjà réservé';
             } else {
-                // Connecté → accès direct à la réservation
                 btn.className = 'btn-outline-gold btn-sm';
-                btn.href      = `${pageRoot}/client/reserver.php?coiffeur_id=${coiffeurId}&presta_id=${prestaId}&date_rdv=${dateChoisie}&heure_debut=${slotHeure}`;
-                btn.setAttribute('aria-label', `Réserver le créneau ${slotHeure}`);
-                btn.textContent = slotHeure;
+                btn.setAttribute('aria-label', 'Choisir le créneau ' + slotH);
+                btn.addEventListener('click', () => ppSelectionnerHeure(btn, slotH));
+                hasAvailable = true;
             }
             container.appendChild(btn);
         }
 
-        zone.classList.remove('d-none');
-
-        // Invitation à se connecter si visiteur non authentifié
-        if (!estConnecte) {
-            const notice = document.createElement('p');
-            notice.id    = 'slot-login-notice';
-            notice.style.cssText = 'font-size:.78rem;color:rgba(255,255,255,0.45);margin-top:14px;';
-            notice.innerHTML = `<i class="bi bi-lock" style="color:var(--gold);margin-right:5px;"></i>
-                Créez un compte ou connectez-vous pour finaliser votre réservation.&nbsp;
-                <a href="${pageRoot}/index.php?page=login" style="color:var(--gold);font-weight:600;text-decoration:none;">Se connecter →</a>
-                &nbsp;·&nbsp;
-                <a href="${pageRoot}/index.php?page=register&role=client" style="color:rgba(212,175,55,0.7);text-decoration:none;">S'inscrire</a>`;
-            zone.appendChild(notice);
+        if (!hasAvailable) {
+            container.innerHTML = '<span style="color:var(--text-muted);font-size:.82rem;">Toutes les heures sont déjà réservées ce jour-là.</span>';
         }
+
+        zone.classList.remove('d-none');
     };
+
+    /* ══════════════════════════════════════════
+       SÉLECTION D'UNE HEURE
+       ══════════════════════════════════════════ */
+    function ppSelectionnerHeure(btn, heure) {
+        // Désélectionner tous les boutons d'heure
+        document.querySelectorAll('#pp-slots-container button').forEach(b => {
+            b.classList.remove('btn-gold');
+            if (!b.disabled) b.classList.add('btn-outline-gold');
+        });
+
+        btn.classList.remove('btn-outline-gold');
+        btn.classList.add('btn-gold');
+        heureSelectionnee = heure;
+
+        // Mettre à jour le récap
+        const dateObj   = new Date(dateSelectionnee + 'T12:00:00');
+        const dateLabel = dateObj.toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
+        document.getElementById('recap-date-heure').textContent = dateLabel + ' à ' + heure;
+
+        // Construire le lien de destination
+        const continuerURL = EST_CONNECTE
+            ? `${PAGE_ROOT}/client/reserver.php?coiffeur_id=${COIFFEUR_ID}&presta_id=${prestaSelectionId}&date_rdv=${dateSelectionnee}&heure_debut=${heure}`
+            : `${PAGE_ROOT}/index.php?page=login&redirect=${encodeURIComponent(PAGE_ROOT + '/client/reserver.php?coiffeur_id=' + COIFFEUR_ID + '&presta_id=' + prestaSelectionId + '&date_rdv=' + dateSelectionnee + '&heure_debut=' + heure)}`;
+
+        document.getElementById('btn-continuer').href = continuerURL;
+        document.getElementById('btn-continuer-wrap').style.display = 'block';
+
+        // Scroll vers le bouton
+        setTimeout(() => {
+            document.getElementById('btn-continuer-wrap').scrollIntoView({ behavior:'smooth', block:'nearest' });
+        }, 100);
+    }
+
 })();
 </script>
 

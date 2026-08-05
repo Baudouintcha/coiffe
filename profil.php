@@ -325,7 +325,7 @@ include __DIR__ . '/views/components/navbar_client.php';
                     <div class="col-md-6">
                         <div class="glass-cct p-3 h-100">
                             <span style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:8px;">Autorisation sur la plateforme</span>
-                            <?php if (isset($user['abonnement_actif']) && $user['abonnement_actif'] == 1): ?>
+                            <?php if (isset($user['abonnement_status']) && ($user['abonnement_status'] == 1 || strtolower($user['abonnement_status']) === 'actif')): ?>
                                 <span class="badge-verified">COMPTE ACTIF // AUTORISÉ</span>
                             <?php else: ?>
                                 <span class="badge-danger" style="display:inline-block;margin-bottom:8px;">ABONNEMENT EXPIRÉ</span><br>

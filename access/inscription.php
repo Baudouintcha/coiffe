@@ -118,7 +118,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             unset($_SESSION['redirect_url']);
                             header("Location: " . $redirect_url);
                         } elseif ($role === 'coiffeur') {
-                            header("Location: /coiffons/index.php?page=dashboard_coiffeur");
+                            // Page de bienvenue dédiée avant le dashboard
+                            $_SESSION['nouveau_coiffeur'] = true;
+                            header("Location: /coiffons/coiffeurs/bienvenue.php");
                         } else {
                             header("Location: /coiffons/index.php");
                         }

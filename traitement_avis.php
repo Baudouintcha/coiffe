@@ -85,6 +85,22 @@ try {
     }
 
     $pdo->commit();
+
+    // ── Notifications post-avis (non-bloquantes) ──
+    require_once __DIR__ . '/security/notifications.php';
+
+    // Notification au coiffeur : nouvel avis reçu
+    $etoiles = str_repeat('★', $note) . str_repeat('☆', 5 - $note);
+    $notif_coiffeur = "Vous avez reçu un nouvel avis ($etoiles). Consultez votre profil.";
+    notifier($pdo, $id_coiffeur, $notif_coiffeur, $note >= 4 ? 'success' : ($note >= 3 ? 'info' : 'warning'));
+
+    // Alerte admin si note ≤ 2 (avis négatif)
+    if ($note <= 2) {
+        $prenom_client_notif = htmlspecialchars(trim(($_SESSION['prenom'] ?? '') . ' ' . ($_SESSION['nom'] ?? '')));
+        $msg_admin = "⚠️ Avis négatif ($note/5) soumis par $prenom_client_notif pour le coiffeur #$id_coiffeur. Vérifier si c'est un signalement.";
+        notifier_admins($pdo, $msg_admin, 'danger');
+    }
+
     $_SESSION['success'] = "Votre avis a été enregistré avec succès. Merci !";
     header("Location: /coiffons/client/mes_rendezvous.php");
     exit();

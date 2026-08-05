@@ -53,11 +53,6 @@ $coiffeur = $stmt->fetch();
 include __DIR__ . '/../layout/header_coiffeur.php';
 ?>
 
-<!-- Design System v2.0 -->
-<link rel="stylesheet" href="/coiffons/css/variables.css">
-<link rel="stylesheet" href="/coiffons/css/animations.css">
-<link rel="stylesheet" href="/coiffons/css/components.css">
-
 <!-- ActionBar -->
 <?php
 $ab = [

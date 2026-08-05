@@ -96,10 +96,6 @@ $historique_apercu  = array_slice($historique_complet, 0, 5);
 include __DIR__ . '/../layout/header_coiffeur.php';
 ?>
 
-<!-- Design System v2.0 -->
-<link rel="stylesheet" href="/coiffons/css/variables.css">
-<link rel="stylesheet" href="/coiffons/css/animations.css">
-<link rel="stylesheet" href="/coiffons/css/components.css">
 
 <!-- ActionBar -->
 <?php
@@ -163,12 +159,9 @@ include __DIR__ . '/../views/components/action_bar.php';
         'title'   => $titre_abo,
         'text'    => $texte_abo,
         'cta'     => [
-            'type'        => 'submit',
-            'label'       => 'Réactiver l\'abonnement (1 500 FCFA)',
-            'action'      => 'portefeuille.php',
-            'form_fields' => '<input type="hidden" name="csrf_token" value="' . $_SESSION['csrf_token'] . '">'
-                           . '<input type="hidden" name="action" value="toggle_abo">'
-                           . '<input type="hidden" name="status" value="1">',
+            'type'        => 'link',
+            'label'       => '✅ Activer mon abonnement (1 500 FCFA)',
+            'href'        => '/coiffons/paiement/simuler_abonnement.php',
         ],
     ];
     include __DIR__ . '/../views/components/information_block.php';

@@ -88,8 +88,26 @@ $hc_navbar_height       = $hc_navbar_height       ?? 64;
 <style>
 /* HeroCapsule — CL §2, DS §19 */
 .hc-wrapper    { display:flex; justify-content:center; }
-.hc-capsule    { position:relative; width:92%; max-width:var(--max-width); height:420px; min-height:380px; border-radius:52px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.55),0 4px 16px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.06); }
+.hc-capsule    { position:relative; width:92%; max-width:var(--max-width); height:420px; min-height:380px; border-radius:52px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.55),0 4px 16px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.06); background:#0a0a0a; }
 .hc-carousel   { position:absolute; inset:0; z-index:0; }
+
+/* ── SLIDES — manquaient, cause du fond blanc ── */
+.hc-carousel .hero-slide {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transform: scale(1.06);
+    transition: opacity 1.4s ease, transform 8s ease;
+    will-change: opacity, transform;
+}
+.hc-carousel .hero-slide.active {
+    opacity: 1;
+    transform: scale(1);
+}
+
 .hc-overlay    { position:absolute; inset:0; z-index:1; background:linear-gradient(180deg,rgba(10,10,10,0.35) 0%,rgba(10,10,10,0.15) 40%,rgba(10,10,10,0.75) 100%); }
 .hc-profile-card { position:absolute; top:84px; right:24px; z-index:3; background:rgba(255,255,255,0.08); backdrop-filter:blur(20px); border:1px solid var(--glass-border-md); border-radius:var(--radius-lg); padding:14px 18px; display:flex; align-items:center; gap:12px; min-width:220px; box-shadow:0 4px 20px rgba(0,0,0,0.4); }
 .hc-profile-info  { display:flex; flex-direction:column; min-width:0; }
@@ -112,15 +130,16 @@ $hc_navbar_height       = $hc_navbar_height       ?? 64;
 </style>
 
 <script>
-(function() {
+document.addEventListener('DOMContentLoaded', function () {
     const slides = document.querySelectorAll('.hc-carousel .hero-slide');
+    console.log('[HeroCapsule] slides détectées :', slides.length);
     if (slides.length < 2) return;
     let cur = 0;
-    setInterval(() => {
+    setInterval(function () {
         slides[cur].classList.remove('active');
         cur = (cur + 1) % slides.length;
         slides[cur].classList.add('active');
-    }, 4000);
-})();
+    }, 5000);
+});
 </script>
 <?php unset($hc_images, $hc_title, $hc_subtitle, $hc_search_action, $hc_search_placeholder, $hc_profile, $hc_navbar_height); ?>

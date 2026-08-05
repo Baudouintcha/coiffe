@@ -41,7 +41,7 @@ if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexio
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || empty($password)) {
         $error = "Email ou mot de passe invalide.";
     } else {
-        $stmt = $pdo->prepare("SELECT id, nom, prenom, role, sexe, ville, password, date_expiration_abo, statut FROM users WHERE email = ? LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id, nom, prenom, role, sexe, ville, id_quartier, photo_profil, password, date_expiration_abo, statut FROM users WHERE email = ? LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
@@ -49,13 +49,27 @@ if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexio
             $error = "Ce compte a été suspendu.";
         } elseif ($user && password_verify($password, $user['password'])) {
             $_SESSION['login_attempts'] = 0;
-            $_SESSION['id_user'] = $user['id'];
-            $_SESSION['nom']     = $user['nom'];
-            $_SESSION['prenom']  = $user['prenom'];
-            $_SESSION['role']    = $user['role'];
-            $_SESSION['sexe']    = $user['sexe'];
-            $_SESSION['ville']   = $user['ville'];
+            $_SESSION['id_user']        = $user['id'];
+            $_SESSION['nom']            = $user['nom'];
+            $_SESSION['prenom']         = $user['prenom'];
+            $_SESSION['role']           = $user['role'];
+            $_SESSION['sexe']           = $user['sexe'];
+            $_SESSION['ville']          = $user['ville'];
+            $_SESSION['id_quartier']    = $user['id_quartier']  ?? 0;
+            $_SESSION['photo_profil']   = $user['photo_profil'] ?? null;
             $_SESSION['date_expiration_abo'] = $user['date_expiration_abo'];
+
+            // Photo profil — récupérée depuis la BDD pour alimenter navbar et dashboard
+            try {
+                $stmt_photo = $pdo->prepare("SELECT photo_profil, id_quartier FROM users WHERE id = ?");
+                $stmt_photo->execute([$user['id']]);
+                $user_extra = $stmt_photo->fetch();
+                $_SESSION['photo_profil'] = $user_extra['photo_profil'] ?? null;
+                $_SESSION['id_quartier']  = $user_extra['id_quartier']  ?? 0;
+            } catch (Exception $e) {
+                $_SESSION['photo_profil'] = null;
+                $_SESSION['id_quartier']  = 0;
+            }
 
             if ($user['ville']) {
                 $vn = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");

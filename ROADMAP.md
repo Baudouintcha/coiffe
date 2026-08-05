@@ -320,7 +320,24 @@ app.php (DOMIZI) → clic Beauté → métiers → clic Coiffure
 
 ---
 
-### 🚧 PHASE 3 — Module Prestataire/Coiffeur (EN COURS)
+## ✅ PHASE 3 — ASSISTANT IA MÉTIER (TERMINÉE)
+> Date : 2025-07-16
+
+### Améliorations effectuées — `ia_controlleur.php` v2.0
+
+1. **Contexte enrichi par rôle** — 4 blocs distincts (visiteur, client, coiffeur, admin) avec données BDD injectées en temps réel dans le prompt système.
+2. **Visiteur** — liste des 6 derniers coiffeurs actifs avec liens cliquables vers leurs profils publics + détection intention recherche coiffeur.
+3. **Client** — solde portefeuille, 3 derniers RDV avec statuts et liens profils coiffeurs, compteur RDV en attente, détection intentions (RDV, solde, réservation).
+4. **Coiffeur** — statut abonnement + date expiration, solde, planning du jour, demandes en attente, nombre de services catalogue, détection intentions (RDV, finances, abonnement, catalogue).
+5. **Admin** — KPIs temps réel : nombre users/clients/coiffeurs actifs-inactifs, RDV en attente, diplômes en attente, liens back-office.
+6. **Liens Markdown** — l'IA génère des liens `[texte](url)` convertis en HTML cliquable par le JS (`markdownToHtml()`).
+7. **`ia_assistant.php`** — rendu Markdown (liens, gras, listes) + suggestions rapides contextuelles par rôle (3 boutons pré-remplis selon visiteur/client/coiffeur/admin).
+
+### Fichiers modifiés
+- `ia_controlleur.php` — refonte complète v2.0
+- `views/components/ia_assistant.php` — Markdown renderer + suggestions rapides
+
+---
 **Objectif : Dashboard premium + gestion activité quotidienne**
  
 **Flux validé :**
@@ -413,7 +430,45 @@ rendez_vous          →  rendez_vous (même structure)
 
 ---
 
-### 🚧 PHASE 6 — Paiement Kkiapay
+## ✅ PHASE 5 — AVIS & RÉPUTATION (TERMINÉE)
+> Date : 2025-07-16
+
+### Implémentations effectuées
+
+1. **`traitement_avis.php`** — Notifications post-avis ajoutées :
+   - Notification au coiffeur après chaque avis soumis (★★★★★ incluses dans le message)
+   - Alerte admin automatique si note ≤ 2 via `notifier_admins()` (helper `security/notifications.php`)
+
+2. **`client/mes_rendezvous.php`** — Flash messages branchés :
+   - Lecture de `$_SESSION['success']` et `$_SESSION['error']` en début de page
+   - Affichage via toast DS v2.0 après redirection depuis `traitement_avis.php`
+
+3. **`coiffeurs/mes_avis.php`** — Page créée :
+   - Score global avec note affichée en grand (format "4.7 / 5")
+   - Distribution graphique des notes (barres colorées : gold ≥4, warning =3, danger ≤2)
+   - Liste des 20 derniers avis avec prénom masqué (K***), date relative, étoiles
+   - Empty state si aucun avis
+
+4. **`views/coiffeur/dashboard.php`** — Lien "Mes Avis" ajouté dans la sidebar
+
+5. **`layout/header_coiffeur.php`** — Lien "Avis" ajouté dans le bottom nav mobile
+
+6. **`filter/annuaire_coiffeurs.php`** — Note moyenne et nombre d'avis déjà affichés sur chaque carte (Phase 2)
+
+7. **`coiffeurs/profil_public.php`** — Section avis publics déjà implémentée avec date relative et prénom masqué (Phase 2)
+
+### Cycle complet validé
+```
+RDV terminé → client reçoit bouton "Laisser un avis"
+→ laisser_avis.php (star rating + commentaire + signalement optionnel)
+→ traitement_avis.php (anti-doublon + INSERT commentaires + notification coiffeur + alerte admin si note ≤ 2)
+→ note moyenne recalculée en temps réel dans annuaire + profil public
+→ coiffeur consulte ses avis sur mes_avis.php
+```
+
+---
+
+### ✅ PHASE 6 — Portefeuille & Paiement simulé (TERMINÉE — voir entrée ci-dessus)
 **Objectif : Paiement Mobile Money réel**
 
 **Flux abonnement coiffeur :**
@@ -441,7 +496,23 @@ Client clique "Recharger" → Kkiapay popup
 
 ---
 
-### 🚧 PHASE 7 — Notifications (Push Web + In-app)
+## ✅ PHASE 7 — ADMINISTRATION (TERMINÉE)
+> Date : 2025-07-17
+
+### Corrections `admin_dashboard.php`
+- Toutes les requêtes utilisant `transactions_site` et `abonnements_paiements` (tables obsolètes) remplacées par les vraies tables : `transactions_portefeuille`, `users`, `commentaires`
+- Requêtes wrappées dans `try/catch` — plus aucune erreur fatale si une table manque
+- `$diplomes_attente` — nouvelle requête pour les coiffeurs non approuvés avec diplôme uploadé
+- `$nb_notifs_admin` — compteur notifications admin non lues
+- `$abonnements_attente` — basé sur `users.abonnement_status` (table réelle)
+
+### Nouvelles actions `admin_actions.php`
+- `ACTION 10 : approuver_diplome` — `UPDATE users SET is_approved = 1` + notification coiffeur
+- `ACTION 11 : refuser_diplome` — notification coiffeur avec demande de resoumission
+
+### 🚧 PHASE 8 — DONNÉES DE DÉMONSTRATION (À FAIRE)
+
+
 **Objectif : Interpeller les utilisateurs même hors du site**
 
 **Réponse à la question "est-on sûr que ça peut interpeller les users ?"**

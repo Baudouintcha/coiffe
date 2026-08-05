@@ -50,6 +50,26 @@ if (isset($_SESSION['sexe'])) {
             Bonjour ! Je suis <strong><?= htmlspecialchars($nomIA) ?></strong>,
             votre assistant(e) personnel(le). Comment puis-je vous aider aujourd'hui ?
         </div>
+        <!-- Suggestions rapides selon le rôle -->
+        <div class="chat-suggestions" id="chat-suggestions">
+            <?php if (($role_actuel ?? 'invite') === 'invite'): ?>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Je cherche un coiffeur à Cotonou')">🔍 Coiffeur à Cotonou</button>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Comment créer un compte ?')">📝 Créer un compte</button>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Comment fonctionne la plateforme ?')">ℹ️ Comment ça marche ?</button>
+            <?php elseif (($role_actuel ?? '') === 'client'): ?>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Montre-moi mes rendez-vous')">📅 Mes RDV</button>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Quel est mon solde ?')">💰 Mon solde</button>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Comment réserver un coiffeur ?')">✂️ Réserver</button>
+            <?php elseif (($role_actuel ?? '') === 'coiffeur'): ?>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Combien ai-je de demandes en attente ?')">⏳ Demandes en attente</button>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Quels sont mes RDV du jour ?')">📅 RDV du jour</button>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Quel est mon solde ?')">💰 Mon solde</button>
+            <?php elseif (($role_actuel ?? '') === 'admin'): ?>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Combien y a-t-il de diplômes en attente ?')">🎓 Diplômes en attente</button>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Donne-moi les statistiques de la plateforme')">📊 Statistiques</button>
+                <button class="chat-suggestion-btn" onclick="sendQuick('Combien de RDV sont en attente ?')">📋 RDV en attente</button>
+            <?php endif; ?>
+        </div>
     </div>
 
     <div class="chat-footer">
@@ -177,6 +197,25 @@ if (isset($_SESSION['sexe'])) {
 .chat-actions      { display: flex; gap: 8px; }
 .chat-actions label{ flex: 1; text-align: center; }
 
+/* Suggestions rapides */
+.chat-suggestions  { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chat-suggestion-btn {
+    background: rgba(212,175,55,0.08);
+    border: 1px solid rgba(212,175,55,0.25);
+    color: rgba(255,255,255,0.75);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Inter', sans-serif;
+}
+.chat-suggestion-btn:hover {
+    background: rgba(212,175,55,0.18);
+    color: var(--gold);
+    border-color: var(--gold);
+}
+
 @media (max-width: 576px) {
     #ai-bubble   { width: 60px; height: 60px; bottom: 20px; right: 20px; }
     #ai-bubble span { font-size: 28px; }
@@ -191,6 +230,15 @@ function toggleChat() {
     const isOpen = win.style.display === 'block';
     win.style.display = isOpen ? 'none' : 'block';
     win.setAttribute('aria-hidden', isOpen ? 'true' : 'false');
+}
+
+// Envoyer un message suggestion rapide
+function sendQuick(text) {
+    // Masquer les suggestions après utilisation
+    const suggestions = document.getElementById('chat-suggestions');
+    if (suggestions) suggestions.style.display = 'none';
+    if (userInput) userInput.value = text;
+    sendMessage();
 }
 
 // Reconnaissance vocale
@@ -218,6 +266,19 @@ function parler(texte) {
 }
 
 // Envoi de message
+// Convertit le Markdown basique en HTML (liens, gras, tirets)
+function markdownToHtml(text) {
+    return text
+        // Liens [texte](url)
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:var(--gold);text-decoration:underline;" target="_self">$1</a>')
+        // Gras **texte**
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        // Tirets de liste (début de ligne)
+        .replace(/^- (.+)/gm, '• $1')
+        // Sauts de ligne
+        .replace(/\n/g, '<br>');
+}
+
 async function sendMessage(imageBase64 = null) {
     const text = userInput?.value?.trim();
     if (!text && !imageBase64) return;
@@ -236,10 +297,11 @@ async function sendMessage(imageBase64 = null) {
         const data = await res.json();
         document.getElementById(tempId)?.remove();
         if (data.status === 'success') {
-            content.innerHTML += `<div class="chat-bubble chat-bubble--ia">${data.reply}</div>`;
+            const htmlReply = markdownToHtml(data.reply);
+            content.innerHTML += `<div class="chat-bubble chat-bubble--ia">${htmlReply}</div>`;
             parler(data.reply);
         } else {
-            content.innerHTML += `<div class="chat-bubble chat-bubble--ia" style="color:var(--danger-text)">Erreur de connexion à l'assistant.</div>`;
+            content.innerHTML += `<div class="chat-bubble chat-bubble--ia" style="color:var(--danger-text)">${data.reply || 'Erreur de connexion.'}</div>`;
         }
     } catch {
         document.getElementById(tempId)?.remove();

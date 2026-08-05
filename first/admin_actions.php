@@ -213,12 +213,48 @@ switch ($action) {
         }
         break;
 
+    // =================================================================
+    // ACTION 10 : Approuver le diplôme d'un coiffeur
+    // =================================================================
+    case 'approuver_diplome':
+        $id_user = intval($_GET['id'] ?? 0);
+        if ($id_user > 0) {
+            $pdo->prepare("UPDATE users SET is_approved = 1 WHERE id = ?")->execute([$id_user]);
+
+            // Notification au coiffeur
+            require_once __DIR__ . '/../security/notifications.php';
+            notifier($pdo, $id_user,
+                'Félicitations ! Votre diplôme a été approuvé par notre équipe. Votre profil est maintenant entièrement visible dans l\'annuaire.',
+                'success'
+            );
+
+            header("Location: admin_dashboard.php?success=statut_visibilite_maj");
+            exit();
+        }
+        break;
+
+    // =================================================================
+    // ACTION 11 : Refuser le diplôme d'un coiffeur
+    // =================================================================
+    case 'refuser_diplome':
+        $id_user = intval($_GET['id'] ?? 0);
+        if ($id_user > 0) {
+            // Pas de modification is_approved, juste notification
+            require_once __DIR__ . '/../security/notifications.php';
+            notifier($pdo, $id_user,
+                'Votre document de certification n\'a pas pu être validé. Veuillez déposer un document lisible dans votre profil.',
+                'danger'
+            );
+            header("Location: admin_dashboard.php?success=statut_visibilite_maj");
+            exit();
+        }
+        break;
+
     // Action inconnue : retour au dashboard par défaut
     default:
         header("Location: admin_dashboard.php");
         exit();
 }
-
 // Redirection de sécurité en fin de fichier au cas où aucune condition n'est validée
 header("Location: admin_dashboard.php");
 exit();
