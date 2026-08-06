@@ -13,7 +13,7 @@ $page_root    = $page_root    ?? '/coiffons';
 
 $nav_items = [
     ['icon' => 'bi-house',        'label' => 'Accueil',    'href' => $page_root . '/index.php',                          'match' => ['index.php', 'dashboard']],
-    ['icon' => 'bi-search',       'label' => 'Rechercher', 'href' => $page_root . '/filter/annuaire_coiffeurs.php',       'match' => ['annuaire_coiffeurs.php']],
+    ['icon' => 'bi-search',       'label' => 'Rechercher', 'href' => $page_root . '/filter/annuaire_coiffeurs.php',       'match' => ['annuaire_coiffeurs.php'], 'role' => 'client'],
     ['icon' => 'bi-calendar3',    'label' => 'Mes RDV',    'href' => $page_root . '/client/mes_rendezvous.php',           'match' => ['mes_rendezvous.php']],
     ['icon' => 'bi-person-circle','label' => 'Profil',     'href' => $page_root . '/profil.php',                          'match' => ['profil.php', 'modifier_profil.php']],
 ];
@@ -21,6 +21,10 @@ $nav_items = [
 <nav class="client-bottom-nav" role="navigation" aria-label="Navigation mobile">
     <div class="cbn-items">
         <?php foreach ($nav_items as $item):
+            // Skip items that have a role restriction and user doesn't match
+            if (isset($item['role']) && ($item['role'] !== ($_SESSION['role'] ?? null))) {
+                continue;
+            }
             $is_active = in_array($current_page, $item['match']);
         ?>
         <a href="<?= htmlspecialchars($item['href']) ?>"

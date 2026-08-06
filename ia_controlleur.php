@@ -33,7 +33,7 @@ $role_actuel = $_SESSION['role']    ?? 'invite';
 $nom_user    = htmlspecialchars($_SESSION['nom']    ?? 'Visiteur');
 $prenom_user = htmlspecialchars($_SESSION['prenom'] ?? '');
 $id_user     = isset($_SESSION['id_user']) ? (int)$_SESSION['id_user'] : null;
-$ville_user  = $_SESSION['ville'] ?? 0;
+$ville_user  = $_SESSION['id_ville'] ?? 0;
 
 $message_lower = mb_strtolower($message_utilisateur, 'UTF-8');
 

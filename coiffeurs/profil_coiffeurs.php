@@ -1,4 +1,4 @@
-<?php
+r <?php
 /**
  * coiffeurs/profil_coiffeurs.php — Profil et paramètres du coiffeur
  * Migration Design System v2.0 — Parcours Coiffeur — Page 6
@@ -25,17 +25,17 @@ $id_coiffeur  = $_SESSION['id_user'];
 $message_type = '';
 $message_text = '';
 
-// Mise à jour du profil — SQL inchangé
+// Mise à jour du profil
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['maj_profil'])) {
-    $nom       = htmlspecialchars($_POST['nom']);
-    $prenom    = htmlspecialchars($_POST['prenom']);
-    $email     = htmlspecialchars($_POST['email']);
-    $telephone = htmlspecialchars($_POST['telephone']);
-    $ville     = htmlspecialchars($_POST['ville']);
-    $quartier  = htmlspecialchars($_POST['quartier']);
+    $nom        = htmlspecialchars(trim($_POST['nom']));
+    $prenom     = htmlspecialchars(trim($_POST['prenom']));
+    $email      = htmlspecialchars(trim($_POST['email']));
+    $telephone  = htmlspecialchars(trim($_POST['telephone']));
+    $id_ville   = !empty($_POST['ville']) ? intval($_POST['ville']) : null;
+    $id_quartier= !empty($_POST['id_quartier']) ? intval($_POST['id_quartier']) : null;
 
-    $stmt = $pdo->prepare("UPDATE users SET nom = ?, prenom = ?, email = ?, telephone = ?, ville = ?, quartier = ? WHERE id = ?");
-    if ($stmt->execute([$nom, $prenom, $email, $telephone, $ville, $quartier, $id_coiffeur])) {
+    $stmt = $pdo->prepare("UPDATE users SET nom = ?, prenom = ?, email = ?, telephone = ?, id_ville = ?, id_quartier = ? WHERE id = ?");
+    if ($stmt->execute([$nom, $prenom, $email, $telephone, $id_ville, $id_quartier, $id_coiffeur])) {
         $_SESSION['nom'] = $nom;
         $message_type = 'success';
         $message_text = 'Profil mis à jour avec succès.';
@@ -45,10 +45,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['maj_profil'])) {
     }
 }
 
-// Récupération infos coiffeur — SQL inchangé
+// Récupération infos coiffeur avec ville et quartier actuels
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$id_coiffeur]);
 $coiffeur = $stmt->fetch();
+
+// Récupération des villes
+try {
+    $stmtV = $pdo->query("SELECT id, nom_ville FROM villes ORDER BY nom_ville");
+    $villes = $stmtV->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $villes = [];
+}
+
+// Récupération des quartiers de la ville actuelle du coiffeur
+$id_ville_actuelle = $coiffeur['ville'] ?? null; // Note: 'ville' stocke l'ID de la ville
+$quartiers = [];
+if ($id_ville_actuelle) {
+    try {
+        $stmtQ = $pdo->prepare("SELECT id, nom_quartier FROM quartiers WHERE id_ville = ? ORDER BY nom_quartier");
+        $stmtQ->execute([$id_ville_actuelle]);
+        $quartiers = $stmtQ->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        $quartiers = [];
+    }
+}
 
 include __DIR__ . '/../layout/header_coiffeur.php';
 ?>
@@ -100,16 +121,26 @@ endif; ?>
                     ?>
                 </div>
                 <div class="col-md-6">
-                    <?php
-                    $ff = ['type'=>'text','name'=>'ville','label'=>'Ville','value'=>$coiffeur['ville']??'','required'=>true,'icon_prefix'=>'bi-building'];
-                    include __DIR__ . '/../views/components/form_field.php';
-                    ?>
+                    <label class="form-label-cct">Ville <span style="color:var(--danger-text)">*</span></label>
+                    <select name="ville" id="villeSelect" class="fc-dark" required onchange="chargerQuartiers(this.value)">
+                        <option value="">— Choisir une ville —</option>
+                        <?php foreach ($villes as $v): ?>
+                            <option value="<?= $v['id'] ?>" <?= ($coiffeur['ville'] ?? '') == $v['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($v['nom_ville']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="col-md-6">
-                    <?php
-                    $ff = ['type'=>'text','name'=>'quartier','label'=>'Quartier','value'=>$coiffeur['quartier']??'','required'=>true,'icon_prefix'=>'bi-geo-alt'];
-                    include __DIR__ . '/../views/components/form_field.php';
-                    ?>
+                    <label class="form-label-cct">Quartier <span style="color:var(--danger-text)">*</span></label>
+                    <select name="id_quartier" id="quartierSelect" class="fc-dark" required>
+                        <option value="">— Choisir un quartier —</option>
+                        <?php foreach ($quartiers as $q): ?>
+                            <option value="<?= $q['id'] ?>" <?= ($coiffeur['id_quartier'] ?? '') == $q['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($q['nom_quartier']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
             </div>
 
@@ -131,5 +162,35 @@ endif; ?>
         </form>
     </div>
 </div>
+
+<script>
+// Charger les quartiers en AJAX quand la ville change
+function chargerQuartiers(idVille) {
+    const qs = document.getElementById('quartierSelect');
+    if (!idVille || idVille === '0') {
+        qs.innerHTML = '<option value="">— Choisir un quartier —</option>';
+        return;
+    }
+    fetch('/coiffons/access/get_quartiers.php?id_ville=' + idVille)
+        .then(r => r.json())
+        .then(data => {
+            console.log('Quartiers chargés:', data);  // Debug
+            qs.innerHTML = '<option value="">— Choisir un quartier —</option>';
+            if (data.length === 0) {
+                console.warn('Aucun quartier trouvé pour cette ville');
+            }
+            data.forEach(q => {
+                const opt = document.createElement('option');
+                opt.value = q.id;  // q.id est l'alias de id_quartier
+                opt.textContent = q.nom_quartier;
+                qs.appendChild(opt);
+            });
+        })
+        .catch(e => {
+            console.error('Erreur lors du chargement des quartiers:', e);
+            qs.innerHTML = '<option value="">Erreur de chargement</option>';
+        });
+}
+</script>
 
 <?php include __DIR__ . '/../layout/footer_coiffeur.php'; ?>

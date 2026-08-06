@@ -41,7 +41,7 @@ if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexio
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || empty($password)) {
         $error = "Email ou mot de passe invalide.";
     } else {
-        $stmt = $pdo->prepare("SELECT id, nom, prenom, role, sexe, ville, id_quartier, photo_profil, password, date_expiration_abo, statut FROM users WHERE email = ? LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id, nom, prenom, role, sexe, id_ville, id_quartier, photo_profil, password, date_expiration_abo, statut FROM users WHERE email = ? LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
@@ -54,7 +54,7 @@ if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexio
             $_SESSION['prenom']         = $user['prenom'];
             $_SESSION['role']           = $user['role'];
             $_SESSION['sexe']           = $user['sexe'];
-            $_SESSION['ville']          = $user['ville'];
+            $_SESSION['id_ville']       = $user['id_ville'];
             $_SESSION['id_quartier']    = $user['id_quartier']  ?? 0;
             $_SESSION['photo_profil']   = $user['photo_profil'] ?? null;
             $_SESSION['date_expiration_abo'] = $user['date_expiration_abo'];
@@ -71,9 +71,9 @@ if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexio
                 $_SESSION['id_quartier']  = 0;
             }
 
-            if ($user['ville']) {
+            if ($user['id_ville']) {
                 $vn = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");
-                $vn->execute([$user['ville']]);
+                $vn->execute([$user['id_ville']]);
                 $vd = $vn->fetch();
                 $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
             }

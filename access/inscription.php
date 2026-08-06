@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         if (!empty($errors)) {
             $message = "msg-danger::" . implode('<br>', array_map('htmlspecialchars', $errors));
-        } elseif ($role == 'coiffeur' && (!isset($_FILES['diplome']) || $_FILES['diplome']['error'] !== 0)) {
+        } elseif ($role == 'coiffeur' && empty($_POST['diplome_b64'])) {
             $message = "msg-danger::Le diplôme est obligatoire pour les coiffeurs.";
         } else {
             $password_hash = password_hash($password, PASSWORD_BCRYPT);
@@ -100,13 +100,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if ($check->rowCount() > 0) {
                     $message = "msg-danger::Cet email est déjà utilisé.";
                 } else {
-                    $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, id_ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     if ($ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, $role, $id_ville, $id_quartier, $diplome_path, $photo_profil_path])) {
                         $_SESSION['id_user']  = $pdo->lastInsertId();
                         $_SESSION['nom']      = $nom;
                         $_SESSION['prenom']   = $prenom;
                         $_SESSION['role']     = $role;
-                        $_SESSION['ville']    = $id_ville;
+                        $_SESSION['id_ville']    = $id_ville;
                         $vn = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");
                         $vn->execute([$id_ville]);
                         $vd = $vn->fetch();

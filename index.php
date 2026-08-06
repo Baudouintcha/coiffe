@@ -42,7 +42,7 @@ switch ($page) {
         }
         // Prépare les données de matching pour la vue
         $coiffeurs_matching = [];
-        $id_ville_client    = $_SESSION['ville'] ?? 0;
+        $id_ville_client    = $_SESSION['id_ville'] ?? 0;
         $id_quartier_client = $_SESSION['id_quartier'] ?? 0;
         try {
             $stmt = $pdo->prepare("
@@ -141,7 +141,7 @@ switch ($page) {
 
         // Données pour le client connecté (matching géographique)
         if ($role_actuel === 'client') {
-            $id_ville_client   = $_SESSION['ville'] ?? 0;
+            $id_ville_client   = $_SESSION['id_ville'] ?? 0;
             $id_quartier_client= $_SESSION['id_quartier'] ?? 0;
             try {
                 $stmt = $pdo->prepare("

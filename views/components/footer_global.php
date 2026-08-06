@@ -25,7 +25,9 @@ $page_root = $page_root ?? '/coiffons';
             <div class="col-6 col-md-2">
                 <div class="footer-section-title">Navigation</div>
                 <a href="<?= $page_root ?>/index.php"                         class="footer-link">Accueil</a>
+                <?php if (($_SESSION['role'] ?? null) === 'client'): ?>
                 <a href="<?= $page_root ?>/filter/annuaire_coiffeurs.php"      class="footer-link">Annuaire</a>
+                <?php endif; ?>
                 <a href="<?= $page_root ?>/client/mes_rendezvous.php"          class="footer-link">Mes RDV</a>
                 <a href="<?= $page_root ?>/client/catalogue.php"               class="footer-link">Catalogue</a>
             </div>

@@ -66,12 +66,14 @@ if (isset($pdo) && isset($_SESSION['id_user'])) {
         Coiffe Chez Toi
     </a>
     <div class="cct-nav-actions">
+        <?php if (($_SESSION['role'] ?? null) === 'client'): ?>
         <a href="<?= $page_root ?>/filter/annuaire_coiffeurs.php"
            class="nav-icon-btn"
            title="Rechercher un coiffeur"
            aria-label="Rechercher">
             <i class="bi bi-search" aria-hidden="true"></i>
         </a>
+        <?php endif; ?>
         <a href="<?= $page_root ?>/client/mes_rendezvous.php"
            class="nav-icon-btn"
            title="Mes rendez-vous"

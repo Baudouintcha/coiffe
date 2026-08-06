@@ -34,15 +34,12 @@ if ($user['role'] === 'admin') {
     exit();
 }
 
-// Variables blocs + graphiques — logique inchangée
+// Variables blocs stats
 $bloc1_val = 0; $bloc1_lbl = ""; $bloc1_icon = ""; $bloc1_link = ""; $bloc1_sub = "";
 $bloc2_val = 0; $bloc2_lbl = ""; $bloc2_icon = ""; $bloc2_link = ""; $bloc2_sub = "";
 $bloc3_val = 0; $bloc3_lbl = ""; $bloc3_icon = ""; $bloc3_link = ""; $bloc3_sub = "";
 $bloc4_val = ""; $bloc4_lbl = ""; $bloc4_icon = ""; $bloc4_link = ""; $bloc4_sub = "";
 $argent_gele = 0;
-$stats_rdv = ['en_attente' => 0, 'accepte' => 0, 'termine' => 0, 'annule' => 0];
-$stats_villes = [];
-$stats_mensuelles = array_fill(1, 12, 0);
 $commentaires = [];
 $note_moyenne = 0;
 $total_avis = 0;
@@ -74,9 +71,6 @@ if ($user['role'] === 'coiffeur') {
     $bloc4_lbl = "Clients fidélisés"; $bloc4_icon = "bi-people"; $bloc4_link = "#"; $bloc4_sub = "Total clients uniques";
     try { $s = $pdo->prepare("SELECT COUNT(DISTINCT client_id) FROM rendez_vous WHERE coiffeur_id = ?"); $s->execute([$user_id]); $bloc4_val = intval($s->fetchColumn()); } catch (Exception $e) { $bloc4_val = 0; }
 
-    try { $s = $pdo->prepare("SELECT statut_rdv, COUNT(*) as total FROM rendez_vous WHERE coiffeur_id = ? GROUP BY statut_rdv"); $s->execute([$user_id]); while ($row = $s->fetch()) { if (array_key_exists($row['statut_rdv'], $stats_rdv)) $stats_rdv[$row['statut_rdv']] = intval($row['total']); } } catch (Exception $e) {}
-    try { $s = $pdo->prepare("SELECT v.nom_ville, COUNT(zc.id_quartier) as total FROM zones_coiffeur zc JOIN quartiers q ON zc.id_quartier = q.id JOIN villes v ON q.id_ville = v.id WHERE zc.id_coiffeur = ? GROUP BY v.nom_ville"); $s->execute([$user_id]); $stats_villes = $s->fetchAll(PDO::FETCH_ASSOC) ?: []; } catch (Exception $e) {}
-
 } else {
     try { $s = $pdo->prepare("SELECT r.date_creation, r.commentaire, r.note, u.nom, u.prenom FROM rendez_vous r JOIN users u ON r.coiffeur_id = u.id WHERE r.client_id = ? AND r.commentaire IS NOT NULL ORDER BY r.date_creation DESC LIMIT 10"); $s->execute([$user_id]); $commentaires = $s->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
 
@@ -91,9 +85,6 @@ if ($user['role'] === 'coiffeur') {
 
     $bloc4_val = "<span style='color:var(--success-text);font-weight:700;'><i class='bi bi-circle-fill me-1' style='font-size:7px;'></i> ACTIF</span>";
     $bloc4_lbl = "Statut du compte"; $bloc4_icon = "bi-shield-check"; $bloc4_link = "#"; $bloc4_sub = "Profil vérifié";
-
-    try { $s = $pdo->prepare("SELECT statut_rdv, COUNT(*) as total FROM rendez_vous WHERE client_id = ? GROUP BY statut_rdv"); $s->execute([$user_id]); while ($row = $s->fetch()) { if (array_key_exists($row['statut_rdv'], $stats_rdv)) $stats_rdv[$row['statut_rdv']] = intval($row['total']); } } catch (Exception $e) {}
-    try { $s = $pdo->prepare("SELECT MONTH(date_creation) as mois, COUNT(*) as total FROM rendez_vous WHERE client_id = ? AND YEAR(date_creation) = YEAR(CURDATE()) GROUP BY MONTH(date_creation)"); $s->execute([$user_id]); while ($row = $s->fetch()) { $stats_mensuelles[intval($row['mois'])] = intval($row['total']); } } catch (Exception $e) {}
 }
 
 $lien_rendezvous = ($user['role'] === 'client') ? "/coiffons/client/mes_rendezvous.php" : "/coiffons/coiffeurs/agenda_coiffeurs.php";
@@ -122,7 +113,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
     /* profil.php — styles spécifiques DS-conformes */
     .profil-page { padding-top:calc(var(--navbar-height) + 1.5rem); padding-bottom:calc(var(--bottomnav-height) + 2rem); min-height:100vh; background:var(--dark); }
@@ -133,8 +123,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression
     .metric-value { font-size:1.05rem; font-weight:700; color:var(--text-primary); margin:4px 0; }
     .metric-link { font-size:0.6rem; color:var(--gold); text-decoration:none; font-weight:600; }
     .metric-link:hover { color:var(--gold-hover); }
-    .chart-box { background:var(--dark-3); border:1px solid var(--glass-border); border-radius:var(--radius-md); padding:12px; text-align:center; }
-    .chart-label { font-size:0.65rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; display:block; margin-bottom:10px; }
     .info-row { font-size:0.75rem; }
     .info-key { color:var(--text-muted); display:block; font-size:0.6rem; text-transform:uppercase; margin-bottom:2px; }
     .info-val { color:var(--text-primary); font-weight:700; }
@@ -248,32 +236,6 @@ include __DIR__ . '/views/components/navbar_client.php';
                     <?php endforeach; ?>
                 </div>
 
-                <!-- Graphiques Chart.js — logique inchangée -->
-                <h5 style="font-size:0.72rem;font-weight:700;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:1rem;">
-                    <i class="bi bi-bar-chart-line-fill me-2" aria-hidden="true"></i>ANALYSE ET COUVERTURE VISUELLE
-                </h5>
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <div class="chart-box">
-                            <span class="chart-label">
-                                <?= $user['role'] === 'coiffeur' ? 'SITUATION DES DEMANDES' : 'STATUTS DE MES RÉSERVATIONS' ?>
-                            </span>
-                            <div style="max-height:160px;display:flex;justify-content:center;">
-                                <canvas id="chartRdv"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="chart-box">
-                            <span class="chart-label">
-                                <?= $user['role'] === 'coiffeur' ? 'QUARTIERS COUVERTS PAR VILLE' : 'FRÉQUENCE DE MES SÉANCES (2026)' ?>
-                            </span>
-                            <div style="max-height:160px;display:flex;justify-content:center;">
-                                <canvas id="chartDynamiqueRole"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Portefeuille -->
                 <h5 id="solde-section" style="font-size:0.72rem;font-weight:700;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:1rem;">
@@ -312,7 +274,7 @@ include __DIR__ . '/views/components/navbar_client.php';
                         <div class="col-sm-6"><span class="info-key">Numéro WhatsApp</span><span class="info-val" style="color:var(--gold);"><?= htmlspecialchars($user['telephone']) ?></span></div>
                         <div class="col-sm-4"><span class="info-key">Genre</span><span class="info-val"><?= htmlspecialchars(ucfirst($user['sexe'] ?? '—')) ?></span></div>
                         <div class="col-sm-4"><span class="info-key">Ville</span><span class="info-val"><?= htmlspecialchars($user['nom_ville_clean'] ?? 'Non spécifiée') ?></span></div>
-                        <div class="col-sm-4"><span class="info-key">Quartier</span><span class="info-val"><?= htmlspecialchars($user['nom_quartier_clean'] ?? 'Général') ?></span></div>
+                        <div class="col-sm-4"><span class="info-key">Quartier</span><span class="info-val"><?= htmlspecialchars($user['nom_quartier_clean'] ?? 'Non spécifié') ?></span></div>
                     </div>
                 </div>
 
@@ -472,9 +434,9 @@ include __DIR__ . '/views/components/bottom_nav_client.php';
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-/* Chart.js — logique inchangée, couleurs via DS tokens */
-const ctxRdv = document.getElementById('chartRdv').getContext('2d');
+</body>
+</html>
+
 new Chart(ctxRdv, {
     type: 'doughnut',
     data: {

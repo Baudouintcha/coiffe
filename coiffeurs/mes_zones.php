@@ -50,8 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_zones']))
     }
 }
 
-// Récupération ville coiffeur — SQL inchangé
-$profile_stmt = $pdo->prepare("SELECT ville FROM users WHERE id = ?");
+// Récupération ville coiffeur — SQL CORRIGÉ : utiliser id_ville au lieu de ville
+$profile_stmt = $pdo->prepare("SELECT id_ville FROM users WHERE id = ?");
 $profile_stmt->execute([$id_coiffeur]);
 $id_ville_coiffeur = intval($profile_stmt->fetchColumn());
 

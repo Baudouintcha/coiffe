@@ -28,7 +28,7 @@ require_once __DIR__ . '/../security/config.php';
 $est_client_connecte = isset($_SESSION['id_user']) && ($_SESSION['role'] ?? '') === 'client';
 
 // Localisation session client
-$ville_session    = $est_client_connecte ? (int)($_SESSION['ville']       ?? 0) : 0;
+$ville_session    = $est_client_connecte ? (int)($_SESSION['id_ville']       ?? 0) : 0;
 $quartier_session = $est_client_connecte ? (int)($_SESSION['id_quartier'] ?? 0) : 0;
 
 // Paramètres GET — surcharge temporaire possible
