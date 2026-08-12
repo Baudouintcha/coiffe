@@ -540,7 +540,48 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
 .bn-item.active { color:var(--gold); }
 .bn-item:hover { color:var(--gold); }
 
+/* ── LAYOUT GRID OPTION B ── */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+    grid-auto-rows: max-content;
+}
+.dashboard-grid .col-left {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+.dashboard-grid .col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+/* Align profil public à la hauteur de col-left */
+@media (min-width: 1200px) {
+    .dashboard-grid .col-right .profile-card {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        height: auto;
+    }
+}
+/* Section pleine largeur : Services + Actions */
+.dashboard-full-width {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
 /* ── RESPONSIVE ── */
+@media (max-width: 1199px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    .dashboard-full-width {
+        grid-template-columns: 1fr;
+    }
+}
 @media (max-width: 900px) {
     .sidebar { transform:translateX(-100%); }
     .sidebar.open { transform:translateX(0); }
@@ -683,9 +724,11 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
             </div>
         </div>
 
-        <div class="row g-3">
-            <!-- Colonne gauche : prochain RDV + planning + demandes -->
-            <div class="col-12 col-xl-8">
+        <!-- ── LAYOUT GRID OPTION B : Colonne hauteur égale ── -->
+        <div class="dashboard-grid">
+
+            <!-- Colonne gauche : Prochain RDV + Planning + Demandes -->
+            <div class="col-left">
 
                 <!-- PROCHAIN RDV -->
                 <div class="g-card mb-3">
@@ -799,13 +842,13 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
                 </div>
                 <?php endif; ?>
 
-            </div>
+            </div><!-- /.col-left -->
 
-            <!-- Colonne droite : profil + actions rapides + services -->
-            <div class="col-12 col-xl-4">
+            <!-- Colonne droite : Profil public -->
+            <div class="col-right">
 
                 <!-- COMPLÉTUDE DU PROFIL -->
-                <div class="g-card mb-3">
+                <div class="g-card profile-card">
                     <div class="g-card-header">
                         <span class="g-card-title"><i class="bi bi-person-check text-warning me-2"></i>Mon profil public</span>
                         <span style="font-size:0.82rem;font-weight:700;color:var(--gold)"><?= $completude_pct ?>%</span>
@@ -832,87 +875,106 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
                     </div>
                 </div>
 
-                <!-- ACTIONS RAPIDES -->
-                <div class="g-card mb-3">
-                    <div class="g-card-header">
-                        <span class="g-card-title"><i class="bi bi-lightning text-warning me-2"></i>Actions rapides</span>
+            </div><!-- /.col-right -->
+
+        </div><!-- /.dashboard-grid -->
+
+        <!-- ── SECTION PLEINE LARGEUR : Actions rapides → CTA "Ajouter mes services" → Avis ── -->
+
+        <!-- ACTIONS RAPIDES -->
+        <div class="g-card" style="margin-bottom:1.5rem;grid-column:1/-1;">
+            <div class="g-card-header">
+                <span class="g-card-title"><i class="bi bi-lightning text-warning me-2"></i>Actions rapides</span>
+            </div>
+            <div class="g-card-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="quick-action">
+                            <div class="qa-icon"><i class="bi bi-plus-circle"></i></div>
+                            <span class="qa-label">Nouveau service</span>
+                        </a>
                     </div>
-                    <div class="g-card-body">
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="quick-action">
-                                    <div class="qa-icon"><i class="bi bi-plus-circle"></i></div>
-                                    <span class="qa-label">Ajouter service</span>
-                                </a>
-                            </div>
-                            <div class="col-6">
-                                <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="quick-action">
-                                    <div class="qa-icon"><i class="bi bi-calendar-plus"></i></div>
-                                    <span class="qa-label">Mon agenda</span>
-                                </a>
-                            </div>
-                            <div class="col-6">
-                                <a href="/coiffons/coiffeurs/mes_zones.php" class="quick-action">
-                                    <div class="qa-icon"><i class="bi bi-geo-alt"></i></div>
-                                    <span class="qa-label">Mes zones</span>
-                                </a>
-                            </div>
-                            <div class="col-6">
-                                <a href="/coiffons/coiffeurs/portefeuille.php" class="quick-action">
-                                    <div class="qa-icon"><i class="bi bi-wallet2"></i></div>
-                                    <span class="qa-label">Portefeuille</span>
-                                </a>
-                            </div>
-                        </div>
+                    <div class="col-6">
+                        <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="quick-action">
+                            <div class="qa-icon"><i class="bi bi-calendar-plus"></i></div>
+                            <span class="qa-label">Mon agenda</span>
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="/coiffons/coiffeurs/mes_zones.php" class="quick-action">
+                            <div class="qa-icon"><i class="bi bi-geo-alt"></i></div>
+                            <span class="qa-label">Mes zones</span>
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="/coiffons/coiffeurs/portefeuille.php" class="quick-action">
+                            <div class="qa-icon"><i class="bi bi-wallet2"></i></div>
+                            <span class="qa-label">Portefeuille</span>
+                        </a>
                     </div>
                 </div>
-
-                <!-- MES SERVICES (résumé) -->
-                <div class="g-card">
-                    <div class="g-card-header">
-                        <span class="g-card-title"><i class="bi bi-scissors text-warning me-2"></i>Mes services</span>
-                        <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="g-card-link">Gérer →</a>
-                    </div>
-                    <div class="g-card-body">
-                        <?php if (empty($mes_services)): ?>
-                            <p style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:12px 0">
-                                Aucun service. <a href="/coiffons/coiffeurs/gestion_catalogue.php" style="color:var(--gold)">Ajouter →</a>
-                            </p>
-                        <?php else: ?>
-                            <div class="row g-2">
-                                <?php foreach (array_slice($mes_services, 0, 4) as $svc): ?>
-                                    <div class="col-6">
-                                        <div class="service-card">
-                                            <?php
-                                            $photo_svc = $svc['photo_style'] ?? null;
-                                            $photo_path_svc = $photo_svc ? __DIR__ . '/../../uploads/' . $photo_svc : null;
-                                            ?>
-                                            <?php if ($photo_path_svc && file_exists($photo_path_svc)): ?>
-                                                <img src="/coiffons/uploads/<?= htmlspecialchars($photo_svc) ?>" class="service-img" loading="lazy" alt="">
-                                            <?php else: ?>
-                                                <div class="service-img-ph"><i class="bi bi-image"></i></div>
-                                            <?php endif; ?>
-                                            <div class="service-info">
-                                                <div class="service-name"><?= htmlspecialchars(mb_strimwidth($svc['nom_style'] ?? '', 0, 20, '…')) ?></div>
-                                                <div class="service-price"><?= number_format($svc['prix'] ?? 0, 0, ',', ' ') ?> F</div>
-                                                <div class="service-actions">
-                                                    <a href="/coiffons/coiffeurs/gestion_catalogue.php?ouvrir_modifier=<?= $svc['id_prestation'] ?>" class="sa-btn sa-edit">
-                                                        <i class="bi bi-pencil"></i> Éditer
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
             </div>
         </div>
-    </div>
-</div>
+
+        <!-- CTA BUTTON "AJOUTER MES SERVICES" -->
+        <div style="grid-column:1/-1;margin-bottom:1.5rem;">
+            <a href="/coiffons/coiffeurs/gestion_catalogue.php"
+               style="display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,var(--gold),#c9a227);color:#000;font-weight:700;padding:14px 20px;border-radius:16px;text-decoration:none;transition:all 0.2s;border:none;cursor:pointer;font-size:0.88rem;">
+                <i class="bi bi-plus-circle-fill"></i> Ajouter mes services
+            </a>
+        </div>
+
+        <!-- MES AVIS RÉCENTS -->
+        <div class="g-card" style="grid-column:1/-1;">
+            <div class="g-card-header">
+                <span class="g-card-title">
+                    <i class="bi bi-star-fill me-2" style="color:var(--gold)"></i>Mes avis récents
+                </span>
+                <?php if ($note_moy_dashboard): ?>
+                    <span style="background:var(--gold);color:#000;font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:20px;">
+                        ★ <?= $note_moy_dashboard ?> / 5
+                    </span>
+                <?php endif; ?>
+            </div>
+            <div class="g-card-body">
+                <?php if (empty($avis_recents)): ?>
+                    <p style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:12px 0;">
+                        <i class="bi bi-star" style="display:block;font-size:1.4rem;margin-bottom:6px;opacity:.2;"></i>
+                        Aucun avis pour l'instant
+                    </p>
+                <?php else: ?>
+                    <?php foreach ($avis_recents as $av):
+                        $note_av = intval($av['note'] ?? 0);
+                        $extrait = mb_strimwidth($av['message'] ?? '', 0, 50, '…');
+                        $date_av = date('d/m/Y', strtotime($av['date_creation'] ?? 'now'));
+                    ?>
+                        <div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                <span style="font-size:.75rem;font-weight:600;color:rgba(255,255,255,0.7);">
+                                    <?= htmlspecialchars($av['client_prenom'] . ' ' . substr($av['client_nom'], 0, 1) . '.') ?>
+                                </span>
+                                <span style="font-size:.68rem;color:rgba(255,255,255,0.3);"><?= $date_av ?></span>
+                            </div>
+                            <div style="font-size:.82rem;color:#D4AF37;margin-bottom:3px;">
+                                <?php for ($s = 1; $s <= 5; $s++): ?>
+                                    <span style="opacity:<?= $s <= $note_av ? '1' : '0.2' ?>;">★</span>
+                                <?php endfor; ?>
+                            </div>
+                            <?php if (!empty($extrait)): ?>
+                                <p style="font-size:.75rem;color:rgba(255,255,255,0.45);margin:0;font-style:italic;">
+                                    "<?= htmlspecialchars($extrait) ?>"
+                                </p>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+
+    </div><!-- /.page-body -->
+</div><!-- /.main-content -->
+
+<!-- ── BOTTOM NAV MOBILE ── -->
 <nav class="bottom-nav">
     <div class="bn-items">
         <a href="?page=dashboard_coiffeur" class="bn-item active"><i class="bi bi-grid-1x2"></i><span>Accueil</span></a>
@@ -928,478 +990,6 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
 document.addEventListener('click', function(e) {
     const sidebar = document.getElementById('sidebar');
     if (sidebar.classList.contains('open') && !sidebar.contains(e.target)) {
-        sidebar.classList.remove('open');
-    }
-});
-</script>
-</body>
-</html>
-        <?php if ($photo_profil && file_exists(__DIR__ . '/../../' . $photo_profil)): ?>
-            <img src="/coiffons/<?= htmlspecialchars($photo_profil) ?>" class="s-avatar-img" alt="">
-        <?php else: ?>
-            <div class="s-avatar-ph"><?= $initiale ?></div>
-        <?php endif; ?>
-        <div>
-            <div class="s-name"><?= $prenom ?></div>
-            <div class="s-role">Coiffeur</div>
-        </div>
-    </div>
-    <nav class="sidebar-nav">
-        <a href="/coiffons/index.php?page=dashboard_coiffeur" class="nav-item active">
-            <i class="bi bi-grid-1x2"></i> Dashboard
-        </a>
-        <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="nav-item">
-            <i class="bi bi-calendar-check"></i> Rendez-vous
-            <?php if ($demandes_attente > 0): ?>
-                <span class="nav-badge"><?= $demandes_attente ?></span>
-            <?php endif; ?>
-        </a>
-        <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="nav-item">
-            <i class="bi bi-scissors"></i> Mes services
-        </a>
-        <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="nav-item">
-            <i class="bi bi-clock"></i> Mon agenda
-        </a>
-        <a href="/coiffons/coiffeurs/mes_zones.php" class="nav-item">
-            <i class="bi bi-geo-alt"></i> Mes zones
-        </a>
-        <a href="/coiffons/coiffeurs/portefeuille.php" class="nav-item">
-            <i class="bi bi-wallet2"></i> Portefeuille
-        </a>
-        <a href="/coiffons/coiffeurs/profil_coiffeurs.php" class="nav-item">
-            <i class="bi bi-person-circle"></i> Mon profil
-        </a>
-    </nav>
-    <div class="sidebar-footer">
-        <a href="/coiffons/deconnexion.php">
-            <i class="bi bi-box-arrow-right"></i> Déconnexion
-        </a>
-    </div>
-</aside>
-
-<!-- ── MAIN CONTENT ── -->
-<div class="main-content">
-
-    <!-- Topbar -->
-    <div class="topbar">
-        <div class="d-flex align-items-center gap-3">
-            <button class="topbar-btn d-md-none" onclick="document.getElementById('sidebar').classList.toggle('open')" style="border:none;cursor:pointer;">
-                <i class="bi bi-list"></i>
-            </button>
-            <span class="topbar-title">Dashboard</span>
-        </div>
-        <div class="topbar-actions">
-            <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="topbar-btn" title="Rendez-vous">
-                <i class="bi bi-calendar-check"></i>
-                <?php if ($demandes_attente > 0): ?>
-                    <span class="notif-dot"></span>
-                <?php endif; ?>
-            </a>
-            <a href="#" class="topbar-btn" title="Notifications">
-                <i class="bi bi-bell"></i>
-                <?php if ($nb_notifs > 0): ?>
-                    <span class="notif-dot"></span>
-                <?php endif; ?>
-            </a>
-        </div>
-    </div>
-
-    <div class="page-body">
-
-        <!-- ── BANNIÈRES CONDITIONNELLES ── -->
-        <?php if (!$abonnement_actif): ?>
-        <div class="banner banner-danger">
-            <i class="bi bi-exclamation-triangle-fill"></i>
-            <span>
-                <strong>Abonnement inactif.</strong>
-                Votre profil n'apparaît pas dans l'annuaire.
-                <a href="/coiffons/coiffeurs/portefeuille.php" style="font-weight:700;text-decoration:underline;">
-                    Souscrire maintenant →
-                </a>
-            </span>
-        </div>
-        <?php endif; ?>
-
-        <?php if (!$diplome_approuve): ?>
-        <div class="banner banner-warning">
-            <i class="bi bi-shield-exclamation"></i>
-            <span>
-                <strong>Diplôme en cours de vérification.</strong>
-                Votre profil est visible mais moins prioritaire dans les résultats.
-            </span>
-        </div>
-        <?php endif; ?>
-
-        <?php if ($abonnement_actif && $diplome_approuve): ?>
-        <div class="banner banner-success">
-            <i class="bi bi-check-circle-fill"></i>
-            <span>Votre compte est actif et visible dans l'annuaire.</span>
-        </div>
-        <?php endif; ?>
-
-        <!-- ── HERO STATS ── -->
-        <div class="hero-stats">
-            <div class="hero-greet">
-                <h2><?= $salutation ?>, <?= $prenom ?> 👋</h2>
-                <p><?= date('l d F Y') ?></p>
-            </div>
-            <div class="stats-row">
-                <div class="stat-box">
-                    <span class="stat-val"><?= $rdv_aujourd_hui ?></span>
-                    <span class="stat-lbl">RDV Aujourd'hui</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-val"><?= number_format($gains_aujourd_hui, 0, ',', ' ') ?></span>
-                    <span class="stat-lbl">Gains (FCFA)</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-val"><?= $demandes_attente ?></span>
-                    <span class="stat-lbl">En attente</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-val" style="color:#6ee7b7;"><?= number_format($solde_disponible, 0, ',', ' ') ?></span>
-                    <span class="stat-lbl">Solde FCFA</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="row g-4">
-
-            <!-- ── COL PRINCIPALE ── -->
-            <div class="col-lg-8">
-
-                <!-- PROCHAIN RDV -->
-                <div class="g-card mb-4">
-                    <div class="g-card-header">
-                        <span class="g-card-title"><i class="bi bi-clock me-2" style="color:var(--gold)"></i>Prochain rendez-vous</span>
-                        <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="g-card-link">Voir tout</a>
-                    </div>
-                    <?php if ($prochain_rdv): ?>
-                        <div class="next-rdv-card">
-                            <div class="rdv-time-block">
-                                <span class="rdv-time"><?= substr($prochain_rdv['heure_debut'], 0, 5) ?></span>
-                                <span class="rdv-date-s"><?= date('d/m', strtotime($prochain_rdv['date_rdv'])) ?></span>
-                            </div>
-                            <div class="rdv-info">
-                                <div class="rdv-client">
-                                    <?= htmlspecialchars($prochain_rdv['client_nom'] . ' ' . $prochain_rdv['client_prenom']) ?>
-                                </div>
-                                <div class="rdv-service"><?= htmlspecialchars($prochain_rdv['nom_style']) ?></div>
-                                <?php if ($prochain_rdv['client_adresse_texte']): ?>
-                                    <div class="rdv-addr">
-                                        <i class="bi bi-geo-alt"></i>
-                                        <?= htmlspecialchars($prochain_rdv['client_adresse_texte']) ?>
-                                        <?php if ($prochain_rdv['client_gps_lat']): ?>
-                                            <a href="https://www.google.com/maps?q=<?= $prochain_rdv['client_gps_lat'] ?>,<?= $prochain_rdv['client_gps_lng'] ?>"
-                                               target="_blank" style="color:var(--gold);font-size:0.7rem;margin-left:4px;">
-                                                <i class="bi bi-map"></i> Maps
-                                            </a>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                            <div class="rdv-actions">
-                                <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="btn-gold-sm">Voir détails</a>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                        <div class="g-card-body" style="text-align:center;padding:2rem;color:rgba(255,255,255,0.3);font-size:0.85rem;">
-                            <i class="bi bi-calendar-x" style="font-size:1.8rem;display:block;margin-bottom:8px;"></i>
-                            Aucun rendez-vous prévu
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-                <!-- PLANNING DU JOUR -->
-                <div class="g-card mb-4">
-                    <div class="g-card-header">
-                        <span class="g-card-title"><i class="bi bi-list-ul me-2" style="color:var(--gold)"></i>Planning du jour</span>
-                        <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="g-card-link">Gérer</a>
-                    </div>
-                    <div class="g-card-body">
-                        <?php if (empty($planning_jour)): ?>
-                            <p style="color:rgba(255,255,255,0.3);font-size:0.82rem;text-align:center;padding:1rem 0;">
-                                Aucun RDV aujourd'hui
-                            </p>
-                        <?php else: ?>
-                            <?php foreach ($planning_jour as $rdv_j):
-                                $statut_class = match($rdv_j['statut_rdv']) {
-                                    'confirme','accepte' => 'badge-upcoming',
-                                    'termine'            => 'badge-done',
-                                    'annule'             => 'badge-cancelled',
-                                    default              => 'badge-waiting'
-                                };
-                                $statut_label = match($rdv_j['statut_rdv']) {
-                                    'confirme','accepte' => 'Confirmé',
-                                    'termine'            => 'Terminé',
-                                    'annule'             => 'Annulé',
-                                    'en_attente'         => 'En attente',
-                                    default              => $rdv_j['statut_rdv']
-                                };
-                            ?>
-                                <div class="planning-item">
-                                    <span class="pl-time"><?= substr($rdv_j['heure_debut'], 0, 5) ?></span>
-                                    <div class="pl-info">
-                                        <div class="pl-name">
-                                            <?= htmlspecialchars($rdv_j['client_nom'] . ' ' . $rdv_j['client_prenom']) ?>
-                                        </div>
-                                        <div class="pl-service">
-                                            <?= htmlspecialchars($rdv_j['nom_style']) ?>
-                                            · <?= $rdv_j['duree'] ?> min
-                                        </div>
-                                    </div>
-                                    <span class="status-badge <?= $statut_class ?>"><?= $statut_label ?></span>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- DEMANDES EN ATTENTE -->
-                <?php if (!empty($demandes)): ?>
-                <div class="g-card mb-4">
-                    <div class="g-card-header">
-                        <span class="g-card-title">
-                            <i class="bi bi-bell me-2" style="color:var(--gold)"></i>
-                            Demandes en attente
-                            <span style="background:var(--gold);color:#000;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px;"><?= count($demandes) ?></span>
-                        </span>
-                        <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="g-card-link">Tout voir</a>
-                    </div>
-                    <div class="g-card-body">
-                        <?php foreach ($demandes as $d): ?>
-                            <div class="demand-card">
-                                <div class="demand-client">
-                                    <div class="d-avatar-ph"><?= strtoupper(substr($d['client_nom'], 0, 1)) ?></div>
-                                    <div>
-                                        <div class="d-name"><?= htmlspecialchars($d['client_nom'] . ' ' . $d['client_prenom']) ?></div>
-                                        <div class="d-date"><?= date('d/m/Y', strtotime($d['date_rdv'])) ?> à <?= substr($d['heure_debut'], 0, 5) ?></div>
-                                    </div>
-                                </div>
-                                <div class="d-service"><?= htmlspecialchars($d['nom_style']) ?></div>
-                                <div class="d-price"><?= number_format($d['prix'], 0, ',', ' ') ?> FCFA</div>
-                                <div class="d-actions">
-                                    <a href="/coiffons/coiffeurs/valider_rendezvous.php?action=accepter&id=<?= $d['id'] ?>"
-                                       class="btn-accept">
-                                        <i class="bi bi-check-lg me-1"></i>Accepter
-                                    </a>
-                                    <a href="/coiffons/coiffeurs/valider_rendezvous.php?action=refuser&id=<?= $d['id'] ?>"
-                                       class="btn-decline"
-                                       onclick="return confirm('Refuser ce rendez-vous ?')">
-                                        <i class="bi bi-x-lg me-1"></i>Refuser
-                                    </a>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-            </div><!-- /.col-lg-8 -->
-
-            <!-- ── COL LATÉRALE ── -->
-            <div class="col-lg-4">
-
-                <!-- COMPLÉTUDE DU PROFIL -->
-                <div class="g-card mb-4">
-                    <div class="g-card-header">
-                        <span class="g-card-title"><i class="bi bi-person-check me-2" style="color:var(--gold)"></i>Profil public</span>
-                        <span style="font-size:0.78rem;color:var(--gold);font-weight:700;"><?= $completude_pct ?>%</span>
-                    </div>
-                    <div class="g-card-body">
-                        <div class="completude-bar">
-                            <div class="completude-fill" style="width:<?= $completude_pct ?>%"></div>
-                        </div>
-                        <div class="check-item <?= $checks['photo'] ? 'ok' : '' ?>">
-                            <i class="bi bi-<?= $checks['photo'] ? 'check-circle-fill text-success' : 'circle text-muted' ?>"></i>
-                            Photo de profil
-                        </div>
-                        <div class="check-item <?= $checks['services'] ? 'ok' : '' ?>">
-                            <i class="bi bi-<?= $checks['services'] ? 'check-circle-fill text-success' : 'circle text-muted' ?>"></i>
-                            Services ajoutés
-                        </div>
-                        <div class="check-item <?= $checks['disponibilites'] ? 'ok' : '' ?>">
-                            <i class="bi bi-<?= $checks['disponibilites'] ? 'check-circle-fill text-success' : 'circle text-muted' ?>"></i>
-                            Agenda configuré
-                        </div>
-                        <div class="check-item <?= $checks['zones'] ? 'ok' : '' ?>">
-                            <i class="bi bi-<?= $checks['zones'] ? 'check-circle-fill text-success' : 'circle text-muted' ?>"></i>
-                            Zones d'intervention
-                        </div>
-                        <div class="check-item <?= $checks['diplome'] ? 'ok' : '' ?>">
-                            <i class="bi bi-<?= $checks['diplome'] ? 'check-circle-fill text-success' : 'circle text-muted' ?>"></i>
-                            Diplôme uploadé
-                        </div>
-                        <div class="check-item <?= $checks['approbation'] ? 'ok' : '' ?>">
-                            <i class="bi bi-<?= $checks['approbation'] ? 'check-circle-fill text-success' : 'exclamation-circle text-warning' ?>"></i>
-                            Approbation admin
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MES SERVICES (aperçu) -->
-                <div class="g-card mb-4">
-                    <div class="g-card-header">
-                        <span class="g-card-title"><i class="bi bi-scissors me-2" style="color:var(--gold)"></i>Mes services</span>
-                        <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="g-card-link">Gérer</a>
-                    </div>
-                    <div class="g-card-body" style="padding:12px;">
-                        <?php if (empty($mes_services)): ?>
-                            <p style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:1rem 0;">
-                                Aucun service ajouté
-                            </p>
-                            <a href="/coiffons/coiffeurs/gestion_catalogue.php"
-                               class="btn-gold-sm d-block text-center" style="text-decoration:none;">
-                                + Ajouter un service
-                            </a>
-                        <?php else: ?>
-                            <div class="row g-2">
-                                <?php foreach (array_slice($mes_services, 0, 4) as $svc): ?>
-                                    <div class="col-6">
-                                        <div class="service-card">
-                                            <?php if (!empty($svc['photo_style']) && file_exists(__DIR__ . '/../../uploads/' . $svc['photo_style'])): ?>
-                                                <img src="/coiffons/uploads/<?= htmlspecialchars($svc['photo_style']) ?>"
-                                                     class="service-img" alt="">
-                                            <?php else: ?>
-                                                <div class="service-img-ph"><i class="bi bi-scissors"></i></div>
-                                            <?php endif; ?>
-                                            <div class="service-info">
-                                                <div class="service-name"><?= htmlspecialchars($svc['nom_style']) ?></div>
-                                                <div class="service-price"><?= number_format($svc['prix'], 0, ',', ' ') ?> FCFA</div>
-                                                <div class="service-actions">
-                                                    <a href="/coiffons/coiffeurs/gestion_catalogue.php?ouvrir_modifier=<?= $svc['id_prestation'] ?>"
-                                                       class="sa-btn sa-edit">Modifier</a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <?php if (count($mes_services) > 4): ?>
-                                <a href="/coiffons/coiffeurs/gestion_catalogue.php"
-                                   style="color:var(--gold);font-size:0.75rem;text-decoration:none;display:block;text-align:center;margin-top:10px;">
-                                    +<?= count($mes_services) - 4 ?> autres services →
-                                </a>
-                            <?php endif; ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- ACTIONS RAPIDES -->
-                <div class="g-card">
-                    <div class="g-card-header">
-                        <span class="g-card-title">Actions rapides</span>
-                    </div>
-                    <div class="g-card-body">
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="quick-action">
-                                    <div class="qa-icon"><i class="bi bi-plus-circle"></i></div>
-                                    <span class="qa-label">Nouveau service</span>
-                                </a>
-                            </div>
-                            <div class="col-6">
-                                <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="quick-action">
-                                    <div class="qa-icon"><i class="bi bi-calendar-plus"></i></div>
-                                    <span class="qa-label">Mon agenda</span>
-                                </a>
-                            </div>
-                            <div class="col-6">
-                                <a href="/coiffons/coiffeurs/mes_zones.php" class="quick-action">
-                                    <div class="qa-icon"><i class="bi bi-geo-alt"></i></div>
-                                    <span class="qa-label">Mes zones</span>
-                                </a>
-                            </div>
-                            <div class="col-6">
-                                <a href="/coiffons/coiffeurs/portefeuille.php" class="quick-action">
-                                    <div class="qa-icon"><i class="bi bi-wallet2"></i></div>
-                                    <span class="qa-label">Portefeuille</span>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MES AVIS RÉCENTS -->
-                <div class="g-card mt-3">
-                    <div class="g-card-header">
-                        <span class="g-card-title">
-                            <i class="bi bi-star-fill me-2" style="color:var(--gold)"></i>Mes avis récents
-                        </span>
-                        <?php if ($note_moy_dashboard): ?>
-                            <span style="background:var(--gold);color:#000;font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:20px;">
-                                ★ <?= $note_moy_dashboard ?> / 5
-                            </span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="g-card-body">
-                        <?php if (empty($avis_recents)): ?>
-                            <p style="color:rgba(255,255,255,0.3);font-size:0.8rem;text-align:center;padding:12px 0;">
-                                <i class="bi bi-star" style="display:block;font-size:1.4rem;margin-bottom:6px;opacity:.2;"></i>
-                                Aucun avis pour l'instant
-                            </p>
-                        <?php else: ?>
-                            <?php foreach ($avis_recents as $av):
-                                $note_av = intval($av['note'] ?? 0);
-                                $extrait = mb_strimwidth($av['message'] ?? '', 0, 50, '…');
-                                $date_av = date('d/m/Y', strtotime($av['date_creation'] ?? 'now'));
-                            ?>
-                                <div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-                                        <span style="font-size:.75rem;font-weight:600;color:rgba(255,255,255,0.7);">
-                                            <?= htmlspecialchars($av['client_prenom'] . ' ' . substr($av['client_nom'], 0, 1) . '.') ?>
-                                        </span>
-                                        <span style="font-size:.68rem;color:rgba(255,255,255,0.3);"><?= $date_av ?></span>
-                                    </div>
-                                    <div style="font-size:.82rem;color:#D4AF37;margin-bottom:3px;">
-                                        <?php for ($s = 1; $s <= 5; $s++): ?>
-                                            <span style="opacity:<?= $s <= $note_av ? '1' : '0.2' ?>;">★</span>
-                                        <?php endfor; ?>
-                                    </div>
-                                    <?php if (!empty($extrait)): ?>
-                                        <p style="font-size:.75rem;color:rgba(255,255,255,0.45);margin:0;font-style:italic;">
-                                            "<?= htmlspecialchars($extrait) ?>"
-                                        </p>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-            </div><!-- /.col-lg-4 -->
-
-        </div><!-- /.row -->
-    </div><!-- /.page-body -->
-</div><!-- /.main-content -->
-
-<!-- ── BOTTOM NAV MOBILE ── -->
-<nav class="bottom-nav">
-    <div class="bn-items">
-        <a href="/coiffons/index.php?page=dashboard_coiffeur" class="bn-item active">
-            <i class="bi bi-grid-1x2"></i>Home
-        </a>
-        <a href="/coiffons/coiffeurs/valider_rendezvous.php" class="bn-item">
-            <i class="bi bi-calendar-check"></i>RDV
-        </a>
-        <a href="/coiffons/coiffeurs/gestion_catalogue.php" class="bn-item">
-            <i class="bi bi-scissors"></i>Services
-        </a>
-        <a href="/coiffons/coiffeurs/agenda_coiffeurs.php" class="bn-item">
-            <i class="bi bi-clock"></i>Agenda
-        </a>
-        <a href="/coiffons/deconnexion.php" class="bn-item">
-            <i class="bi bi-box-arrow-right"></i>Quitter
-        </a>
-    </div>
-</nav>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-// Ferme sidebar au clic overlay (mobile)
-document.addEventListener('click', function(e) {
-    const sidebar = document.getElementById('sidebar');
-    if (sidebar && sidebar.classList.contains('open') && !sidebar.contains(e.target)) {
         sidebar.classList.remove('open');
     }
 });

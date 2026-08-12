@@ -17,7 +17,7 @@ if (ini_get("session.use_cookies")) {
 // 4. On détruit complètement la session sur le serveur
 session_destroy();
 
-// 5. On redirige instantanément vers l'accueil
-header("Location: /coiffons/index.php");
+// 5. On redirige instantanément vers app.php (point d'entrée du circuit)
+header("Location: /coiffons/app.php");
 exit();
 ?>

@@ -100,8 +100,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if ($check->rowCount() > 0) {
                     $message = "msg-danger::Cet email est déjà utilisé.";
                 } else {
-                    $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, id_ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    if ($ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, $role, $id_ville, $id_quartier, $diplome_path, $photo_profil_path])) {
+                    // Essayer d'abord avec les colonnes id_ville et id_quartier (nouveau schéma)
+                    try {
+                        $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, id_ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, $role, $id_ville, $id_quartier, $diplome_path, $photo_profil_path]);
+                    } catch (PDOException $e) {
+                        // Si les colonnes n'existent pas, essayer sans (ancien schéma)
+                        if (strpos($e->getMessage(), 'id_ville') !== false || strpos($e->getMessage(), 'id_quartier') !== false) {
+                            $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                            $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, $role, $diplome_path, $photo_profil_path]);
+                        } else {
+                            throw $e;
+                        }
+                    }
+                    
+                    if (isset($ins) && $ins->rowCount() > 0) {
                         $_SESSION['id_user']  = $pdo->lastInsertId();
                         $_SESSION['nom']      = $nom;
                         $_SESSION['prenom']   = $prenom;

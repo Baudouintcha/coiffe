@@ -401,8 +401,8 @@
         </div>
         <div class="brand-line"></div>
         <p class="brand-tagline">
-            Le service à domicile, chez toi.<br>
-            Des professionnels qualifiés, partout en Afrique de l'Ouest.
+            Le service à domicile, chez vous.<br>
+            Des professionnels qualifiés, partout dans le Bénin.
         </p>
     </div>
 
