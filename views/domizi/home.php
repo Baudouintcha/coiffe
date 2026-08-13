@@ -402,7 +402,7 @@
         <div class="brand-line"></div>
         <p class="brand-tagline">
             Le service à domicile, chez vous.<br>
-            Des professionnels qualifiés, partout dans le Bénin.
+            Des professionnels qualifiés, partout dans le Bénin.           
         </p>
     </div>
 
