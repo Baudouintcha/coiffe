@@ -12,11 +12,83 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/../security/csrf.php';
+require_once __DIR__ . '/../src/Services/OtpService.php';
+require_once __DIR__ . '/../src/Services/EmailService.php';
 
 // Rôle pré-défini depuis l'URL — logique PHP inchangée
 $role_predefini = isset($_GET['role']) ? trim($_GET['role']) : 'client';
 if (!in_array($role_predefini, ['client', 'coiffeur'])) {
     $role_predefini = 'client';
+}
+
+$message = "";
+
+// ═══ HANDLE OTP VERIFICATION ═══
+$otp_verification = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'verify_otp') {
+    require_once __DIR__ . '/../access/verify_otp.php';
+    // $otp_verification contains result from verify_otp.php
+    
+    if (isset($otp_verification) && $otp_verification['success']) {
+        // OTP verified successfully
+        $_SESSION['email_verified'] = true;
+        
+        // Redirect to dashboard based on role
+        $role = $_SESSION['role'] ?? 'client';
+        header("Cache-Control: no-store, no-cache, must-revalidate");
+        header("Pragma: no-cache");
+        if ($role === 'client') {
+            $redirect_url = $_SESSION['redirect_url'] ?? '/coiffons/index.php?page=dashboard';
+            unset($_SESSION['redirect_url']);
+            header("Location: " . $redirect_url);
+        } elseif ($role === 'coiffeur') {
+            $_SESSION['nouveau_coiffeur'] = true;
+            header("Location: /coiffons/coiffeurs/bienvenue.php");
+        } else {
+            header("Location: /coiffons/index.php");
+        }
+        exit();
+    } elseif (isset($otp_verification) && !$otp_verification['success']) {
+        $message = "msg-danger::" . htmlspecialchars($otp_verification['message']);
+    }
+}
+
+// ═══ HANDLE RESEND OTP ═══
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'resend_otp') {
+    csrf_verify();
+    
+    $user_id = $_SESSION['id_user'] ?? null;
+    $purpose = $_POST['otp_purpose'] ?? 'registration';
+    
+    if ($user_id) {
+        $otp_service = new OtpService($pdo);
+        $email_service = new EmailService();
+        
+        // Check if we can request a new OTP (rate limiting)
+        $can_request = $otp_service->canRequest($user_id, $purpose);
+        
+        if ($can_request['success']) {
+            // Generate new OTP
+            $otp_result = $otp_service->generate($user_id, $purpose);
+            
+            if ($otp_result['success']) {
+                // Send via email
+                $email = $_SESSION['otp_email'] ?? '';
+                $email_send_result = $email_service->sendOtpCode($email, $otp_result['code'], 5, $purpose);
+                
+                if ($email_send_result['success']) {
+                    $_SESSION['otp_resent_message'] = 'Code de vérification renvoyé avec succès.';
+                } else {
+                    $_SESSION['otp_resent_message'] = 'Erreur lors de l\'envoi du code.';
+                }
+            }
+        } else {
+            $_SESSION['otp_resent_message'] = $can_request['message'];
+        }
+        
+        header("Location: /coiffons/access/inscription.php");
+        exit();
+    }
 }
 
 $message = "";
@@ -124,20 +196,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $vn->execute([$id_ville]);
                         $vd = $vn->fetch();
                         $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
-                        header("Cache-Control: no-store, no-cache, must-revalidate");
-                        header("Pragma: no-cache");
-                        if ($role === 'client') {
-                            $redirect_url = $_SESSION['redirect_url'] ?? '/coiffons/index.php?page=dashboard';
-                            unset($_SESSION['redirect_url']);
-                            header("Location: " . $redirect_url);
-                        } elseif ($role === 'coiffeur') {
-                            // Page de bienvenue dédiée avant le dashboard
-                            $_SESSION['nouveau_coiffeur'] = true;
-                            header("Location: /coiffons/coiffeurs/bienvenue.php");
+                        
+                        // ═══ PHASE 2: GENERATE OTP FOR EMAIL VERIFICATION ═══
+                        $otp_service = new OtpService($pdo);
+                        $email_service = new EmailService();
+                        
+                        // Generate OTP with purpose 'registration'
+                        $otp_result = $otp_service->generate($_SESSION['id_user'], 'registration');
+                        
+                        if ($otp_result['success']) {
+                            // Send OTP code via email
+                            $email_send_result = $email_service->sendOtpCode($email, $otp_result['code'], 5, 'registration');
+                            
+                            if ($email_send_result['success']) {
+                                // Set flag to show OTP verification page
+                                $_SESSION['show_otp_verification'] = true;
+                                $_SESSION['otp_purpose'] = 'registration';
+                                $_SESSION['otp_email'] = $email;
+                                header("Cache-Control: no-store, no-cache, must-revalidate");
+                                header("Pragma: no-cache");
+                                header("Location: /coiffons/access/inscription.php");
+                                exit();
+                            } else {
+                                $message = "msg-danger::Erreur lors de l'envoi du code de vérification: " . htmlspecialchars($email_send_result['message']);
+                                // Delete the user account we just created
+                                $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$_SESSION['id_user']]);
+                                unset($_SESSION['id_user']);
+                            }
                         } else {
-                            header("Location: /coiffons/index.php");
+                            $message = "msg-danger::Erreur lors de la génération du code de vérification.";
+                            // Delete the user account we just created
+                            $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$_SESSION['id_user']]);
+                            unset($_SESSION['id_user']);
                         }
-                        exit();
                     } else {
                         $message = "msg-danger::Erreur lors de l'enregistrement.";
                     }
@@ -292,7 +383,30 @@ if (!empty($message)) {
             </div>
         <?php endif; ?>
 
-        <!-- ══ FORMULAIRE — logique PHP inchangée, HTML migré DS ══ -->
+        <!-- ═══ SHOW OTP VERIFICATION IF IN VERIFICATION STATE ═══ -->
+        <?php if (isset($_SESSION['show_otp_verification']) && $_SESSION['show_otp_verification']): ?>
+            <?php
+                $otp_purpose = $_SESSION['otp_purpose'] ?? 'registration';
+                $user_email = $_SESSION['otp_email'] ?? '';
+                // Mask email for display
+                $email_parts = explode('@', $user_email);
+                $masked_email = substr($email_parts[0], 0, 1) . str_repeat('*', max(0, strlen($email_parts[0]) - 2)) . '@' . $email_parts[1];
+                
+                $submit_action = 'verify_otp';
+                $csrf_token = $_SESSION['_csrf_token'] ?? '';
+                
+                // Check for resend message
+                $error_message = '';
+                if (isset($_SESSION['otp_verification_error'])) {
+                    $error_message = $_SESSION['otp_verification_error'];
+                    unset($_SESSION['otp_verification_error']);
+                }
+                
+                $show_resend = true;
+                include __DIR__ . '/../views/components/otp_verification.php';
+            ?>
+        <?php else: ?>
+            <!-- ══ REGISTRATION FORM (original) ══ -->
         <form method="POST"
               enctype="multipart/form-data"
               id="inscriptionForm"
@@ -481,6 +595,8 @@ if (!empty($message)) {
                 Se connecter
             </a>
         </p>
+
+        <?php endif; /* END OTP/FORM CONDITIONAL */ ?>
 
     </div>
 </main>

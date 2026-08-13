@@ -10,6 +10,9 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/security/config.php';
+require_once __DIR__ . '/security/csrf.php';
+require_once __DIR__ . '/src/Services/OtpService.php';
+require_once __DIR__ . '/src/Services/EmailService.php';
 
 if (!isset($_SESSION['id_user'])) {
     header("Location: /coiffons/index.php?page=login");
@@ -89,16 +92,74 @@ if ($user['role'] === 'coiffeur') {
 
 $lien_rendezvous = ($user['role'] === 'client') ? "/coiffons/client/mes_rendezvous.php" : "/coiffons/coiffeurs/agenda_coiffeurs.php";
 
-// Suppression compte — SQL inchangé
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_suppression'])) {
-    $raison = htmlspecialchars(trim($_POST['raison_depart']));
-    if (!empty($raison)) {
-        $pdo->prepare("INSERT INTO suppressions_comptes (nom_utilisateur, email_utilisateur, role_utilisateur, raison) VALUES (?, ?, ?, ?)")->execute([$user['nom'], $user['email'], $user['role'], $raison]);
+// ═══ ACCOUNT DELETION WITH OTP ═══
+$account_deletion_step = 1; // Step 1: Confirmation, Step 2: OTP, Step 3: Final confirmation
+if (isset($_SESSION['account_deletion_step'])) {
+    $account_deletion_step = $_SESSION['account_deletion_step'];
+}
+
+// STEP 1: Request account deletion (generate OTP)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'request_deletion') {
+    csrf_verify();
+    
+    $otp_service = new OtpService($pdo);
+    $otp_result = $otp_service->generate($user_id, 'account_deletion');
+    
+    if ($otp_result['success']) {
+        $email_service = new EmailService();
+        $email_send_result = $email_service->sendOtpCode($user['email'], $otp_result['code'], 5, 'account_deletion');
+        
+        if ($email_send_result['success']) {
+            $_SESSION['account_deletion_step'] = 2;
+            header("Location: /coiffons/profil.php");
+            exit();
+        }
+    }
+}
+
+// STEP 2: Verify OTP
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'verify_deletion') {
+    csrf_verify();
+    
+    $code = $_POST['otp_code'] ?? '';
+    
+    if (preg_match('/^\d{6}$/', $code)) {
+        $otp_service = new OtpService($pdo);
+        $result = $otp_service->verify($user_id, 'account_deletion', $code);
+        
+        if ($result['success']) {
+            $_SESSION['account_deletion_step'] = 3;
+            header("Location: /coiffons/profil.php");
+            exit();
+        }
+    }
+}
+
+// STEP 3: Final confirmation and deletion
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_final_deletion') {
+    csrf_verify();
+    
+    if (isset($_SESSION['account_deletion_step']) && $_SESSION['account_deletion_step'] === 3) {
+        // Log deletion
+        $raison = htmlspecialchars(trim($_POST['raison_depart'] ?? 'Suppression via formulaire'));
+        $pdo->prepare("INSERT INTO suppressions_comptes (nom_utilisateur, email_utilisateur, role_utilisateur, raison) VALUES (?, ?, ?, ?)")
+            ->execute([$user['nom'], $user['email'], $user['role'], $raison]);
+        
+        // Delete user
         $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$user_id]);
+        
+        // Clear session and redirect
         session_destroy();
-        echo "<script>alert('Votre compte et vos données ont été définitivement supprimés.');window.location.href='/coiffons/index.php';</script>";
+        header("Location: /coiffons/index.php?account_deleted=1");
         exit();
     }
+}
+
+// Cancel deletion
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'cancel_deletion') {
+    unset($_SESSION['account_deletion_step']);
+    header("Location: /coiffons/profil.php");
+    exit();
 }
 ?>
 <!DOCTYPE html>
@@ -323,23 +384,88 @@ include __DIR__ . '/views/components/navbar_client.php';
                     <p style="color:var(--text-muted);font-size:0.72rem;line-height:1.5;margin-bottom:12px;">
                         Cette action supprimera définitivement votre compte, l'historique de vos rendez-vous et vos soldes. Opération irréversible.
                     </p>
-                    <button class="btn-ghost btn-sm" type="button"
-                            onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';"
-                            style="font-size:0.72rem;color:var(--danger-text);">
-                        <i class="bi bi-trash3 me-1" aria-hidden="true"></i> DEMANDER LA SUPPRESSION DE MON COMPTE
-                    </button>
-                    <div style="display:none;margin-top:1rem;">
-                        <form method="POST">
-                            <div class="mb-3">
-                                <label class="form-label-cct" style="color:var(--gold);font-size:0.72rem;">POURQUOI SOUHAITEZ-VOUS NOUS QUITTER ?</label>
-                                <textarea name="raison_depart" class="fc-dark" rows="2" placeholder="Dites-nous en quelques mots pourquoi..." required style="font-size:0.75rem;"></textarea>
-                            </div>
-                            <button type="submit" name="confirmer_suppression" class="btn-danger-cct btn-sm w-100"
-                                    onclick="return confirm('Êtes-vous absolument sûr(e) de vouloir supprimer votre compte ? Cette action est irréversible.')">
-                                CONFIRMER LA SUPPRESSION DÉFINITIVE
-                            </button>
-                        </form>
-                    </div>
+
+                    <!-- STEP 1: Initial request -->
+                    <?php if ($account_deletion_step === 1): ?>
+                        <button class="btn-ghost btn-sm" type="button"
+                                onclick="document.getElementById('deletion-form-1').style.display=document.getElementById('deletion-form-1').style.display==='none'?'block':'none';"
+                                style="font-size:0.72rem;color:var(--danger-text);">
+                            <i class="bi bi-trash3 me-1" aria-hidden="true"></i> DEMANDER LA SUPPRESSION DE MON COMPTE
+                        </button>
+                        <div id="deletion-form-1" style="display:none;margin-top:1rem;">
+                            <form method="POST" novalidate>
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="action" value="request_deletion">
+                                <p style="color:var(--warning-text);font-size:0.65rem;margin-bottom:8px;">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Un code de vérification sera envoyé à votre email. Vous devrez le confirmer pour supprimer votre compte.
+                                </p>
+                                <button type="submit" class="btn-danger-cct btn-sm w-100">
+                                    ENVOYER UN CODE DE VÉRIFICATION
+                                </button>
+                            </form>
+                        </div>
+
+                    <!-- STEP 2: OTP verification -->
+                    <?php elseif ($account_deletion_step === 2): ?>
+                        <div style="background:rgba(220,53,69,0.1);border:1px solid rgba(220,53,69,0.3);border-radius:8px;padding:12px;margin:8px 0;">
+                            <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">
+                                Un code de vérification a été envoyé à <strong><?= htmlspecialchars($user['email']) ?></strong>
+                            </p>
+                            <form method="POST" novalidate>
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="action" value="verify_deletion">
+                                
+                                <div class="otp-inputs" style="display:flex;gap:6px;justify-content:center;margin:12px 0;flex-wrap:wrap;">
+                                    <?php for ($i = 1; $i <= 6; $i++): ?>
+                                        <input type="text" class="deletion-otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]" 
+                                               placeholder="•" name="deletion_otp_digit_<?= $i ?>" id="deletion_otp_digit_<?= $i ?>"
+                                               style="width:40px;height:40px;text-align:center;font-size:1.2rem;border:1px solid rgba(220,53,69,0.3);border-radius:6px;background:rgba(220,53,69,0.05);color:var(--danger-text);font-weight:700;">
+                                    <?php endfor; ?>
+                                </div>
+                                <input type="hidden" name="otp_code" id="deletion_otp_code" value="">
+                                
+                                <div style="display:flex;gap:6px;">
+                                    <button type="submit" class="btn-danger-cct btn-sm w-50">Vérifier</button>
+                                    <form method="POST" style="flex:1;">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="action" value="cancel_deletion">
+                                        <button type="submit" class="btn-ghost btn-sm w-100">Annuler</button>
+                                    </form>
+                                </div>
+                            </form>
+                        </div>
+
+                    <!-- STEP 3: Final confirmation -->
+                    <?php elseif ($account_deletion_step === 3): ?>
+                        <div style="background:rgba(220,53,69,0.15);border:2px solid rgba(220,53,69,0.4);border-radius:8px;padding:12px;margin:8px 0;">
+                            <p style="font-size:0.75rem;color:var(--danger-text);font-weight:700;margin-bottom:8px;">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                DERNIER AVERTISSEMENT
+                            </p>
+                            <p style="font-size:0.7rem;color:var(--text-muted);line-height:1.5;margin-bottom:10px;">
+                                Vous êtes sur le point de supprimer votre compte. Cette action est définitive et irréversible. Tous vos données, historique et soldes seront perdus.
+                            </p>
+                            <form method="POST" novalidate>
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="action" value="confirm_final_deletion">
+                                <div class="mb-3">
+                                    <label class="form-label-cct" style="color:var(--danger-text);font-size:0.72rem;">RAISON DE VOTRE DÉPART (OPTIONNEL)</label>
+                                    <textarea name="raison_depart" class="fc-dark" rows="2" placeholder="Aidez-nous à améliorer..." style="font-size:0.75rem;"></textarea>
+                                </div>
+                                <div style="display:flex;gap:6px;">
+                                    <button type="submit" class="btn-danger-cct btn-sm w-50" onclick="return confirm('Êtes-vous absolument sûr(e) ? Cette action est irréversible.')">
+                                        SUPPRIMER MON COMPTE
+                                    </button>
+                                    <form method="POST" style="flex:1;">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="action" value="cancel_deletion">
+                                        <button type="submit" class="btn-ghost btn-sm w-100">Annuler</button>
+                                    </form>
+                                </div>
+                            </form>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
             </div><!-- /.profil-card -->
@@ -473,6 +599,45 @@ new Chart(ctxDyna, {
     options: { scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { stepSize: 1, color: 'rgba(255,255,255,0.3)', font: { size: 9 } } }, x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } } }, plugins: { legend: { display: false } }, responsive: true, maintainAspectRatio: false }
 });
 <?php endif; ?>
+
+// ═══ OTP Deletion Input Handler ═══
+document.addEventListener('DOMContentLoaded', function() {
+    const deletionOtpInputs = document.querySelectorAll('.deletion-otp-input');
+    
+    deletionOtpInputs.forEach((input, index) => {
+        input.addEventListener('input', function(e) {
+            if (!/^\d*$/.test(this.value)) {
+                this.value = '';
+                return;
+            }
+            if (this.value.length > 1) {
+                this.value = this.value.slice(-1);
+            }
+            
+            // Update hidden field
+            const code = Array.from(deletionOtpInputs).map(i => i.value).join('');
+            document.getElementById('deletion_otp_code').value = code;
+            
+            // Auto focus next
+            if (this.value && index < deletionOtpInputs.length - 1) {
+                deletionOtpInputs[index + 1].focus();
+            }
+        });
+        
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && this.value === '' && index > 0) {
+                deletionOtpInputs[index - 1].focus();
+                e.preventDefault();
+            } else if (e.key === 'ArrowLeft' && index > 0) {
+                deletionOtpInputs[index - 1].focus();
+                e.preventDefault();
+            } else if (e.key === 'ArrowRight' && index < deletionOtpInputs.length - 1) {
+                deletionOtpInputs[index + 1].focus();
+                e.preventDefault();
+            }
+        });
+    });
+});
 </script>
 </body>
 </html>

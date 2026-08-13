@@ -15,6 +15,13 @@ require_once __DIR__ . '/../security/csrf.php';
 
 $error = "";
 
+// Show password reset success message
+$success_message = '';
+if (isset($_SESSION['password_reset_success']) && $_SESSION['password_reset_success']) {
+    $success_message = "Votre mot de passe a été réinitialisé avec succès. Connectez-vous avec votre nouveau mot de passe.";
+    unset($_SESSION['password_reset_success']);
+}
+
 // ── PROTECTION BRUTE FORCE ── (inchangé)
 if (!isset($_SESSION['login_attempts'])) {
     $_SESSION['login_attempts'] = 0;
@@ -160,6 +167,14 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
             </div>
         <?php endif; ?>
 
+        <!-- Message de succès -->
+        <?php if (!empty($success_message)): ?>
+            <div class="msg-success mb-4" role="alert" aria-live="polite">
+                <i class="bi bi-check-circle-fill me-2" aria-hidden="true"></i>
+                <?= htmlspecialchars($success_message) ?>
+            </div>
+        <?php endif; ?>
+
         <!-- Formulaire — logique PHP inchangée, HTML migré DS -->
         <form action="" method="POST" novalidate>
             <?= csrf_field() ?>
@@ -223,8 +238,16 @@ $bg_image  = !empty($images_bg) ? '/coiffons/imgid/' . basename($images_bg[0]) :
 
         </form>
 
+        <!-- Lien mot de passe oublié -->
+        <p style="text-align:center;margin-top:1rem;font-size:.75rem;color:var(--text-muted);">
+            <a href="/coiffons/access/password_reset.php"
+               style="color:var(--text-disabled);text-decoration:none;">
+                Mot de passe oublié ?
+            </a>
+        </p>
+
         <!-- Lien inscription -->
-        <p style="text-align:center;margin-top:1.25rem;font-size:.82rem;color:var(--text-muted);">
+        <p style="text-align:center;margin-top:.6rem;font-size:.82rem;color:var(--text-muted);">
             Pas encore de compte ?
             <a href="/coiffons/index.php?page=register&role=client"
                style="color:var(--gold);text-decoration:none;font-weight:600;">

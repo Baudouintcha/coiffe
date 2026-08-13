@@ -19,6 +19,9 @@ if (!isset($_SESSION['id_user'])) {
 }
 
 require_once __DIR__ . '/security/config.php';
+require_once __DIR__ . '/security/csrf.php';
+require_once __DIR__ . '/src/Services/OtpService.php';
+require_once __DIR__ . '/src/Services/EmailService.php';
 
 $user_id = $_SESSION['id_user'];
 
@@ -42,6 +45,92 @@ if ($user['role'] === 'admin') {
 
 $erreurs = [];
 $succes  = false;
+
+// ═══ HANDLE EMAIL CHANGE OTP REQUEST ═══
+$email_change_step = 1; // Step 1: Email form, Step 2: OTP verification
+if (isset($_SESSION['email_change_step'])) {
+    $email_change_step = $_SESSION['email_change_step'];
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'request_email_change') {
+    csrf_verify();
+    
+    $new_email = filter_var(trim($_POST['new_email']), FILTER_SANITIZE_EMAIL);
+    
+    if (!filter_var($new_email, FILTER_VALIDATE_EMAIL)) {
+        $erreurs[] = "Adresse email invalide.";
+    } elseif ($new_email === $user['email']) {
+        $erreurs[] = "Le nouvel email doit être différent de l'email actuel.";
+    } else {
+        // Check if email already exists
+        $check = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $check->execute([$new_email, $user_id]);
+        if ($check->rowCount() > 0) {
+            $erreurs[] = "Cet email est déjà utilisé par un autre compte.";
+        } else {
+            // Generate OTP
+            $otp_service = new OtpService($pdo);
+            $otp_result = $otp_service->generate($user_id, 'email_change');
+            
+            if ($otp_result['success']) {
+                // Send OTP to NEW email
+                $email_service = new EmailService();
+                $email_send_result = $email_service->sendOtpCode($new_email, $otp_result['code'], 5, 'email_change');
+                
+                if ($email_send_result['success']) {
+                    $_SESSION['email_change_step'] = 2;
+                    $_SESSION['email_change_new_email'] = $new_email;
+                    header("Location: /coiffons/modifier_profil.php");
+                    exit();
+                } else {
+                    $erreurs[] = "Erreur lors de l'envoi du code: " . htmlspecialchars($email_send_result['message']);
+                }
+            } else {
+                $erreurs[] = "Erreur lors de la génération du code de vérification.";
+            }
+        }
+    }
+}
+
+// ═══ HANDLE EMAIL CHANGE OTP VERIFICATION ═══
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'verify_email_change') {
+    csrf_verify();
+    
+    $code = $_POST['otp_code'] ?? '';
+    $new_email = $_SESSION['email_change_new_email'] ?? '';
+    
+    if (!preg_match('/^\d{6}$/', $code)) {
+        $erreurs[] = "Code invalide ou expiré.";
+    } elseif (empty($new_email)) {
+        $erreurs[] = "Session invalide. Veuillez recommencer.";
+    } else {
+        $otp_service = new OtpService($pdo);
+        $result = $otp_service->verify($user_id, 'email_change', $code);
+        
+        if ($result['success']) {
+            // Update email in database
+            $pdo->prepare("UPDATE users SET email = ? WHERE id = ?")->execute([$new_email, $user_id]);
+            
+            // Clear session
+            unset($_SESSION['email_change_step']);
+            unset($_SESSION['email_change_new_email']);
+            
+            // Show success message
+            header("Location: /coiffons/modifier_profil.php?email_change_success=1");
+            exit();
+        } else {
+            $erreurs[] = $result['message'] ?? "Code invalide ou expiré.";
+        }
+    }
+}
+
+// ═══ HANDLE EMAIL CHANGE CANCEL ═══
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'cancel_email_change') {
+    unset($_SESSION['email_change_step']);
+    unset($_SESSION['email_change_new_email']);
+    header("Location: /coiffons/modifier_profil.php");
+    exit();
+}
 
 // Traitement formulaire — SQL CORRIGÉ : utiliser id_ville (INT) au lieu de ville (TEXT)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -182,6 +271,76 @@ include __DIR__ . '/views/components/navbar_client.php';
                     <div class="col-12">
                         <?php $ff = ['type'=>'email','name'=>'_email_readonly','label'=>'Adresse Email (non modifiable)','value'=>$user['email']??'','disabled'=>true,'icon_prefix'=>'bi-envelope']; include __DIR__ . '/views/components/form_field.php'; ?>
                     </div>
+
+                    <!-- ═══ EMAIL CHANGE SECTION ═══ -->
+                    <?php if ($email_change_step === 1): ?>
+                        <div class="col-12 mt-3">
+                            <div style="background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.3);border-radius:8px;padding:12px;margin:8px 0;">
+                                <button type="button" class="btn-gold w-100" style="font-size:0.85rem;padding:8px;" data-bs-toggle="collapse" data-bs-target="#email-change-form">
+                                    <i class="bi bi-pencil me-2" aria-hidden="true"></i>
+                                    Changer mon adresse email
+                                </button>
+                            </div>
+                            <div class="collapse" id="email-change-form">
+                                <div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;padding:12px;margin-top:8px;">
+                                    <form method="POST" novalidate style="display:flex;flex-direction:column;gap:8px;">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="action" value="request_email_change">
+                                        <label style="font-size:0.75rem;color:var(--text-muted);font-weight:500;text-transform:uppercase;">Nouvel email</label>
+                                        <input type="email" name="new_email" class="fc-dark" placeholder="nouvel.email@example.com" required style="font-size:0.9rem;">
+                                        <small style="color:var(--text-muted);font-size:0.7rem;">Un code de vérification sera envoyé à cette adresse.</small>
+                                        <div style="display:flex;gap:6px;margin-top:8px;">
+                                            <button type="submit" class="btn-gold" style="flex:1;font-size:0.8rem;padding:7px;">Envoyer code</button>
+                                            <button type="button" class="btn-ghost" style="flex:1;font-size:0.8rem;padding:7px;" data-bs-toggle="collapse" data-bs-target="#email-change-form">Annuler</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    <!-- ═══ EMAIL VERIFICATION STEP ═══ -->
+                    <?php elseif ($email_change_step === 2): ?>
+                        <div class="col-12 mt-3">
+                            <div style="background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.4);border-radius:8px;padding:12px;">
+                                <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 10px 0;">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Un code a été envoyé à <strong><?= htmlspecialchars($_SESSION['email_change_new_email'] ?? '') ?></strong>
+                                </p>
+                                <form method="POST" novalidate>
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="action" value="verify_email_change">
+                                    
+                                    <!-- OTP Input Fields -->
+                                    <div class="otp-inputs" style="display:flex;gap:6px;justify-content:center;margin:12px 0;flex-wrap:wrap;">
+                                        <?php for ($i = 1; $i <= 6; $i++): ?>
+                                            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]" 
+                                                   placeholder="•" name="otp_digit_<?= $i ?>" id="otp_digit_<?= $i ?>"
+                                                   style="width:40px;height:40px;text-align:center;font-size:1.2rem;border:1px solid rgba(212,175,55,0.3);border-radius:6px;background:rgba(212,175,55,0.05);color:var(--gold);font-weight:700;">
+                                        <?php endfor; ?>
+                                    </div>
+                                    <input type="hidden" name="otp_code" id="otp_code" value="">
+                                    
+                                    <div style="display:flex;gap:6px;">
+                                        <button type="submit" class="btn-gold" style="flex:1;font-size:0.8rem;padding:7px;">Vérifier</button>
+                                        <form method="POST" style="flex:1;">
+                                            <?= csrf_field() ?>
+                                            <input type="hidden" name="action" value="cancel_email_change">
+                                            <button type="submit" class="btn-ghost w-100" style="font-size:0.8rem;padding:7px;">Annuler</button>
+                                        </form>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Success message -->
+                    <?php if (isset($_GET['email_change_success'])): ?>
+                        <div class="col-12 mt-3">
+                            <div style="background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.4);border-radius:8px;padding:12px;color:#10b981;">
+                                <i class="bi bi-check-circle-fill me-2"></i>
+                                Votre adresse email a été mise à jour avec succès!
+                            </div>
+                        </div>
+                    <?php endif; ?>
                     <div class="col-12">
                         <?php $ff = ['type'=>'tel','name'=>'telephone','label'=>'Téléphone (WhatsApp)','value'=>$user['telephone']??'','placeholder'=>'Ex: +22967000000','required'=>true,'icon_prefix'=>'bi-telephone']; include __DIR__ . '/views/components/form_field.php'; ?>
                     </div>
@@ -275,6 +434,46 @@ function chargerQuartiers(idVille) {
             qs.innerHTML = '<option value="">Erreur de chargement</option>';
         });
 }
+
+// ═══ OTP Email Change Input Handler ═══
+document.addEventListener('DOMContentLoaded', function() {
+    const otpInputs = document.querySelectorAll('.otp-input');
+    
+    otpInputs.forEach((input, index) => {
+        input.addEventListener('input', function(e) {
+            if (!/^\d*$/.test(this.value)) {
+                this.value = '';
+                return;
+            }
+            if (this.value.length > 1) {
+                this.value = this.value.slice(-1);
+            }
+            
+            // Update hidden field
+            const code = Array.from(otpInputs).map(i => i.value).join('');
+            document.getElementById('otp_code').value = code;
+            
+            // Auto focus next
+            if (this.value && index < otpInputs.length - 1) {
+                otpInputs[index + 1].focus();
+            }
+        });
+        
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && this.value === '' && index > 0) {
+                otpInputs[index - 1].focus();
+                e.preventDefault();
+            } else if (e.key === 'ArrowLeft' && index > 0) {
+                otpInputs[index - 1].focus();
+                e.preventDefault();
+            } else if (e.key === 'ArrowRight' && index < otpInputs.length - 1) {
+                otpInputs[index + 1].focus();
+                e.preventDefault();
+            }
+        });
+    });
+});
+
 </script>
 </body>
 </html>

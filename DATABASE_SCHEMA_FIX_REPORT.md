@@ -1,51 +1,51 @@
-# Database Schema Column Name Fixes
+# Corrections des Noms de Colonne du Schéma Base de Données
 
-## Summary
-Fixed critical database schema inconsistencies where PHP code was referencing non-existent column names in the `users` table. The issue was that code referenced `ville` (text field) when the actual database column is `id_ville` (INT) to store the city ID.
+## Résumé
+Correction des incohérences critiques du schéma base de données où le code PHP référençait des noms de colonne inexistants dans la table `users`. Le problème était que le code référençait `ville` (champ texte) alors que la vraie colonne base de données est `id_ville` (INT) pour stocker l'ID de ville.
 
-## Root Cause
-- **Database Schema (domizi_v2.sql)** defines users table with:
-  - `id_ville` (INT UNSIGNED) — Foreign key to villes.id
-  - `id_quartier` (INT UNSIGNED) — Foreign key to quartiers.id
+## Cause Racine
+- **Schéma Base de Données (domizi_v2.sql)** définit la table users avec:
+  - `id_ville` (INT UNSIGNED) — Clé étrangère vers villes.id
+  - `id_quartier` (INT UNSIGNED) — Clé étrangère vers quartiers.id
 
-- **Legacy Code** was using:
-  - `ville` (non-existent column)
-  - `id_quartier` (correct, but paired with wrong column name)
+- **Code Hérité** utilisait:
+  - `ville` (colonne non-existante)
+  - `id_quartier` (correct, mais appairé avec le mauvais nom de colonne)
 
-## Files Fixed
+## Fichiers Corrigés
 
 ### 1. coiffeurs/profil_coiffeurs.php
-**Issue**: Line 40 was using UPDATE with `ville` column instead of `id_ville`
+**Problème**: La ligne 40 utilisait UPDATE avec la colonne `ville` au lieu de `id_ville`
 ```sql
--- BEFORE (WRONG):
+-- AVANT (INCORRECT):
 UPDATE users SET nom = ?, prenom = ?, email = ?, telephone = ?, ville = ?, id_quartier = ? WHERE id = ?
 
--- AFTER (FIXED):
+-- APRÈS (CORRIGÉ):
 UPDATE users SET nom = ?, prenom = ?, email = ?, telephone = ?, id_ville = ?, id_quartier = ? WHERE id = ?
 ```
-**Impact**: Profile updates now correctly save city selection.
+**Impact**: Les mises à jour de profil sauvegardent maintenant correctement la sélection de ville.
 
 ### 2. modifier_profil.php
-**Issues**:
-- Line 47: Used `$ville = htmlspecialchars(trim($_POST['ville']));` storing text instead of integer
-- Line 58: UPDATE statement used `ville = ?` with text value
-- Line 176-188: Form field was `<input type="text" name="ville">` instead of dropdown
+**Problèmes**:
+- Ligne 47: Utilisait `$ville = htmlspecialchars(trim($_POST['ville']));` stockant du texte au lieu d'un entier
+- Ligne 58: L'instruction UPDATE utilisait `ville = ?` avec une valeur texte
+- Lignes 176-188: Le champ formulaire était `<input type="text" name="ville">` au lieu d'une liste déroulante
 
-**Changes**:
-- Changed `$ville` to `$id_ville = (!empty($_POST['id_ville'])) ? intval($_POST['id_ville']) : null;`
-- Updated SQL: `UPDATE users SET ... id_ville = ?, ...`
-- Converted form field to dropdown with city options from villes table
-- Added `onchange="chargerQuartiers(this.value)"` to populate quartier options dynamically
-- Added JavaScript function `chargerQuartiers()` to load quartiers via AJAX from `/coiffons/access/get_quartiers.php`
+**Modifications**:
+- Changé `$ville` en `$id_ville = (!empty($_POST['id_ville'])) ? intval($_POST['id_ville']) : null;`
+- Mis à jour SQL: `UPDATE users SET ... id_ville = ?, ...`
+- Converti le champ formulaire en liste déroulante avec options de ville depuis la table villes
+- Ajout de `onchange="chargerQuartiers(this.value)"` pour remplir dynamiquement les options quartier
+- Ajout de la fonction JavaScript `chargerQuartiers()` pour charger les quartiers via AJAX depuis `/coiffons/access/get_quartiers.php`
 
-**Before**:
+**Avant**:
 ```php
 $ff = ['type'=>'text','name'=>'ville','label'=>'Ville',...];
 ```
 
-**After**:
+**Après**:
 ```php
-// Loads villes from database
+// Charge les villes depuis la base de données
 $opts_v = [['value'=>'','label'=>'-- Sélectionnez une ville --']];
 foreach ($liste_villes as $v) {
     $opts_v[] = ['value'=>$v['id'], 'label'=>$v['nom_ville'], ...];
@@ -54,90 +54,90 @@ $ff = ['type'=>'select','name'=>'id_ville','label'=>'Ville',...'attrs'=>'onchang
 ```
 
 ### 3. access/connexion.php
-**Issues**:
-- Line 44: SELECT statement used `ville` column (doesn't exist)
-- Line 58: Set `$_SESSION['ville']` with ID value instead of `$_SESSION['id_ville']`
-- Line 63: Used `$user['ville']` instead of `$user['id_ville']`
+**Problèmes**:
+- Ligne 44: L'instruction SELECT utilisait la colonne `ville` (n'existe pas)
+- Ligne 58: Définissait `$_SESSION['ville']` avec la valeur ID au lieu de `$_SESSION['id_ville']`
+- Ligne 63: Utilisait `$user['ville']` au lieu de `$user['id_ville']`
 
-**Changes**:
-- Changed SELECT to use `id_ville` instead of `ville`
-- Updated SESSION variables: `$_SESSION['id_ville'] = $user['id_ville'];`
-- Fixed referencing: `if ($user['id_ville'])` → fetch city name
+**Modifications**:
+- Changé SELECT pour utiliser `id_ville` au lieu de `ville`
+- Mise à jour des variables SESSION: `$_SESSION['id_ville'] = $user['id_ville'];`
+- Correction de la référence: `if ($user['id_ville'])` → récupérer le nom de ville
 
 ### 4. access/inscription.php
-**Issues**:
-- Line 103: INSERT statement used `ville` column instead of `id_ville`
+**Problème**:
+- Ligne 103: L'instruction INSERT utilisait la colonne `ville` au lieu de `id_ville`
 
-**Changes**:
+**Modifications**:
 ```sql
--- BEFORE:
+-- AVANT:
 INSERT INTO users (..., ville, id_quartier, ...) VALUES (...)
 
--- AFTER:
+-- APRÈS:
 INSERT INTO users (..., id_ville, id_quartier, ...) VALUES (...)
 ```
 
 ### 5. coiffeurs/mes_zones.php
-**Issue**: Line 54 selected non-existent `ville` column
+**Problème**: Ligne 54 sélectionnait la colonne `ville` non-existante
 ```php
--- BEFORE:
+-- AVANT:
 $profile_stmt = $pdo->prepare("SELECT ville FROM users WHERE id = ?");
 
--- AFTER:
+-- APRÈS:
 $profile_stmt = $pdo->prepare("SELECT id_ville FROM users WHERE id = ?");
 ```
 
 ### 6. index.php
-**Issues**: Two occurrences of `$_SESSION['ville']` 
-- Line 45: `$id_ville_client = $_SESSION['ville'] ?? 0;`
-- Line 144: `$id_ville_client = $_SESSION['ville'] ?? 0;`
+**Problèmes**: Deux occurrences de `$_SESSION['ville']` 
+- Ligne 45: `$id_ville_client = $_SESSION['ville'] ?? 0;`
+- Ligne 144: `$id_ville_client = $_SESSION['ville'] ?? 0;`
 
-**Changes**: Both updated to use `$_SESSION['id_ville']`
+**Modifications**: Les deux mises à jour pour utiliser `$_SESSION['id_ville']`
 
 ### 7. ia_controlleur.php
-**Issue**: Line 36 used `$_SESSION['ville']`
+**Problème**: Ligne 36 utilisait `$_SESSION['ville']`
 ```php
--- BEFORE:
+-- AVANT:
 $ville_user = $_SESSION['ville'] ?? 0;
 
--- AFTER:
+-- APRÈS:
 $ville_user = $_SESSION['id_ville'] ?? 0;
 ```
 
 ### 8. filter/annuaire_coiffeurs.php
-**Issue**: Line 31 used `$_SESSION['ville']`
+**Problème**: Ligne 31 utilisait `$_SESSION['ville']`
 ```php
--- BEFORE:
+-- AVANT:
 $ville_session = $est_client_connecte ? (int)($_SESSION['ville'] ?? 0) : 0;
 
--- AFTER:
+-- APRÈS:
 $ville_session = $est_client_connecte ? (int)($_SESSION['id_ville'] ?? 0) : 0;
 ```
 
-## Session Variable Changes
-Unified all session variables to use correct database column names:
-- `$_SESSION['ville']` → `$_SESSION['id_ville']` (stores INT city ID)
-- `$_SESSION['id_quartier']` (unchanged, already correct)
+## Changements des Variables Session
+Unification de toutes les variables session pour utiliser les noms corrects de colonnes base de données:
+- `$_SESSION['ville']` → `$_SESSION['id_ville']` (stocke l'INT ID de ville)
+- `$_SESSION['id_quartier']` (inchangé, déjà correct)
 
-## Verification
-All profile update operations now:
-1. ✅ Correctly reference `id_ville` and `id_quartier` columns
-2. ✅ Store integers (city/quartier IDs) instead of text
-3. ✅ Use dropdown selects in forms instead of text inputs
-4. ✅ Load quartiers dynamically via AJAX when city changes
-5. ✅ Properly hydrate session variables on login/registration
+## Vérification
+Toutes les opérations de mise à jour de profil maintenant:
+1. ✅ Référencent correctement les colonnes `id_ville` et `id_quartier`
+2. ✅ Stockent les entiers (IDs de ville/quartier) au lieu de texte
+3. ✅ Utilisent des listes déroulantes select dans les formulaires au lieu de champs texte
+4. ✅ Chargent les quartiers dynamiquement via AJAX quand la ville change
+5. ✅ Hydratent correctement les variables session lors de la connexion/inscription
 
-## Error Messages Fixed
+## Messages d'Erreur Corrigés
 - ❌ "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'ville'"
 - ❌ "SQLSTATE[HY000]: General error: 1054 Unknown column 'id_ville' in 'field list'"
 
-Both errors should now be resolved.
+Les deux erreurs devraient maintenant être résolues.
 
-## Testing Checklist
-- [ ] User can modify profile from coiffeur dashboard (profil_coiffeurs.php)
-- [ ] User can modify profile from modifier_profil.php
-- [ ] City dropdown loads correctly
-- [ ] Quartier dropdown updates when city changes
-- [ ] Save/registration creates users with correct id_ville/id_quartier
-- [ ] Login session hydration works correctly
-- [ ] Filter/annuaire shows correct geographic matching
+## Checklist de Test
+- [ ] L'utilisateur peut modifier le profil depuis le tableau de bord coiffeur (profil_coiffeurs.php)
+- [ ] L'utilisateur peut modifier le profil depuis modifier_profil.php
+- [ ] La liste déroulante de ville se charge correctement
+- [ ] La liste déroulante quartier se met à jour quand la ville change
+- [ ] La sauvegarde/inscription crée des utilisateurs avec id_ville/id_quartier corrects
+- [ ] L'hydratation de session login fonctionne correctement
+- [ ] Filtre/annuaire affiche les correspondances géographiques correctes
