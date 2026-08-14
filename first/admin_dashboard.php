@@ -130,7 +130,7 @@ try {
 
 // 7. COMPTES & AVIS SIGNALÉS
 try {
-    $users_list = $bdd->query("SELECT id, nom, prenom, role, email, telephone, statut, created_at FROM users ORDER BY id DESC LIMIT 50")->fetchAll();
+    $users_list = $bdd->query("SELECT id, nom, prenom, role, email, telephone, statut, is_approved, created_at FROM users ORDER BY id DESC LIMIT 50")->fetchAll();
 } catch (Exception $e) { $users_list = []; }
 
 try {
@@ -334,10 +334,23 @@ try {
                     if ($_GET['success'] === 'user_supprime') echo "L'utilisateur a été exclu définitivement.";
                     if ($_GET['success'] === 'com_supprime') echo "Le commentaire inapproprié a été supprimé.";
                     if ($_GET['success'] === 'log_nettoye') echo "L'historique de suppression a été mis à jour.";
-                    if ($_GET['success'] === 'statut_visibilite_maj') echo "L'approbation publique a été modifiée.";
+                    if ($_GET['success'] === 'statut_visibilite_maj') echo "L'approbation a été modifiée avec succès.";
                     if ($_GET['success'] === 'bannissement_maj') echo "Le statut de bannissement a été mis à jour.";
                     if ($_GET['success'] === 'fraude_traitee') echo "La fraude a été résolue, le tricheur banni et le client récompensé (+2 000 FCFA).";
                     if ($_GET['success'] === 'notifications_envoyees') echo "Notifications push de rétention diffusées avec succès.";
+                    if ($_GET['success'] === 'abo_valide') echo "✅ Abonnement validé ! Le coiffeur peut maintenant utiliser toutes les fonctionnalités.";
+                    if ($_GET['success'] === 'retrait_valide') echo "✅ Retrait effectué ! Les fonds seront crédités au coiffeur sous 24h.";
+                ?>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_GET['error'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show bg-danger text-white border-0 shadow-lg mb-4" role="alert">
+                <strong><i class="bi bi-exclamation-circle-fill"></i> Erreur :</strong>
+                <?php
+                    if ($_GET['error'] === 'echec_retrait') echo "❌ Impossible de traiter le retrait. Vérifiez le solde du coiffeur.";
+                    if ($_GET['error'] === 'echec_traitement') echo "❌ Une erreur s'est produite lors du traitement.";
                 ?>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
             </div>
@@ -544,6 +557,65 @@ try {
             <div class="tab-pane fade" id="validations">
                 <div class="row g-4">
                     
+                    <!-- Diplômes en Attente d'Approbation (NOUVEAU) -->
+                    <div class="col-md-12">
+                        <div class="card bg-dark border-secondary p-4 mb-4">
+                            <h5 class="text-primary mb-3 fw-bold small text-uppercase"><i class="bi bi-file-earmark-check"></i> Diplômes en Attente d'Approbation</h5>
+                            <p class="text-muted small mb-3">Coiffeurs avec diplômes uploadés, en attente d'approbation par l'admin pour apparaître dans l'annuaire.</p>
+                            <div class="table-responsive">
+                                <table class="table table-premium text-center align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Coiffeur</th><th>Téléphone</th><th>Date d'Inscription</th><th>Diplôme</th><th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (empty($diplomes_attente)): ?>
+                                            <tr><td colspan="5" class="text-muted">✅ Aucun diplôme en attente. Tous les coiffeurs sont approuvés !</td></tr>
+                                        <?php else: ?>
+                                            <?php foreach ($diplomes_attente as $dip): ?>
+                                                <tr>
+                                                    <td class="fw-bold text-gold"><?php echo htmlspecialchars($dip['nom'] . ' ' . $dip['prenom']); ?></td>
+                                                    <td class="text-warning"><?php echo htmlspecialchars($dip['telephone']); ?></td>
+                                                    <td class="text-secondary small"><?php echo date('d/m/Y', strtotime($dip['created_at'])); ?></td>
+                                                    <td>
+                                                        <?php 
+                                                            // Construire le chemin complet du diplôme
+                                                            $diplome_path = $dip['diplome'];
+                                                            
+                                                            // Si c'est un chemin relatif, ajouter le préfixe
+                                                            if (!empty($diplome_path) && strpos($diplome_path, 'http') !== 0 && strpos($diplome_path, '/') !== 0) {
+                                                                $diplome_path = '../access/uploads/diplomes/' . basename($diplome_path);
+                                                            } elseif (!empty($diplome_path) && strpos($diplome_path, 'http') !== 0) {
+                                                                // Si c'est un chemin absolu mais pas une URL
+                                                                $diplome_path = '../access/uploads/diplomes/' . basename($diplome_path);
+                                                            }
+                                                        ?>
+                                                        <?php if (!empty($diplome_path)): ?>
+                                                            <a href="<?php echo htmlspecialchars($diplome_path); ?>" target="_blank" class="btn btn-sm btn-outline-info" title="Ouvrir le diplôme">
+                                                                <i class="bi bi-eye"></i> Voir
+                                                            </a>
+                                                        <?php else: ?>
+                                                            <span class="text-muted small">Pas de diplôme</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <a href="admin_actions.php?action=approuver_diplome&id=<?php echo $dip['id']; ?>" class="btn btn-sm btn-success fw-bold">
+                                                            <i class="bi bi-check-circle-fill"></i> Approuver
+                                                        </a>
+                                                        <a href="admin_actions.php?action=refuser_diplome&id=<?php echo $dip['id']; ?>" class="btn btn-sm btn-danger fw-bold">
+                                                            <i class="bi bi-x-circle-fill"></i> Refuser
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Validations Abonnements -->
                     <div class="col-md-6">
                         <div class="card bg-dark border-secondary p-4 h-100">
@@ -564,7 +636,7 @@ try {
                                                     <td class="fw-bold"><?php echo htmlspecialchars($ab['nom'] . ' ' . $ab['prenom']); ?></td>
                                                     <td class="text-warning"><?php echo htmlspecialchars($ab['telephone']); ?></td>
                                                     <td>
-                                                        <a href="admin_actions.php?action=valider_abonnement&id=<?php echo $ab['id_abonnement']; ?>" class="btn btn-success btn-sm fw-bold">
+                                                        <a href="admin_actions.php?action=valider_abonnement&id=<?php echo $ab['id']; ?>" class="btn btn-success btn-sm fw-bold">
                                                             <i class="bi bi-check-circle"></i> Confirmer
                                                         </a>
                                                     </td>

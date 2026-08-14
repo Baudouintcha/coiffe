@@ -214,7 +214,75 @@ switch ($action) {
         break;
 
     // =================================================================
-    // ACTION 10 : Approuver le diplôme d'un coiffeur
+    // ACTION 10 : Valider/Confirmer un abonnement (Paiement de 1500F accepté)
+    // =================================================================
+    case 'valider_abonnement':
+        $id_user = intval($_GET['id'] ?? 0);
+        if ($id_user > 0) {
+            // Marquer l'abonnement comme actif et fixer date d'expiration (+1 mois)
+            $stmt = $pdo->prepare("
+                UPDATE users 
+                SET abonnement_status = 1, 
+                    date_expiration_abo = DATE_ADD(NOW(), INTERVAL 1 MONTH)
+                WHERE id = ?
+            ");
+            $stmt->execute([$id_user]);
+
+            // Notification au coiffeur
+            require_once __DIR__ . '/../security/notifications.php';
+            notifier($pdo, $id_user,
+                'Votre abonnement de 1 500 F a été confirmé ! Vous avez accès à toutes les fonctionnalités pendant 1 mois.',
+                'success'
+            );
+
+            header("Location: admin_dashboard.php?success=abo_valide");
+            exit();
+        }
+        break;
+
+    // =================================================================
+    // ACTION 11 : Valider un retrait Mobile Money
+    // =================================================================
+    case 'valider_retrait':
+        $id_transaction = intval($_GET['id'] ?? 0);
+        if ($id_transaction > 0) {
+            // Récupérer les infos de la transaction
+            $stmt = $pdo->prepare("SELECT user_id, montant_net FROM transactions_portefeuille WHERE id_transaction = ?");
+            $stmt->execute([$id_transaction]);
+            $transaction = $stmt->fetch();
+
+            if ($transaction) {
+                $pdo->beginTransaction();
+                try {
+                    // 1. Marquer la transaction comme effectuée
+                    $update_trans = $pdo->prepare("UPDATE transactions_portefeuille SET statut_paiement = 'complete' WHERE id_transaction = ?");
+                    $update_trans->execute([$id_transaction]);
+
+                    // 2. Débiter le solde du coiffeur (retrait effectué)
+                    $debit = $pdo->prepare("UPDATE users SET solde = solde - ? WHERE id = ?");
+                    $debit->execute([$transaction['montant_net'], $transaction['user_id']]);
+
+                    // 3. Notification au coiffeur
+                    require_once __DIR__ . '/../security/notifications.php';
+                    notifier($pdo, $transaction['user_id'],
+                        'Votre demande de retrait de ' . number_format($transaction['montant_net'], 0, ',', ' ') . ' F a été traitée avec succès. Les fonds arriveront sur votre Mobile Money dans 24h.',
+                        'success'
+                    );
+
+                    $pdo->commit();
+                    header("Location: admin_dashboard.php?success=retrait_valide");
+                    exit();
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    header("Location: admin_dashboard.php?error=echec_retrait");
+                    exit();
+                }
+            }
+        }
+        break;
+
+    // =================================================================
+    // ACTION 12 : Approuver le diplôme d'un coiffeur
     // =================================================================
     case 'approuver_diplome':
         $id_user = intval($_GET['id'] ?? 0);

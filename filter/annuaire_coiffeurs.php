@@ -45,52 +45,101 @@ if ($est_client_connecte && !isset($_GET['ville']) && !isset($_GET['q']) && !iss
 }
 
 // Y-a-t-il eu une recherche active ?
-// Pour un visiteur : il faut au moins un GET param.
-// Pour un client en mode_auto : on affiche toujours les résultats de sa zone.
-// La soumission du formulaire (action=1) force aussi l'affichage.
-$form_submitted = isset($_GET['q']) || isset($_GET['ville']) || isset($_GET['id_quartier']) || isset($_GET['_zone_override']);
+// Nouvelle logique : deux recherches indépendantes
+// - search_type=name : recherche par nom
+// - search_type=ville : recherche par ville
+$search_type    = $_GET['search_type'] ?? ''; // 'name', 'ville', ou vide
+$form_submitted = $search_type !== '';
 $a_recherche    = $form_submitted || $mode_auto;
 
 // ─────────────────────────────────────────────
-// 2. REQUÊTE COIFFEURS
+// 2. REQUÊTE COIFFEURS — Deux logiques indépendantes
 // ─────────────────────────────────────────────
-$sql    = "SELECT DISTINCT u.*, v.nom_ville, q.nom_quartier,
-               (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
-               (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
-           FROM users u
-           LEFT JOIN villes v ON u.ville = v.id
-           LEFT JOIN quartiers q ON u.id_quartier = q.id
-           LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
-           WHERE u.role = 'coiffeur'
-             AND u.is_approved = 1
-             AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')";
-$params = [];
+$coiffeurs = [];
 
-if ($ville_filtre > 0) {
-    $sql      .= " AND u.ville = ?";
-    $params[]  = $ville_filtre;
-}
-if ($quartier_filtre > 0) {
-    $sql      .= " AND (u.id_quartier = ? OR z.id_quartier = ?)";
-    $params[]  = $quartier_filtre;
-    $params[]  = $quartier_filtre;
-}
-if ($q !== '') {
-    $sql      .= " AND (u.nom LIKE ? OR u.prenom LIKE ? OR CONCAT(u.prenom,' ',u.nom) LIKE ? OR CONCAT(u.nom,' ',u.prenom) LIKE ?)";
-    $frag      = '%' . $q . '%';
-    $params[]  = $frag;
-    $params[]  = $frag;
-    $params[]  = $frag;
-    $params[]  = $frag;
-}
-$sql .= " ORDER BY note_moyenne DESC, nb_avis DESC, u.created_at DESC";
+if ($search_type === 'name') {
+    // ── Recherche par nom ──
+    if ($q !== '') {
+        $sql    = "SELECT DISTINCT u.*, v.nom_ville, q.nom_quartier,
+                       (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+                       (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                   FROM users u
+                   LEFT JOIN villes v ON u.ville = v.id
+                   LEFT JOIN quartiers q ON u.id_quartier = q.id
+                   WHERE u.role = 'coiffeur'
+                     AND u.is_approved = 1
+                     AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')
+                     AND (u.nom LIKE ? OR u.prenom LIKE ? OR CONCAT(u.prenom,' ',u.nom) LIKE ? OR CONCAT(u.nom,' ',u.prenom) LIKE ?)
+                   ORDER BY note_moyenne DESC, nb_avis DESC, u.created_at DESC";
+        $frag      = '%' . $q . '%';
+        $params   = [$frag, $frag, $frag, $frag];
 
-try {
-    $stmt     = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $coiffeurs = $stmt->fetchAll();
-} catch (PDOException $e) {
-    $coiffeurs = [];
+        try {
+            $stmt     = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $coiffeurs = $stmt->fetchAll();
+        } catch (PDOException $e) {
+            $coiffeurs = [];
+        }
+    }
+
+} elseif ($search_type === 'ville') {
+    // ── Recherche par ville ──
+    if ($ville_filtre > 0) {
+        $sql    = "SELECT DISTINCT u.*, v.nom_ville, q.nom_quartier,
+                       (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+                       (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                   FROM users u
+                   LEFT JOIN villes v ON u.ville = v.id
+                   LEFT JOIN quartiers q ON u.id_quartier = q.id
+                   WHERE u.role = 'coiffeur'
+                     AND u.is_approved = 1
+                     AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')
+                     AND u.ville = ?
+                   ORDER BY note_moyenne DESC, nb_avis DESC, u.created_at DESC";
+        $params = [$ville_filtre];
+
+        try {
+            $stmt     = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $coiffeurs = $stmt->fetchAll();
+        } catch (PDOException $e) {
+            $coiffeurs = [];
+        }
+    }
+
+} elseif ($mode_auto && !isset($_GET['_zone_override'])) {
+    // ── Mode auto pour client connecté : affiche sa zone par défaut ──
+    $sql    = "SELECT DISTINCT u.*, v.nom_ville, q.nom_quartier,
+                   (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+                   (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+               FROM users u
+               LEFT JOIN villes v ON u.ville = v.id
+               LEFT JOIN quartiers q ON u.id_quartier = q.id
+               LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+               WHERE u.role = 'coiffeur'
+                 AND u.is_approved = 1
+                 AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')";
+    $params = [];
+
+    if ($ville_filtre > 0) {
+        $sql      .= " AND u.ville = ?";
+        $params[]  = $ville_filtre;
+    }
+    if ($quartier_filtre > 0) {
+        $sql      .= " AND (u.id_quartier = ? OR z.id_quartier = ?)";
+        $params[]  = $quartier_filtre;
+        $params[]  = $quartier_filtre;
+    }
+    $sql .= " ORDER BY note_moyenne DESC, nb_avis DESC, u.created_at DESC";
+
+    try {
+        $stmt     = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $coiffeurs = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        $coiffeurs = [];
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -421,6 +470,45 @@ if ($ville_filtre > 0) {
         margin: 0 auto;
     }
 
+    /* ── TABS SYSTEM ── */
+    .ann-tabs {
+        display: flex;
+        gap: 8px;
+        margin: 0 0 1.5rem;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        padding-bottom: 0;
+    }
+    .ann-tab {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: .82rem;
+        font-weight: 600;
+        padding: 10px 16px;
+        cursor: pointer;
+        transition: color .2s, border-color .2s;
+        border-bottom: 2px solid transparent;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        position: relative;
+        top: 1px;
+    }
+    .ann-tab:hover {
+        color: var(--gold);
+    }
+    .ann-tab.active {
+        color: var(--gold);
+        border-bottom-color: var(--gold);
+    }
+
+    /* ── TAB CONTENT ── */
+    .ann-tab-content {
+        display: none;
+    }
+    .ann-tab-content.active {
+        display: block;
+    }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 768px) {
         .ann-hero      { min-height: 62vh; }
@@ -482,17 +570,24 @@ include __DIR__ . '/../views/components/navbar_client.php';
             </div>
             <?php endif; ?>
 
-            <!-- ── Formulaire de recherche ── -->
-            <form method="GET" role="search" aria-label="Rechercher un coiffeur" id="ann-form">
+            <!-- ── Onglets de recherche ── -->
+            <div class="ann-tabs" role="tablist">
+                <button type="button" class="ann-tab active" data-tab="search-name" role="tab" aria-selected="true" aria-controls="search-name-panel">
+                    <i class="bi bi-person-circle me-1" aria-hidden="true"></i>Par nom
+                </button>
+                <button type="button" class="ann-tab" data-tab="search-ville" role="tab" aria-selected="false" aria-controls="search-ville-panel">
+                    <i class="bi bi-geo-alt me-1" aria-hidden="true"></i>Par ville
+                </button>
+            </div>
 
-                <?php if ($mode_auto && !isset($_GET['_zone_override'])): ?>
-                <!-- Champs cachés — zone auto -->
-                <input type="hidden" name="ville"       value="<?= $ville_filtre ?>">
-                <input type="hidden" name="id_quartier" value="<?= $quartier_filtre ?>">
-                <div class="mb-3">
-                    <div class="ann-autocomplete-wrap">
+            <!-- ── TAB 1 : Recherche par nom ── -->
+            <div id="search-name-panel" class="ann-tab-content active" role="tabpanel" aria-labelledby="tab-name">
+                <form method="GET" role="search" aria-label="Rechercher par nom" id="ann-form-name">
+                    <input type="hidden" name="search_type" value="name">
+                    
+                    <div class="ann-autocomplete-wrap mb-3">
                         <label for="annNomInput" class="form-label-cct" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);">
-                            Nom ou style
+                            <i class="bi bi-search me-1" aria-hidden="true"></i>Nom du coiffeur
                         </label>
                         <div style="position:relative;">
                             <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.35);font-size:.95rem;pointer-events:none;">
@@ -504,61 +599,44 @@ include __DIR__ . '/../views/components/navbar_client.php';
                                    class="fc-dark"
                                    style="padding-left:40px;"
                                    value="<?= htmlspecialchars($q) ?>"
-                                   placeholder="Rechercher un coiffeur..."
+                                   placeholder="Entrez un nom, prénom ou nom complet..."
                                    autocomplete="off"
                                    aria-autocomplete="list"
-                                   aria-controls="ann-suggestions-list">
+                                   aria-controls="ann-suggestions-list"
+                                   minlength="2">
                         </div>
                         <div id="ann-suggestions-list" class="ann-suggestions" role="listbox" aria-label="Suggestions de coiffeurs"></div>
                     </div>
-                </div>
-                <button type="submit" class="btn-gold w-100 ann-search-submit" aria-label="Lancer la recherche">
-                    <i class="bi bi-search me-2" aria-hidden="true"></i>Rechercher
-                </button>
 
-                <?php else: ?>
-                <!-- ── Mode visiteur ou surcharge zone ── -->
-                <div class="row g-3 align-items-end">
+                    <button type="submit" class="btn-gold w-100 ann-search-submit" aria-label="Lancer la recherche par nom">
+                        <i class="bi bi-search me-2" aria-hidden="true"></i>Rechercher
+                    </button>
+                </form>
+            </div>
 
-                    <!-- Champ nom — avec autocomplete -->
-                    <div class="col-12 col-md-5">
-                        <label for="annNomInput" class="form-label-cct" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);">Nom du coiffeur</label>
-                        <div class="ann-autocomplete-wrap">
-                            <div style="position:relative;">
-                                <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.35);font-size:.95rem;pointer-events:none;">
-                                    <i class="bi bi-search" aria-hidden="true"></i>
-                                </span>
-                                <input type="text"
-                                       id="annNomInput"
-                                       name="q"
-                                       class="fc-dark"
-                                       style="padding-left:40px;"
-                                       value="<?= htmlspecialchars($q) ?>"
-                                       placeholder="Rechercher..."
-                                       autocomplete="off"
-                                       aria-autocomplete="list"
-                                       aria-controls="ann-suggestions-list">
-                            </div>
-                            <div id="ann-suggestions-list" class="ann-suggestions" role="listbox" aria-label="Suggestions de coiffeurs"></div>
-                        </div>
-                    </div>
-
-                    <!-- Ville -->
-                    <div class="col-12 col-md-3">
-                        <label for="villeSelectAnnuaire" class="form-label-cct" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);">Ville</label>
+            <!-- ── TAB 2 : Recherche par ville ── -->
+            <div id="search-ville-panel" class="ann-tab-content" role="tabpanel" aria-labelledby="tab-ville">
+                <form method="GET" role="search" aria-label="Rechercher par ville" id="ann-form-ville">
+                    <input type="hidden" name="search_type" value="ville">
+                    
+                    <!-- Sélection de la ville -->
+                    <div class="mb-3">
+                        <label for="villeSelectSimple" class="form-label-cct" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);">
+                            <i class="bi bi-geo-alt me-1" aria-hidden="true"></i>Choisir une ville
+                        </label>
                         <div style="position:relative;">
                             <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:rgba(212,175,55,.5);font-size:.9rem;pointer-events:none;">
                                 <i class="bi bi-geo-alt" aria-hidden="true"></i>
                             </span>
                             <select name="ville"
-                                    id="villeSelectAnnuaire"
+                                    id="villeSelectSimple"
                                     class="fc-dark"
                                     style="padding-left:38px;"
-                                    aria-label="Sélectionner une ville">
-                                <option value="">Toutes les villes</option>
+                                    aria-label="Sélectionner une ville"
+                                    required>
+                                <option value="">-- Sélectionner une ville --</option>
                                 <?php foreach ($villes as $v): ?>
-                                    <option value="<?= $v['id'] ?>"
-                                            <?= ($ville_filtre == $v['id']) ? 'selected' : '' ?>>
+                                    <option value="<?= $v['id'] ?>">
                                         <?= htmlspecialchars($v['nom_ville']) ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -566,36 +644,11 @@ include __DIR__ . '/../views/components/navbar_client.php';
                         </div>
                     </div>
 
-                    <!-- Quartier -->
-                    <div class="col-12 col-md-3">
-                        <label for="quartierSelectAnnuaire" class="form-label-cct" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);">Quartier <span style="font-weight:400;opacity:.6;">(optionnel)</span></label>
-                        <select name="id_quartier"
-                                id="quartierSelectAnnuaire"
-                                class="fc-dark"
-                                <?= ($ville_filtre > 0) ? '' : 'disabled' ?>
-                                aria-label="Quartier">
-                            <option value="">Tous</option>
-                            <?php foreach ($quartiers_prefill as $qr): ?>
-                                <option value="<?= $qr['id'] ?>" <?= ($quartier_filtre == $qr['id']) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($qr['nom_quartier']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <!-- Bouton -->
-                    <div class="col-12 col-md-1 d-flex align-items-end">
-                        <button type="submit"
-                                class="btn-gold w-100 ann-search-submit"
-                                aria-label="Lancer la recherche">
-                            <i class="bi bi-search" aria-hidden="true"></i>
-                        </button>
-                    </div>
-
-                </div>
-                <?php endif; ?>
-
-            </form>
+                    <button type="submit" class="btn-gold w-100 ann-search-submit" aria-label="Lancer la recherche par ville">
+                        <i class="bi bi-search me-2" aria-hidden="true"></i>Afficher tous les coiffeurs
+                    </button>
+                </form>
+            </div>
 
         </div><!-- /.ann-search-card -->
     </div>
@@ -928,6 +981,34 @@ include __DIR__ . '/../views/components/bottom_nav_client.php';
         div.appendChild(document.createTextNode(str));
         return div.innerHTML;
     }
+
+    /* ═══════════════════════════════════
+       GESTION DES ONGLETS DE RECHERCHE
+       ═══════════════════════════════════ */
+    const tabs = document.querySelectorAll('.ann-tab');
+    const tabContents = document.querySelectorAll('.ann-tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function () {
+            const tabName = this.dataset.tab;
+
+            // Désactiver tous les onglets
+            tabs.forEach(t => {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+            });
+
+            // Masquer tous les panneaux
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Activer l'onglet et son contenu
+            this.classList.add('active');
+            this.setAttribute('aria-selected', 'true');
+            document.getElementById(tabName + '-panel').classList.add('active');
+        });
+    });
 
     /* ═══════════════════════════════════
        AJAX Quartiers selon ville
