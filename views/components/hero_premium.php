@@ -89,14 +89,14 @@ $hp_show_roles         = $hp_show_roles         ?? true;
                     <a href="<?= htmlspecialchars($hp_role_client_href) ?>"
                        class="hp-role-card"
                        aria-label="Je cherche un coiffeur à domicile">
-                        <span class="hp-role-icon" aria-hidden="true">👤</span>
+                        <span class="hp-role-icon" aria-hidden="true"> </span>
                         <span class="hp-role-title">Je cherche un coiffeur</span>
                         <span class="hp-role-sub">Trouver et réserver une prestation à domicile</span>
                     </a>
                     <a href="<?= htmlspecialchars($hp_role_coiffeur_href) ?>"
                        class="hp-role-card"
                        aria-label="Je suis coiffeur et je propose mes services">
-                        <span class="hp-role-icon" aria-hidden="true">✂️</span>
+                        <span class="hp-role-icon" aria-hidden="true"> </span>
                         <span class="hp-role-title">Je suis coiffeur</span>
                         <span class="hp-role-sub">Créer mon profil et recevoir des clients</span>
                     </a>
