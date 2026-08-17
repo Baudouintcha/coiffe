@@ -1,148 +1,279 @@
 <?php
-
 /**
- * app.php — Point d'entrée XAMPP local
- * Gère aussi les actions API et le changement de langue
+ * app.php — Routeur de "Coiffe Chez Toi"
+ * Appelé par index.php quand l'utilisateur choisit le métier Coiffure
  */
 
-declare(strict_types=1);
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-$envFile = __DIR__ . '/.env';
-if (file_exists($envFile)) {
-    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        if (str_starts_with(trim($line), '#')) continue;
-        if (str_contains($line, '=')) {
-            [$key, $value] = explode('=', $line, 2);
-            $_ENV[trim($key)] = trim($value);
-        }
-    }
-}
-
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
-error_reporting(E_ALL);
-
-use App\Core\Session;
-use App\Core\Lang;
 use App\Core\Database;
 
-Session::start();
+// Récupération de l'instance PDO via le singleton
+$pdo = Database::getInstance();
 
-// ── CHANGEMENT DE LANGUE (via ?lang=fr) ──
-if (isset($_GET['lang'])) {
-    Session::setLang($_GET['lang']);
-    // Retire le paramètre lang de l'URL et redirige proprement
-    $params = $_GET;
-    unset($params['lang']);
-    $redirect = '/coiffons/app.php';
-    if (!empty($params)) {
-        $redirect .= '?' . http_build_query($params);
-    }
-    header('Location: ' . $redirect);
-    exit();
-}
+$page = $_GET['page'] ?? 'home';
+$role = $_GET['role'] ?? null;
 
-Lang::init();
+// ── ROUTING ──
+switch ($page) {
+    case 'login':
+        include __DIR__ . '/access/connexion.php';
+        exit();
 
-// ── API MÉTIERS (appel AJAX ?action=api_metiers&domaine=1) ──
-if (isset($_GET['action']) && $_GET['action'] === 'api_metiers') {
-    header('Content-Type: application/json; charset=utf-8');
-    $idDomaine = intval($_GET['domaine'] ?? 0);
+    case 'register':
+        $role_valide = in_array($role, ['client', 'prestataire', 'coiffeur']) ? $role : 'client';
+        $_GET['role'] = $role_valide;
+        include __DIR__ . '/access/inscription.php';
+        exit();
 
-    try {
-        $pdo  = Database::getInstance();
-        $stmt = $pdo->prepare("
-            SELECT id, nom, slug, icone, description
-            FROM metiers
-            WHERE id_domaine = ? AND actif = 1
-            ORDER BY nom ASC
-        ");
-        $stmt->execute([$idDomaine]);
-        $metiers = $stmt->fetchAll();
-
-        echo json_encode(['success' => true, 'metiers' => $metiers], JSON_UNESCAPED_UNICODE);
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-    }
-    exit();
-}
-
-// ── BRANCHE MÉTIER (?metier=coiffure) ──
-if (isset($_GET['metier'])) {
-    $slugMetier = preg_replace('/[^a-z0-9\-]/', '', strtolower($_GET['metier']));
-
-    try {
-        $pdo  = Database::getInstance();
-        $stmt = $pdo->prepare("
-            SELECT m.*, d.nom as domaine_nom
-            FROM metiers m
-            JOIN domaines d ON m.id_domaine = d.id
-            WHERE m.slug = ? AND m.actif = 1
-        ");
-        $stmt->execute([$slugMetier]);
-        $metier = $stmt->fetch();
-
-        if (!$metier) {
-            http_response_code(404);
-            echo "<h1 style='color:#D4AF37;background:#0a0a0a;padding:40px;font-family:sans-serif'>Métier introuvable</h1>";
+    case 'dashboard_coiffeur':
+        // Dashboard coiffeur — uniquement pour les coiffeurs connectés
+        if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'coiffeur') {
+            header("Location: /coiffons/index.php?page=login");
             exit();
         }
+        include __DIR__ . '/views/coiffeur/dashboard.php';
+        exit();
 
-        // Sauvegarde le métier choisi en session pour tout le parcours
-        Session::set('metier_actif', $metier);
+    case 'dashboard':
+        // Dashboard client — uniquement pour les clients connectés
+        if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'client') {
+            header("Location: /coiffons/index.php?page=login");
+            exit();
+        }
+        // Prépare les données de matching pour la vue
+        $coiffeurs_matching = [];
+        $id_ville_client    = $_SESSION['id_ville'] ?? 0;
+        $id_quartier_client = $_SESSION['id_quartier'] ?? 0;
+        try {
+            // Requête principale : coiffeurs de la même ville (avec ou sans filtre quartier)
+            if ($id_quartier_client > 0) {
+                // Priorité 1 : même ville ET même quartier
+                $stmt = $pdo->prepare("
+                    SELECT DISTINCT u.id as id_coiffeur, 
+                        u.nom as nom_coiffeur,
+                        u.photo_profil as photo_profil_coiffeur,
+                        q.nom_quartier as quartier, 
+                        v.nom_ville as ville,
+                        u.is_approved,
+                        (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
+                        (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style,
+                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                    FROM users u
+                    LEFT JOIN villes v ON u.ville = v.id
+                    LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+                    LEFT JOIN quartiers q ON u.id_quartier = q.id
+                    WHERE u.role = 'coiffeur' 
+                    AND (u.is_approved = 1 OR u.is_approved = '1')
+                    AND (u.statut = 'actif' OR u.statut IS NULL OR u.statut = '')
+                    AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
+                    AND u.ville = ? 
+                    AND (u.id_quartier = ? OR z.id_quartier = ?)
+                    ORDER BY RAND() 
+                    LIMIT 9
+                ");
+                $stmt->execute([$id_ville_client, $id_quartier_client, $id_quartier_client]);
+                $coiffeurs_matching = $stmt->fetchAll();
+            }
+            
+            // Fallback 1 : si aucun résultat ou pas de quartier, chercher dans toute la ville
+            if ((empty($coiffeurs_matching) || $id_quartier_client == 0) && $id_ville_client > 0) {
+                $stmt2 = $pdo->prepare("
+                    SELECT DISTINCT u.id as id_coiffeur, 
+                        u.nom as nom_coiffeur,
+                        u.photo_profil as photo_profil_coiffeur,
+                        q.nom_quartier as quartier, 
+                        v.nom_ville as ville,
+                        u.is_approved,
+                        (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
+                        (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style,
+                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                    FROM users u
+                    LEFT JOIN villes v ON u.ville = v.id
+                    LEFT JOIN quartiers q ON u.id_quartier = q.id
+                    WHERE u.role = 'coiffeur' 
+                    AND (u.is_approved = 1 OR u.is_approved = '1')
+                    AND (u.statut = 'actif' OR u.statut IS NULL OR u.statut = '')
+                    AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
+                    AND u.ville = ?
+                    ORDER BY RAND() 
+                    LIMIT 9
+                ");
+                $stmt2->execute([$id_ville_client]);
+                $coiffeurs_matching = $stmt2->fetchAll();
+            }
+            
+            // Fallback 2 : si toujours rien, afficher tous les coiffeurs approuvés
+            if (empty($coiffeurs_matching)) {
+                $stmt3 = $pdo->prepare("
+                    SELECT DISTINCT u.id as id_coiffeur, 
+                        u.nom as nom_coiffeur,
+                        u.photo_profil as photo_profil_coiffeur,
+                        q.nom_quartier as quartier, 
+                        v.nom_ville as ville,
+                        u.is_approved,
+                        (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
+                        (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style,
+                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                    FROM users u
+                    LEFT JOIN villes v ON u.ville = v.id
+                    LEFT JOIN quartiers q ON u.id_quartier = q.id
+                    WHERE u.role = 'coiffeur' 
+                    AND (u.is_approved = 1 OR u.is_approved = '1')
+                    AND (u.statut = 'actif' OR u.statut IS NULL OR u.statut = '')
+                    AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
+                    ORDER BY RAND() 
+                    LIMIT 9
+                ");
+                $stmt3->execute();
+                $coiffeurs_matching = $stmt3->fetchAll();
+            }
+        } catch (Exception $e) {
+            error_log("Erreur chargement coiffeurs dashboard: " . $e->getMessage());
+            $coiffeurs_matching = [];
+        }
+        include __DIR__ . '/views/client/dashboard.php';
+        exit();
 
-        // Redirige vers la page d'accueil du métier
-        // Pour coiffure → index.php (routeur Coiffe Chez Toi)
-        // Les autres métiers auront leurs propres pages après la soutenance
-        switch ($slugMetier) {
-            case 'coiffure':
-            default:
-                require __DIR__ . '/index.php';
-                break;
+    case 'home':
+    default:
+        // Si l'utilisateur est déjà connecté, redirige vers son dashboard
+        if (isset($_SESSION['id_user'])) {
+            $role_session = $_SESSION['role'] ?? 'client';
+            if ($role_session === 'coiffeur') {
+                header("Location: /coiffons/app.php?page=dashboard_coiffeur");
+                exit();
+            } elseif ($role_session === 'client') {
+                header("Location: /coiffons/app.php?page=dashboard");
+                exit();
+            } elseif ($role_session === 'admin') {
+                header("Location: /coiffons/first/admin_dashboard.php");
+                exit();
+            }
         }
 
-    } catch (Exception $e) {
-        echo "<p style='color:red;background:#0a0a0a;padding:20px'>" . htmlspecialchars($e->getMessage()) . "</p>";
-    }
-    exit();
+        // Invité — affiche la page d'accueil avec le slider
+
+        $role_actuel  = $_SESSION['role'] ?? 'invite';
+        $coiffeur_id  = $_SESSION['id_user'] ?? null;
+        $nom_affichage_client = $_SESSION['nom'] ?? $_SESSION['prenom'] ?? null;
+        $mes_coiffures   = [];
+        $db_coiffeur     = [];
+        $coiffeurs_matching = [];
+        $catalog_demo    = [];
+        $all_comments    = [];
+
+        // Données de démo si la BDD est vide
+        $coiffures_par_defaut = [
+            ['id_prestation'=>1,'id_coiffeur'=>1,'nom_style'=>'Gros Rastas Premium','prix'=>7000,'nom_coiffeur'=>'Alliance Coiffure','ville'=>'Cotonou','quartier'=>'Fidjrossè','photo_style'=>null],
+            ['id_prestation'=>2,'id_coiffeur'=>2,'nom_style'=>'Dégradé Américain / Wave','prix'=>3000,'nom_coiffeur'=>'Barber Shop Pro','ville'=>'Calavi','quartier'=>'Zogbadjè','photo_style'=>null],
+            ['id_prestation'=>3,'id_coiffeur'=>3,'nom_style'=>'Nattes Collées Graphiques','prix'=>5000,'nom_coiffeur'=>'Divine Mains','ville'=>'Porto-Novo','quartier'=>'Ouando','photo_style'=>null],
+        ];
+
+        // Données pour le coiffeur connecté
+        if ($coiffeur_id && $role_actuel === 'coiffeur') {
+            try {
+                $chk = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+                $chk->execute([$coiffeur_id]);
+                $db_coiffeur = $chk->fetch() ?: [];
+
+                $stmt = $pdo->prepare("
+                    SELECT p.*, v.nom_ville as ville, q.nom_quartier as quartiers
+                    FROM prestations p
+                    JOIN users u ON p.id_coiffeur = u.id
+                    LEFT JOIN villes v ON u.ville = v.id
+                    LEFT JOIN quartiers q ON u.id_quartier = q.id
+                    WHERE p.id_coiffeur = ?
+                    ORDER BY p.id_prestation DESC
+                ");
+                $stmt->execute([$coiffeur_id]);
+                $mes_coiffures = $stmt->fetchAll();
+            } catch (Exception $e) {
+                $mes_coiffures = [];
+            }
+        }
+
+        // Données pour le client connecté (matching géographique)
+        if ($role_actuel === 'client') {
+            $id_ville_client   = $_SESSION['id_ville'] ?? 0;
+            $id_quartier_client= $_SESSION['id_quartier'] ?? 0;
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT DISTINCT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville
+                    FROM prestations p
+                    JOIN users u ON p.id_coiffeur = u.id
+                    JOIN villes v ON u.ville = v.id
+                    INNER JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+                    LEFT JOIN quartiers q ON u.id_quartier = q.id
+                    WHERE u.role = 'coiffeur' AND u.abonnement_status = 1
+                    AND u.ville = ? AND z.id_quartier = ?
+                    ORDER BY RAND() LIMIT 6
+                ");
+                $stmt->execute([$id_ville_client, $id_quartier_client]);
+                $coiffeurs_matching = $stmt->fetchAll();
+
+                if (empty($coiffeurs_matching)) {
+                    $stmt2 = $pdo->prepare("
+                        SELECT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville
+                        FROM prestations p
+                        JOIN users u ON p.id_coiffeur = u.id
+                        JOIN villes v ON u.ville = v.id
+                        LEFT JOIN quartiers q ON u.id_quartier = q.id
+                        WHERE u.role = 'coiffeur' AND u.abonnement_status = 1 AND u.ville = ?
+                        ORDER BY RAND() LIMIT 6
+                    ");
+                    $stmt2->execute([$id_ville_client]);
+                    $coiffeurs_matching = $stmt2->fetchAll();
+                }
+
+                if (empty($coiffeurs_matching)) {
+                    $coiffeurs_matching = $pdo->query("
+                        SELECT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville
+                        FROM prestations p
+                        JOIN users u ON p.id_coiffeur = u.id
+                        JOIN villes v ON u.ville = v.id
+                        LEFT JOIN quartiers q ON u.id_quartier = q.id
+                        WHERE u.abonnement_status = 1 ORDER BY RAND() LIMIT 6
+                    ")->fetchAll();
+                }
+            } catch (Exception $e) {
+                $coiffeurs_matching = [];
+            }
+            if (empty($coiffeurs_matching)) $coiffeurs_matching = $coiffures_par_defaut;
+        }
+
+        // Catalogue de démo pour les invités
+        if ($role_actuel === 'invite') {
+            try {
+                $catalog_demo = $pdo->query("
+                    SELECT p.*, u.nom as nom_coiffeur, v.nom_ville as ville, q.nom_quartier as quartier
+                    FROM prestations p
+                    JOIN users u ON p.id_coiffeur = u.id
+                    JOIN villes v ON u.ville = v.id
+                    LEFT JOIN quartiers q ON u.id_quartier = q.id
+                    WHERE u.abonnement_status = 1 ORDER BY RAND() LIMIT 6
+                ")->fetchAll();
+            } catch (Exception $e) { $catalog_demo = []; }
+            if (empty($catalog_demo)) $catalog_demo = $coiffures_par_defaut;
+        }
+
+        // Avis clients
+        try {
+            $all_comments = $pdo->query("
+                SELECT c.*, u.nom FROM commentaires c
+                JOIN users u ON c.id_client = u.id
+                ORDER BY c.date_creation DESC LIMIT 6
+            ")->fetchAll();
+        } catch (Exception $e) { $all_comments = []; }
+
+        // Affiche la vue — elle gère son propre HTML complet
+        include __DIR__ . '/views/home.php';
+        break;
 }
-
-// ── REDIRECTION UTILISATEURS CONNECTÉS VERS LEURS DASHBOARDS ──
-if (isset($_SESSION['id_user'])) {
-    $role_session = $_SESSION['role'] ?? 'client';
-    if ($role_session === 'coiffeur') {
-        header("Location: /coiffons/index.php?page=dashboard_coiffeur");
-        exit();
-    } elseif ($role_session === 'client') {
-        header("Location: /coiffons/index.php?page=dashboard");
-        exit();
-    } elseif ($role_session === 'admin') {
-        header("Location: /coiffons/first/admin_dashboard.php");
-        exit();
-    }
-}
-
-// ── PAGE PRINCIPALE DOMIZI ──
-use App\Core\View;
-
-try {
-    $pdo  = Database::getInstance();
-    $stmt = $pdo->query("
-        SELECT d.*, COUNT(m.id) as nb_metiers
-        FROM domaines d
-        LEFT JOIN metiers m ON m.id_domaine = d.id AND m.actif = 1
-        WHERE d.actif = 1 OR d.actif = 0
-        GROUP BY d.id
-        ORDER BY d.id ASC
-    ");
-    $domaines = $stmt->fetchAll();
-} catch (Exception $e) {
-    $domaines = [];
-}
-
-$lang  = Lang::current();
-$isRtl = Lang::isRtl();
-require __DIR__ . '/views/domizi/home.php';

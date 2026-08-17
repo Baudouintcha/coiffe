@@ -478,8 +478,8 @@
     // ── CHARGEMENT DES MÉTIERS ──
     async function chargerMetiers(idDomaine, nomDomaine) {
         try {
-            // Fonctionne avec app.php : on passe par ?action=api&domaine=X
-            const resp = await fetch(`/coiffons/app.php?action=api_metiers&domaine=${idDomaine}`);
+            // Fonctionne avec index.php : on passe par ?action=api_metiers&domaine=X
+            const resp = await fetch(`/coiffons/index.php?action=api_metiers&domaine=${idDomaine}`);
             const data = await resp.json();
 
             if (!data.success || !data.metiers.length) {
