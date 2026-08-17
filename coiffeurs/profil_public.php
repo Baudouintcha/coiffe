@@ -109,6 +109,21 @@ if (!empty($coiffeur['photo_profil'])) {
         if (file_exists($cp)) { $ps_photo_url = '/coiffons/access/' . $coiffeur['photo_profil']; break; }
     }
 }
+
+// Photo de bannière - prendre une photo de style ou photo profil
+$banner_photo_url = null;
+if (!empty($prestations)) {
+    foreach ($prestations as $p) {
+        if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])) {
+            $banner_photo_url = '/coiffons/' . $p['photo_style'];
+            break;
+        }
+    }
+}
+// Fallback: utiliser la photo de profil comme bannière
+if (!$banner_photo_url) {
+    $banner_photo_url = $ps_photo_url;
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -131,6 +146,35 @@ if (!empty($coiffeur['photo_profil'])) {
     .section-eyebrow   { font-size:.68rem; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--gold); display:block; margin-bottom:.4rem; }
     .section-heading   { font-family:var(--font-display); font-size:clamp(1.2rem,2.5vw,1.6rem); font-weight:700; color:var(--text-primary); margin-bottom:.4rem; }
     .section-sub       { color:var(--text-muted); font-size:.82rem; }
+
+    /* ── Bannière Hero avec photo ── */
+    .profile-hero-banner {
+        position: relative;
+        height: 320px;
+        background: linear-gradient(135deg, var(--dark-3), var(--dark-4));
+        overflow: hidden;
+        margin-top: var(--navbar-height);
+    }
+    .profile-hero-bg {
+        position: absolute;
+        inset: 0;
+        background-size: cover;
+        background-position: center;
+        opacity: 0.35;
+        filter: blur(1px);
+    }
+    .profile-hero-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.85) 100%);
+    }
+    .profile-hero-content {
+        position: relative;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        padding: 2rem 0 1.5rem;
+    }
 
     /* ── Carte prestation sélectionnable ── */
     .presta-card {
@@ -229,14 +273,27 @@ $page_root     = '/coiffons';
 include __DIR__ . '/../views/components/navbar_client.php';
 ?>
 
-<!-- ════════════ 1. PRÉSENTATION COIFFEUR ════════════ -->
-<section class="pp-section" style="background:var(--glass-bg-subtle);border-bottom:1px solid var(--glass-border);padding-top:calc(var(--navbar-height) + 2.5rem);" aria-labelledby="coiffeur-nom">
-    <div class="pp-wrap text-center">
-        <div class="text-start mb-4">
-            <a href="javascript:history.back()" class="btn-ghost btn-sm d-inline-flex align-items-center gap-1">
-                <i class="bi bi-arrow-left" aria-hidden="true"></i> Retour
-            </a>
+<!-- ════════════ BANNIÈRE HERO ════════════ -->
+<section class="profile-hero-banner">
+    <?php if ($banner_photo_url): ?>
+        <div class="profile-hero-bg" style="background-image: url('<?= htmlspecialchars($banner_photo_url) ?>');"></div>
+    <?php endif; ?>
+    <div class="profile-hero-overlay"></div>
+    
+    <div class="profile-hero-content">
+        <div class="pp-wrap w-100">
+            <div class="text-start mb-3">
+                <a href="javascript:history.back()" class="btn-ghost btn-sm d-inline-flex align-items-center gap-1">
+                    <i class="bi bi-arrow-left" aria-hidden="true"></i> Retour
+                </a>
+            </div>
         </div>
+    </div>
+</section>
+
+<!-- ════════════ 1. PRÉSENTATION COIFFEUR ════════════ -->
+<section class="pp-section" style="background:var(--dark);padding-top:2rem;" aria-labelledby="coiffeur-nom">
+    <div class="pp-wrap text-center">
 
         <!-- Avatar -->
         <div class="mb-3">

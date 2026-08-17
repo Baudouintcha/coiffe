@@ -86,8 +86,11 @@ $page_root = '/coiffons';
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
+    /* ── Harmonisation du fond ── */
+    body { background: var(--dark); margin: 0; padding: 0; }
+    
     /* ── Sections spécifiques dashboard client ── */
-    .dash-coiffeurs  { padding: 4rem 0 2rem; background: var(--dark); }
+    .dash-coiffeurs  { padding: 2rem 0 2rem; background: var(--dark); margin-top: -20px; }
     .dash-why        { padding: 4rem 0; background: var(--dark-2); }
     .dash-section-title { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: .25rem; }
     .dash-section-sub   { color: var(--text-muted); font-size: .85rem; margin-bottom: 2rem; }
@@ -147,14 +150,26 @@ include __DIR__ . '/../../views/components/hero_capsule.php';
                     $note_c        = isset($c['note_moyenne']) && $c['note_moyenne'] > 0 ? floatval($c['note_moyenne']) : null;
                     $nb_avis_c     = (int)($c['nb_avis'] ?? 0);
                     $is_verified   = (bool)($c['is_approved'] ?? false);
-                    $photo_c       = $c['photo_style'] ?? null;
-                    $photo_url_c   = ($photo_c && file_exists(__DIR__ . '/../../uploads/' . $photo_c))
-                                     ? '/coiffons/uploads/' . htmlspecialchars($photo_c)
-                                     : null;
+                    
+                    // Photo de style comme cover
+                    $photo_style_c = $c['photo_style'] ?? null;
+                    $photo_cover_url = null;
+                    if ($photo_style_c && file_exists(__DIR__ . '/../../uploads/' . $photo_style_c)) {
+                        $photo_cover_url = '/coiffons/uploads/' . htmlspecialchars($photo_style_c);
+                    }
+                    
+                    // Photo profil comme avatar
+                    $photo_profil_c = $c['photo_profil_coiffeur'] ?? null;
+                    $photo_avatar_url = null;
+                    if ($photo_profil_c && file_exists(__DIR__ . '/../../access/' . $photo_profil_c)) {
+                        $photo_avatar_url = '/coiffons/access/' . htmlspecialchars($photo_profil_c);
+                    }
+                    
                     $card = [
                         'id'          => $id_coiffeur_c,
                         'nom'         => $nom_coiffeur,
-                        'photo_cover' => $photo_url_c,
+                        'photo_cover' => $photo_cover_url,
+                        'photo_avatar'=> $photo_avatar_url,
                         'initiale'    => $initiale_c,
                         'ville'       => $ville_c,
                         'quartier'    => $quartier_c,

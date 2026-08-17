@@ -994,5 +994,14 @@ document.addEventListener('click', function(e) {
     }
 });
 </script>
+
+<!-- ── FOOTER + IA ASSISTANT ── -->
+<?php
+include __DIR__ . '/../../views/components/footer_global.php';
+include __DIR__ . '/../../views/components/ia_assistant.php';
+$current_page = 'dashboard_coiffeur';
+include __DIR__ . '/../../views/components/bottom_nav_client.php';
+?>
+
 </body>
 </html>

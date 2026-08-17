@@ -51,7 +51,7 @@ $hc_navbar_height       = $hc_navbar_height       ?? 64;
                 </div>
             <?php endif; ?>
             <div class="hc-profile-info">
-                <span class="hc-profile-greeting">Bonjour 👋</span>
+                <span class="hc-profile-greeting">Bonjour </span>
                 <span class="hc-profile-name"><?= htmlspecialchars($hc_profile['nom'] ?? '') ?></span>
                 <?php if (!empty($hc_profile['stat'])): ?>
                     <span class="hc-profile-stat"><?= htmlspecialchars($hc_profile['stat']) ?></span>
@@ -87,14 +87,15 @@ $hc_navbar_height       = $hc_navbar_height       ?? 64;
 
 <style>
 /* HeroCapsule — CL §2, DS §19 */
-.hc-wrapper    { display:flex; justify-content:center; }
+.hc-wrapper    { display:flex; justify-content:center; background: var(--dark); padding-bottom: 20px; margin-bottom: 0; }
 .hc-capsule    { position:relative; width:92%; max-width:var(--max-width); height:420px; min-height:380px; border-radius:52px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.55),0 4px 16px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.06); background:#0a0a0a; }
-.hc-carousel   { position:absolute; inset:0; z-index:0; }
+.hc-carousel   { position:absolute; inset:0; z-index:0; background: #0a0a0a; }
 
-/* ── SLIDES — manquaient, cause du fond blanc ── */
+/* ── SLIDES ── */
 .hc-carousel .hero-slide {
     position: absolute;
     inset: 0;
+    background-color: #0a0a0a;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

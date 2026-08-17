@@ -437,5 +437,12 @@ include __DIR__ . '/components/footer_global.php';
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ── FOOTER + IA ASSISTANT ── -->
+<?php
+include __DIR__ . '/views/components/footer_global.php';
+include __DIR__ . '/views/components/ia_assistant.php';
+?>
+
 </body>
 </html>

@@ -48,7 +48,7 @@ if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexio
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || empty($password)) {
         $error = "Email ou mot de passe invalide.";
     } else {
-        $stmt = $pdo->prepare("SELECT id, nom, prenom, role, sexe, photo_profil, password, statut FROM users WHERE email = ? LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id, nom, prenom, role, sexe, photo_profil, password, statut, ville, id_quartier FROM users WHERE email = ? LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
@@ -62,6 +62,8 @@ if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexio
             $_SESSION['role']           = $user['role'];
             $_SESSION['sexe']           = $user['sexe'];
             $_SESSION['photo_profil']   = $user['photo_profil'] ?? null;
+            $_SESSION['id_ville']       = $user['ville'] ?? 0;
+            $_SESSION['id_quartier']    = $user['id_quartier'] ?? 0;
 
             if ($user['role'] === 'admin') {
                 header("Location: /coiffons/first/admin_dashboard.php");

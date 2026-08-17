@@ -110,6 +110,21 @@ if (isset($_GET['metier'])) {
     exit();
 }
 
+// ── REDIRECTION UTILISATEURS CONNECTÉS VERS LEURS DASHBOARDS ──
+if (isset($_SESSION['id_user'])) {
+    $role_session = $_SESSION['role'] ?? 'client';
+    if ($role_session === 'coiffeur') {
+        header("Location: /coiffons/index.php?page=dashboard_coiffeur");
+        exit();
+    } elseif ($role_session === 'client') {
+        header("Location: /coiffons/index.php?page=dashboard");
+        exit();
+    } elseif ($role_session === 'admin') {
+        header("Location: /coiffons/first/admin_dashboard.php");
+        exit();
+    }
+}
+
 // ── PAGE PRINCIPALE DOMIZI ──
 use App\Core\View;
 

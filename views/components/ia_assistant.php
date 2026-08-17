@@ -46,9 +46,13 @@ if (isset($_SESSION['sexe'])) {
     </div>
 
     <div id="chat-content" class="chat-content">
-        <div class="chat-bubble chat-bubble--ia">
-            Bonjour ! Je suis <strong><?= htmlspecialchars($nomIA) ?></strong>,
-            votre assistant(e) personnel(le). Comment puis-je vous aider aujourd'hui ?
+        <div class="chat-bubble chat-bubble--ia chat-bubble--welcome">
+            <div class="welcome-icon">✨</div>
+            <div class="welcome-text">
+                <strong>Bienvenue !</strong><br>
+                <span style="font-size: 0.8rem; color: rgba(212,175,55,0.8);">Je suis <?= htmlspecialchars($nomIA) ?>, votre assistant personnel</span>
+            </div>
+            <div class="welcome-tagline">💅 Ici pour faciliter votre parcours.<br>Que recherchez-vous ?</div>
         </div>
         <!-- Suggestions rapides selon le rôle -->
         <div class="chat-suggestions" id="chat-suggestions">
@@ -156,6 +160,32 @@ if (isset($_SESSION['sexe'])) {
     padding: 10px 14px; color: rgba(255,255,255,0.9);
     font-size: 0.88rem; line-height: 1.55;
     margin-bottom: 12px; max-width: 88%;
+}
+.chat-bubble--welcome {
+    background: linear-gradient(135deg, rgba(212,175,55,0.12) 0%, rgba(212,175,55,0.05) 100%);
+    border: 1.5px solid rgba(212,175,55,0.35);
+    border-radius: 16px; border-top-left-radius: 4px;
+    padding: 16px 14px;
+    display: flex; flex-direction: column; gap: 12px;
+}
+.welcome-icon {
+    font-size: 2rem; display: inline-block; animation: welcomeFloat 2s ease-in-out infinite;
+}
+@keyframes welcomeFloat {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+}
+.welcome-text {
+    color: rgba(255,255,255,0.95);
+    font-weight: 600;
+    line-height: 1.4;
+}
+.welcome-tagline {
+    color: rgba(212,175,55,0.75);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    border-top: 1px solid rgba(212,175,55,0.2);
+    padding-top: 10px;
 }
 .chat-bubble--user {
     background: linear-gradient(135deg, var(--gold) 0%, #b8933a 100%);

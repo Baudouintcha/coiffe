@@ -192,43 +192,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_SESSION['prenom']   = $prenom;
                         $_SESSION['role']     = $role;
                         $_SESSION['id_ville']    = $id_ville;
+                        $_SESSION['id_quartier'] = $id_quartier;
+                        $_SESSION['photo_profil'] = $photo_profil_path;
                         $vn = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");
                         $vn->execute([$id_ville]);
                         $vd = $vn->fetch();
                         $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
                         
-                        // ═══ PHASE 2: GENERATE OTP FOR EMAIL VERIFICATION ═══
-                        $otp_service = new OtpService($pdo);
-                        $email_service = new EmailService();
+                        // ═══ INSCRIPTION RÉUSSIE - Redirection vers le dashboard ═══
+                        // OTP désactivé temporairement pour éviter les erreurs d'envoi d'email
+                        // TODO: Configurer SMTP pour activer la vérification email
                         
-                        // Generate OTP with purpose 'registration'
-                        $otp_result = $otp_service->generate($_SESSION['id_user'], 'registration');
+                        $message = "msg-success::Inscription réussie ! Bienvenue sur Coiffe Chez Toi.";
                         
-                        if ($otp_result['success']) {
-                            // Send OTP code via email
-                            $email_send_result = $email_service->sendOtpCode($email, $otp_result['code'], 5, 'registration');
-                            
-                            if ($email_send_result['success']) {
-                                // Set flag to show OTP verification page
-                                $_SESSION['show_otp_verification'] = true;
-                                $_SESSION['otp_purpose'] = 'registration';
-                                $_SESSION['otp_email'] = $email;
-                                header("Cache-Control: no-store, no-cache, must-revalidate");
-                                header("Pragma: no-cache");
-                                header("Location: /coiffons/access/inscription.php");
-                                exit();
-                            } else {
-                                $message = "msg-danger::Erreur lors de l'envoi du code de vérification: " . htmlspecialchars($email_send_result['message']);
-                                // Delete the user account we just created
-                                $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$_SESSION['id_user']]);
-                                unset($_SESSION['id_user']);
-                            }
+                        // Rediriger vers le dashboard selon le rôle
+                        if ($role === 'coiffeur') {
+                            header("Location: /coiffons/index.php?page=dashboard_coiffeur");
                         } else {
-                            $message = "msg-danger::Erreur lors de la génération du code de vérification.";
-                            // Delete the user account we just created
-                            $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$_SESSION['id_user']]);
-                            unset($_SESSION['id_user']);
+                            header("Location: /coiffons/index.php?page=dashboard");
                         }
+                        exit();
                     } else {
                         $message = "msg-danger::Erreur lors de l'enregistrement.";
                     }

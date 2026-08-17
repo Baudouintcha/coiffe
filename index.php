@@ -45,37 +45,93 @@ switch ($page) {
         $id_ville_client    = $_SESSION['id_ville'] ?? 0;
         $id_quartier_client = $_SESSION['id_quartier'] ?? 0;
         try {
-            $stmt = $pdo->prepare("
-                SELECT DISTINCT p.*, u.nom as nom_coiffeur,
-                    q.nom_quartier as quartier, v.nom_ville as ville,
-                    u.is_approved, u.photo_profil as photo_profil_coiffeur
-                FROM prestations p
-                JOIN users u ON p.id_coiffeur = u.id
-                JOIN villes v ON u.ville = v.id
-                LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
-                LEFT JOIN quartiers q ON u.id_quartier = q.id
-                WHERE u.role = 'coiffeur' AND u.abonnement_status = 1
-                AND u.ville = ? AND z.id_quartier = ?
-                ORDER BY RAND() LIMIT 9
-            ");
-            $stmt->execute([$id_ville_client, $id_quartier_client]);
-            $coiffeurs_matching = $stmt->fetchAll();
-            if (empty($coiffeurs_matching)) {
-                $stmt2 = $pdo->prepare("
-                    SELECT DISTINCT p.*, u.nom as nom_coiffeur,
-                        q.nom_quartier as quartier, v.nom_ville as ville,
-                        u.is_approved, u.photo_profil as photo_profil_coiffeur
-                    FROM prestations p
-                    JOIN users u ON p.id_coiffeur = u.id
-                    JOIN villes v ON u.ville = v.id
+            // Requête principale : coiffeurs de la même ville (avec ou sans filtre quartier)
+            if ($id_quartier_client > 0) {
+                // Priorité 1 : même ville ET même quartier
+                $stmt = $pdo->prepare("
+                    SELECT DISTINCT u.id as id_coiffeur, 
+                        u.nom as nom_coiffeur,
+                        u.photo_profil as photo_profil_coiffeur,
+                        q.nom_quartier as quartier, 
+                        v.nom_ville as ville,
+                        u.is_approved,
+                        (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
+                        (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style,
+                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                    FROM users u
+                    LEFT JOIN villes v ON u.ville = v.id
+                    LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
                     LEFT JOIN quartiers q ON u.id_quartier = q.id
-                    WHERE u.role = 'coiffeur' AND u.abonnement_status = 1 AND u.ville = ?
-                    ORDER BY RAND() LIMIT 9
+                    WHERE u.role = 'coiffeur' 
+                    AND (u.is_approved = 1 OR u.is_approved = '1')
+                    AND (u.statut = 'actif' OR u.statut IS NULL OR u.statut = '')
+                    AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
+                    AND u.ville = ? 
+                    AND (u.id_quartier = ? OR z.id_quartier = ?)
+                    ORDER BY RAND() 
+                    LIMIT 9
+                ");
+                $stmt->execute([$id_ville_client, $id_quartier_client, $id_quartier_client]);
+                $coiffeurs_matching = $stmt->fetchAll();
+            }
+            
+            // Fallback 1 : si aucun résultat ou pas de quartier, chercher dans toute la ville
+            if ((empty($coiffeurs_matching) || $id_quartier_client == 0) && $id_ville_client > 0) {
+                $stmt2 = $pdo->prepare("
+                    SELECT DISTINCT u.id as id_coiffeur, 
+                        u.nom as nom_coiffeur,
+                        u.photo_profil as photo_profil_coiffeur,
+                        q.nom_quartier as quartier, 
+                        v.nom_ville as ville,
+                        u.is_approved,
+                        (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
+                        (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style,
+                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                    FROM users u
+                    LEFT JOIN villes v ON u.ville = v.id
+                    LEFT JOIN quartiers q ON u.id_quartier = q.id
+                    WHERE u.role = 'coiffeur' 
+                    AND (u.is_approved = 1 OR u.is_approved = '1')
+                    AND (u.statut = 'actif' OR u.statut IS NULL OR u.statut = '')
+                    AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
+                    AND u.ville = ?
+                    ORDER BY RAND() 
+                    LIMIT 9
                 ");
                 $stmt2->execute([$id_ville_client]);
                 $coiffeurs_matching = $stmt2->fetchAll();
             }
+            
+            // Fallback 2 : si toujours rien, afficher tous les coiffeurs approuvés
+            if (empty($coiffeurs_matching)) {
+                $stmt3 = $pdo->prepare("
+                    SELECT DISTINCT u.id as id_coiffeur, 
+                        u.nom as nom_coiffeur,
+                        u.photo_profil as photo_profil_coiffeur,
+                        q.nom_quartier as quartier, 
+                        v.nom_ville as ville,
+                        u.is_approved,
+                        (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
+                        (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style,
+                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
+                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                    FROM users u
+                    LEFT JOIN villes v ON u.ville = v.id
+                    LEFT JOIN quartiers q ON u.id_quartier = q.id
+                    WHERE u.role = 'coiffeur' 
+                    AND (u.is_approved = 1 OR u.is_approved = '1')
+                    AND (u.statut = 'actif' OR u.statut IS NULL OR u.statut = '')
+                    AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
+                    ORDER BY RAND() 
+                    LIMIT 9
+                ");
+                $stmt3->execute();
+                $coiffeurs_matching = $stmt3->fetchAll();
+            }
         } catch (Exception $e) {
+            error_log("Erreur chargement coiffeurs dashboard: " . $e->getMessage());
             $coiffeurs_matching = [];
         }
         include __DIR__ . '/views/client/dashboard.php';
