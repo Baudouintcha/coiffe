@@ -18,7 +18,7 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
 
 require_once __DIR__ . '/../security/config.php';
 
-$coiffeur_id = $_SESSION['id_user'];
+$prestataire_id = $_SESSION['id_user'];
 $message_type = '';
 $message_text = '';
 
@@ -42,19 +42,19 @@ function formaterDescriptionWithOptions($texte_desc, $option_noms, $option_prix)
 // A. ACTION : AJOUT D'UNE PRESTATION
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_prestation'])) {
-    $nom_style = htmlspecialchars($_POST['nom_style']);
+    $nom_service = htmlspecialchars($_POST['nom_service']);
     $prix = floatval($_POST['prix']);
     $duree = intval($_POST['duree']);
     $raw_description = $_POST['description'];
 
     $description_complete = formaterDescriptionWithOptions($raw_description, $_POST['option_nom'] ?? [], $_POST['option_prix'] ?? []);
-    $photo_style_path = NULL;
+    $photo_path = NULL;
     $upload_ok = true;
 
-    if (isset($_FILES['photo_style']) && $_FILES['photo_style']['error'] == 0) {
+    if (isset($_FILES['photo']) && $_FILES['photo']['error'] == 0) {
         $allowed = ['jpg', 'jpeg', 'png', 'webp'];
-        $fileName = $_FILES['photo_style']['name'];
-        $fileSize = $_FILES['photo_style']['size'];
+        $fileName = $_FILES['photo']['name'];
+        $fileSize = $_FILES['photo']['size'];
         $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
         if (!in_array($fileExt, $allowed)) {
@@ -66,18 +66,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_prestation']))
             $message_text = 'La photo est trop lourde. Maximum 5 Mo autorisés.';
             $upload_ok = false;
         } else {
-            $photo_style_path = 'uploads/prestations/' . uniqid('', true) . '.' . $fileExt;
+            $photo_path = 'uploads/prestations/' . uniqid('', true) . '.' . $fileExt;
             $target_dir = __DIR__ . '/../uploads/prestations';
             if (!file_exists($target_dir)) {
                 mkdir($target_dir, 0777, true);
             }
-            move_uploaded_file($_FILES['photo_style']['tmp_name'], __DIR__ . '/../' . $photo_style_path);
+            move_uploaded_file($_FILES['photo']['tmp_name'], __DIR__ . '/../' . $photo_path);
         }
     }
 
     if ($upload_ok) {
-        $stmt = $pdo->prepare("INSERT INTO prestations (id_coiffeur, nom_style, prix, photo_style, description, duree) VALUES (?, ?, ?, ?, ?, ?)");
-        if ($stmt->execute([$coiffeur_id, $nom_style, $prix, $photo_style_path, $description_complete, $duree])) {
+        $stmt = $pdo->prepare("INSERT INTO prestations (prestataire_id, nom_service, prix, photo, description, duree) VALUES (?, ?, ?, ?, ?, ?)");
+        if ($stmt->execute([$prestataire_id, $nom_service, $prix, $photo_path, $description_complete, $duree])) {
             $message_type = 'success';
             $message_text = 'Prestation ajoutée avec succès !';
         }
@@ -88,25 +88,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_prestation']))
 // B. ACTION : MODIFICATION D'UNE PRESTATION
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])) {
-    $id_prestation = intval($_POST['id_prestation']);
-    $nom_style = htmlspecialchars($_POST['nom_style']);
+    $id_service = intval($_POST['id_service']);
+    $nom_service = htmlspecialchars($_POST['nom_service']);
     $prix = floatval($_POST['prix']);
     $duree = intval($_POST['duree']);
     $raw_description = $_POST['description'];
     $ancienne_photo = $_POST['ancienne_photo'];
 
-    $check = $pdo->prepare("SELECT id_prestation FROM prestations WHERE id_prestation = ? AND id_coiffeur = ?");
-    $check->execute([$id_prestation, $coiffeur_id]);
+    $check = $pdo->prepare("SELECT id_service FROM prestations WHERE id_service = ? AND prestataire_id = ?");
+    $check->execute([$id_service, $prestataire_id]);
 
     if ($check->rowCount() > 0) {
         $description_complete = formaterDescriptionWithOptions($raw_description, $_POST['edit_option_nom'] ?? [], $_POST['edit_option_prix'] ?? []);
-        $photo_style_path = $ancienne_photo;
+        $photo_path = $ancienne_photo;
         $upload_ok = true;
 
-        if (isset($_FILES['photo_style']) && $_FILES['photo_style']['error'] == 0) {
+        if (isset($_FILES['photo']) && $_FILES['photo']['error'] == 0) {
             $allowed = ['jpg', 'jpeg', 'png', 'webp'];
-            $fileExt = strtolower(pathinfo($_FILES['photo_style']['name'], PATHINFO_EXTENSION));
-            $fileSize = $_FILES['photo_style']['size'];
+            $fileExt = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+            $fileSize = $_FILES['photo']['size'];
 
             if (!in_array($fileExt, $allowed)) {
                 $message_type = 'danger';
@@ -120,18 +120,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])
                 if (!empty($ancienne_photo) && file_exists(__DIR__ . '/../' . $ancienne_photo)) {
                     @unlink(__DIR__ . '/../' . $ancienne_photo);
                 }
-                $photo_style_path = 'uploads/prestations/' . uniqid('', true) . '.' . $fileExt;
+                $photo_path = 'uploads/prestations/' . uniqid('', true) . '.' . $fileExt;
                 $target_dir = __DIR__ . '/../uploads/prestations';
                 if (!file_exists($target_dir)) {
                     mkdir($target_dir, 0777, true);
                 }
-                move_uploaded_file($_FILES['photo_style']['tmp_name'], __DIR__ . '/../' . $photo_style_path);
+                move_uploaded_file($_FILES['photo']['tmp_name'], __DIR__ . '/../' . $photo_path);
             }
         }
 
         if ($upload_ok) {
-            $upd = $pdo->prepare("UPDATE prestations SET nom_style = ?, prix = ?, photo_style = ?, description = ?, duree = ? WHERE id_prestation = ?");
-            if ($upd->execute([$nom_style, $prix, $photo_style_path, $description_complete, $duree, $id_prestation])) {
+            $upd = $pdo->prepare("UPDATE prestations SET nom_service = ?, prix = ?, photo = ?, description = ?, duree = ? WHERE id_service = ?");
+            if ($upd->execute([$nom_service, $prix, $photo_path, $description_complete, $duree, $id_service])) {
                 $message_type = 'success';
                 $message_text = 'Prestation mise à jour avec succès !';
             }
@@ -143,18 +143,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])
 // C. ACTION : SUPPRESSION D'UNE PRESTATION
 // ==========================================
 if (isset($_GET['supprimer'])) {
-    $id_prestation = intval($_GET['supprimer']);
+    $id_service = intval($_GET['supprimer']);
 
-    $check = $pdo->prepare("SELECT photo_style FROM prestations WHERE id_prestation = ? AND id_coiffeur = ?");
-    $check->execute([$id_prestation, $coiffeur_id]);
+    $check = $pdo->prepare("SELECT photo FROM prestations WHERE id_service = ? AND prestataire_id = ?");
+    $check->execute([$id_service, $prestataire_id]);
     $prest = $check->fetch();
 
     if ($prest) {
-        if (!empty($prest['photo_style']) && file_exists(__DIR__ . '/../' . $prest['photo_style'])) {
-            @unlink(__DIR__ . '/../' . $prest['photo_style']);
+        if (!empty($prest['photo']) && file_exists(__DIR__ . '/../' . $prest['photo'])) {
+            @unlink(__DIR__ . '/../' . $prest['photo']);
         }
-        $del = $pdo->prepare("DELETE FROM prestations WHERE id_prestation = ?");
-        $del->execute([$id_prestation]);
+        $del = $pdo->prepare("DELETE FROM prestations WHERE id_service = ?");
+        $del->execute([$id_service]);
         $redirect = $_SERVER['HTTP_REFERER'] ?? 'gestion_catalogue.php';
         echo "<script>alert('Prestation supprimée du catalogue.'); window.location.href='" . htmlspecialchars($redirect, ENT_QUOTES) . "';</script>";
         exit();
@@ -162,8 +162,8 @@ if (isset($_GET['supprimer'])) {
 }
 
 // Récupération des prestations à jour
-$stmt = $pdo->prepare("SELECT * FROM prestations WHERE id_coiffeur = ? ORDER BY id_prestation DESC");
-$stmt->execute([$coiffeur_id]);
+$stmt = $pdo->prepare("SELECT * FROM prestations WHERE prestataire_id = ? ORDER BY id_service DESC");
+$stmt->execute([$prestataire_id]);
 $prestations = $stmt->fetchAll();
 
 // Header coiffeur (ouverture HTML + topbar)
@@ -199,7 +199,7 @@ endif; ?>
             <form method="POST" enctype="multipart/form-data" novalidate>
 
                 <?php
-                $ff = ['type'=>'text','name'=>'nom_style','label'=>'Nom de la coiffure','placeholder'=>'Ex: Nattes Collées Homme','required'=>true];
+                $ff = ['type'=>'text','name'=>'nom_service','label'=>'Nom de la coiffure','placeholder'=>'Ex: Nattes Collées Homme','required'=>true];
                 include __DIR__ . '/../views/components/form_field.php';
 
                 $ff = ['type'=>'number','name'=>'prix','label'=>'Prix de base (FCFA)','placeholder'=>'Ex: 5000','required'=>true,'attrs'=>'min="0"'];
@@ -220,7 +220,7 @@ endif; ?>
                 ];
                 include __DIR__ . '/../views/components/form_field.php';
 
-                $ff = ['type'=>'file','name'=>'photo_style','label'=>'Image (Max 5 Mo)','required'=>true,'attrs'=>'accept="image/*"'];
+                $ff = ['type'=>'file','name'=>'photo','label'=>'Image (Max 5 Mo)','required'=>true,'attrs'=>'accept="image/*"'];
                 include __DIR__ . '/../views/components/form_field.php';
 
                 $ff = ['type'=>'textarea','name'=>'description','label'=>'Description de base','placeholder'=>'Ex: Lavage inclus...','rows'=>2];
@@ -282,11 +282,11 @@ endif; ?>
 
                     // URL photo
                     $photo_url_p = null;
-                    if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])) {
-                        $photo_url_p = '/coiffons/' . htmlspecialchars($p['photo_style']);
+                    if (!empty($p['photo']) && file_exists(__DIR__ . '/../' . $p['photo'])) {
+                        $photo_url_p = '/coiffons/' . htmlspecialchars($p['photo']);
                     }
 
-                    $modal_id_p = 'modal-modifier-' . $p['id_prestation'];
+                    $modal_id_p = 'modal-modifier-' . $p['id_service'];
                 ?>
                     <div class="col-sm-6">
                         <!-- GalleryCard étendue avec options + actions modal -->
@@ -295,7 +295,7 @@ endif; ?>
                             <div class="gallery-card-img">
                                 <?php if ($photo_url_p): ?>
                                     <img src="<?= $photo_url_p ?>"
-                                         alt="<?= htmlspecialchars($p['nom_style']) ?>"
+                                         alt="<?= htmlspecialchars($p['nom_service']) ?>"
                                          loading="lazy">
                                 <?php else: ?>
                                     <div class="gallery-card-img-placeholder">
@@ -306,7 +306,7 @@ endif; ?>
                             <!-- Body -->
                             <div class="p-4 d-flex flex-column" style="flex:1;">
                                 <h5 style="font-weight:700;color:#fff;margin-bottom:6px;">
-                                    <?= htmlspecialchars($p['nom_style']) ?>
+                                    <?= htmlspecialchars($p['nom_service']) ?>
                                 </h5>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span style="color:var(--gold);font-weight:700;font-size:1rem;">
@@ -340,13 +340,13 @@ endif; ?>
                                     <button type="button"
                                             class="btn-outline-gold btn-sm flex-grow-1"
                                             onclick="openModal('<?= $modal_id_p ?>')"
-                                            aria-label="Modifier <?= htmlspecialchars($p['nom_style']) ?>">
+                                            aria-label="Modifier <?= htmlspecialchars($p['nom_service']) ?>">
                                         <i class="bi bi-pencil me-1" aria-hidden="true"></i> Modifier
                                     </button>
-                                    <a href="?supprimer=<?= $p['id_prestation'] ?>"
+                                    <a href="?supprimer=<?= $p['id_service'] ?>"
                                        class="btn-danger-cct btn-sm"
                                        onclick="return confirm('Supprimer définitivement ce style ?')"
-                                       aria-label="Supprimer <?= htmlspecialchars($p['nom_style']) ?>">
+                                       aria-label="Supprimer <?= htmlspecialchars($p['nom_service']) ?>">
                                         <i class="bi bi-trash" aria-hidden="true"></i>
                                     </a>
                                 </div>
@@ -360,11 +360,11 @@ endif; ?>
                     ob_start();
                     ?>
                     <form method="POST" enctype="multipart/form-data" novalidate>
-                        <input type="hidden" name="id_prestation" value="<?= $p['id_prestation'] ?>">
-                        <input type="hidden" name="ancienne_photo" value="<?= htmlspecialchars($p['photo_style']) ?>">
+                        <input type="hidden" name="id_service" value="<?= $p['id_service'] ?>">
+                        <input type="hidden" name="ancienne_photo" value="<?= htmlspecialchars($p['photo']) ?>">
 
                         <?php
-                        $ff = ['type'=>'text','name'=>'nom_style','label'=>'Nom de la coiffure','value'=>$p['nom_style'],'required'=>true];
+                        $ff = ['type'=>'text','name'=>'nom_service','label'=>'Nom de la coiffure','value'=>$p['nom_service'],'required'=>true];
                         include __DIR__ . '/../views/components/form_field.php';
                         ?>
 
@@ -395,7 +395,7 @@ endif; ?>
                         </div>
 
                         <?php
-                        $ff = ['type'=>'file','name'=>'photo_style','label'=>'Changer la photo (optionnel — Max 5 Mo)','attrs'=>'accept="image/*"'];
+                        $ff = ['type'=>'file','name'=>'photo','label'=>'Changer la photo (optionnel — Max 5 Mo)','attrs'=>'accept="image/*"'];
                         include __DIR__ . '/../views/components/form_field.php';
 
                         $ff = ['type'=>'textarea','name'=>'description','label'=>'Description','value'=>$un_description,'rows'=>2];
@@ -408,7 +408,7 @@ endif; ?>
                                 <i class="bi bi-tags me-1" aria-hidden="true"></i>
                                 Options / Variations
                             </label>
-                            <div id="wrapper-options-edit-<?= $p['id_prestation'] ?>">
+                            <div id="wrapper-options-edit-<?= $p['id_service'] ?>">
                                 <?php foreach ($options_array as $o): ?>
                                     <div class="row g-2 mb-2 align-items-center option-item">
                                         <div class="col-7">
@@ -436,7 +436,7 @@ endif; ?>
                             </div>
                             <button type="button"
                                     class="btn-outline-gold btn-sm w-100 mt-2"
-                                    onclick="ajouterOptionEdit(<?= $p['id_prestation'] ?>)">
+                                    onclick="ajouterOptionEdit(<?= $p['id_service'] ?>)">
                                 <i class="bi bi-plus" aria-hidden="true"></i> Ajouter une variation
                             </button>
                         </div>
@@ -458,7 +458,7 @@ endif; ?>
                     <?php
                     $modal_content = ob_get_clean();
                     $modal_id      = $modal_id_p;
-                    $modal_title   = 'Modifier : ' . htmlspecialchars($p['nom_style']);
+                    $modal_title   = 'Modifier : ' . htmlspecialchars($p['nom_service']);
                     $modal_width   = '580px';
                     include __DIR__ . '/../views/components/modal.php';
                     unset($modal_content, $modal_id, $modal_title, $modal_width);

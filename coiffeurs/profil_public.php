@@ -20,10 +20,10 @@ require_once __DIR__ . '/../security/config.php';
 
 $est_connecte = isset($_SESSION['id_user']) && !empty($_SESSION['role']) && $_SESSION['role'] !== 'invite';
 
-$id_coiffeur = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT)
-            ?? filter_input(INPUT_GET, 'id_coiffeur', FILTER_VALIDATE_INT);
+$prestataire_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT)
+            ?? filter_input(INPUT_GET, 'prestataire_id', FILTER_VALIDATE_INT);
 
-if (!$id_coiffeur) {
+if (!$prestataire_id) {
     echo "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body style='background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;'><div style='text-align:center'><p style='color:rgba(255,255,255,0.4);'>Coiffeur introuvable.</p><a href='/coiffons/index.php' style='color:#D4AF37;'>Retour à l'accueil</a></div></body></html>";
     exit();
 }
@@ -38,7 +38,7 @@ try {
         WHERE u.id = ? AND LOWER(u.role) = 'coiffeur'
         AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')
     ");
-    $stmt->execute([$id_coiffeur]);
+    $stmt->execute([$prestataire_id]);
     $coiffeur = $stmt->fetch();
 
     if (!$coiffeur) {
@@ -47,8 +47,8 @@ try {
     }
 
     // Prestations — SQL inchangé
-    $stmt_presta = $pdo->prepare("SELECT * FROM prestations WHERE id_coiffeur = ? ORDER BY id_prestation ASC");
-    $stmt_presta->execute([$id_coiffeur]);
+    $stmt_presta = $pdo->prepare("SELECT * FROM prestations WHERE prestataire_id = ? ORDER BY id_service ASC");
+    $stmt_presta->execute([$prestataire_id]);
     $prestations = $stmt_presta->fetchAll();
 
     // Avis — SQL inchangé
@@ -56,27 +56,27 @@ try {
         $stmt_avis = $pdo->prepare("
             SELECT c.*, u.nom as client_nom, u.prenom as client_prenom
             FROM commentaires c
-            JOIN users u ON c.id_client = u.id
-            WHERE c.id_coiffeur = ? AND c.type_commentaire = 'public'
+            JOIN users u ON c.client_id = u.id
+            WHERE c.prestataire_id = ? AND c.type = 'public'
               AND c.statut_moderation != 'rejete'
             ORDER BY c.date_creation DESC LIMIT 5
         ");
-        $stmt_avis->execute([$id_coiffeur]);
+        $stmt_avis->execute([$prestataire_id]);
         $avis_publics = $stmt_avis->fetchAll();
     } catch (Exception $e) { $avis_publics = []; }
 
     // Note moyenne — SQL inchangé
     try {
-        $stmt_note = $pdo->prepare("SELECT AVG(note) as moy, COUNT(*) as nb FROM commentaires WHERE id_coiffeur = ?");
-        $stmt_note->execute([$id_coiffeur]);
+        $stmt_note = $pdo->prepare("SELECT AVG(note) as moy, COUNT(*) as nb FROM commentaires WHERE prestataire_id = ?");
+        $stmt_note->execute([$prestataire_id]);
         $stats_note   = $stmt_note->fetch();
         $note_moyenne = $stats_note['nb'] > 0 ? round($stats_note['moy'], 1) : null;
         $stats_avis   = ['total' => intval($stats_note['nb'])];
     } catch (Exception $e) { $note_moyenne = null; $stats_avis = ['total' => 0]; }
 
     // Disponibilités — SQL inchangé
-    $stmt_dispo = $pdo->prepare("SELECT * FROM disponibilites WHERE coiffeur_id = ?");
-    $stmt_dispo->execute([$id_coiffeur]);
+    $stmt_dispo = $pdo->prepare("SELECT * FROM disponibilites WHERE prestataire_id = ?");
+    $stmt_dispo->execute([$prestataire_id]);
     $planning_coiffeur = [];
     foreach ($stmt_dispo->fetchAll() as $d) {
         $planning_coiffeur[strtolower(trim($d['jour_semaine']))] = [
@@ -88,9 +88,9 @@ try {
     // Créneaux occupés — SQL inchangé
     $stmt_rdv = $pdo->prepare("
         SELECT date_rdv, heure_debut FROM rendez_vous
-        WHERE coiffeur_id = ? AND statut_rdv IN ('en_attente','accepte','confirme')
+        WHERE prestataire_id = ? AND statut_rdv IN ('en_attente','accepte','confirme')
     ");
-    $stmt_rdv->execute([$id_coiffeur]);
+    $stmt_rdv->execute([$prestataire_id]);
     $busy_slots = [];
     foreach ($stmt_rdv->fetchAll() as $r) {
         $busy_slots[$r['date_rdv'] . ' ' . substr($r['heure_debut'], 0, 5)] = true;
@@ -114,8 +114,8 @@ if (!empty($coiffeur['photo_profil'])) {
 $banner_photo_url = null;
 if (!empty($prestations)) {
     foreach ($prestations as $p) {
-        if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])) {
-            $banner_photo_url = '/coiffons/' . $p['photo_style'];
+        if (!empty($p['photo']) && file_exists(__DIR__ . '/../' . $p['photo'])) {
+            $banner_photo_url = '/coiffons/' . $p['photo'];
             break;
         }
     }
@@ -360,8 +360,8 @@ include __DIR__ . '/../views/components/navbar_client.php';
         <div class="row g-4" id="prestations-grid">
             <?php foreach ($prestations as $p):
                 $photo_url_p = null;
-                if (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style'])) {
-                    $photo_url_p = '/coiffons/' . $p['photo_style'];
+                if (!empty($p['photo']) && file_exists(__DIR__ . '/../' . $p['photo'])) {
+                    $photo_url_p = '/coiffons/' . $p['photo'];
                 }
                 $explode_p   = explode("|||", $p['description'] ?? '');
                 $desc_pure_p = $explode_p[0] ?? '';
@@ -370,15 +370,15 @@ include __DIR__ . '/../views/components/navbar_client.php';
             ?>
             <div class="col-12 col-sm-6 col-lg-4">
                 <article class="presta-card"
-                         data-presta-id="<?= (int)$p['id_prestation'] ?>"
-                         data-presta-nom="<?= htmlspecialchars($p['nom_style']) ?>"
+                         data-presta-id="<?= (int)$p['id_service'] ?>"
+                         data-presta-nom="<?= htmlspecialchars($p['nom_service']) ?>"
                          data-presta-prix="<?= (int)$p['prix'] ?>"
                          data-presta-duree="<?= (int)($p['duree'] ?? 60) ?>"
                          data-presta-options="<?= htmlspecialchars(json_encode($opts_p, JSON_UNESCAPED_UNICODE)) ?>"
                          onclick="selectionnerPrestation(this)"
                          role="button" tabindex="0"
                          onkeypress="if(event.key==='Enter')selectionnerPrestation(this)"
-                         aria-label="Choisir <?= htmlspecialchars($p['nom_style']) ?> — <?= number_format($p['prix'],0,',','') ?> FCFA">
+                         aria-label="Choisir <?= htmlspecialchars($p['nom_service']) ?> — <?= number_format($p['prix'],0,',','') ?> FCFA">
 
                     <!-- Checkmark sélection -->
                     <div class="presta-card-check" aria-hidden="true">
@@ -387,13 +387,13 @@ include __DIR__ . '/../views/components/navbar_client.php';
 
                     <!-- Image -->
                     <?php if ($photo_url_p): ?>
-                        <img src="<?= htmlspecialchars($photo_url_p) ?>" class="presta-img" alt="<?= htmlspecialchars($p['nom_style']) ?>" loading="lazy">
+                        <img src="<?= htmlspecialchars($photo_url_p) ?>" class="presta-img" alt="<?= htmlspecialchars($p['nom_service']) ?>" loading="lazy">
                     <?php else: ?>
                         <div class="presta-img-ph" aria-hidden="true"><i class="bi bi-scissors"></i></div>
                     <?php endif; ?>
 
                     <div class="presta-body">
-                        <div class="presta-name"><?= htmlspecialchars($p['nom_style']) ?></div>
+                        <div class="presta-name"><?= htmlspecialchars($p['nom_service']) ?></div>
                         <?php if (!empty($desc_pure_p)): ?>
                             <p class="presta-desc"><?= htmlspecialchars($desc_pure_p) ?></p>
                         <?php else: ?>
@@ -579,7 +579,7 @@ include __DIR__ . '/../views/components/bottom_nav_client.php';
     'use strict';
 
     /* ── Données PHP → JS ── */
-    const COIFFEUR_ID   = <?= (int)$id_coiffeur ?>;
+    const COIFFEUR_ID   = <?= (int)$prestataire_id ?>;
     const EST_CONNECTE  = <?= $est_connecte ? 'true' : 'false' ?>;
     const PAGE_ROOT     = '/coiffons';
     const BUSY_SLOTS    = <?= json_encode($busy_slots, JSON_UNESCAPED_UNICODE) ?>;
@@ -713,8 +713,8 @@ include __DIR__ . '/../views/components/bottom_nav_client.php';
 
         // Construire le lien de destination
         const continuerURL = EST_CONNECTE
-            ? `${PAGE_ROOT}/client/reserver.php?coiffeur_id=${COIFFEUR_ID}&presta_id=${prestaSelectionId}&date_rdv=${dateSelectionnee}&heure_debut=${heure}`
-            : `${PAGE_ROOT}/index.php?page=login&redirect=${encodeURIComponent(PAGE_ROOT + '/client/reserver.php?coiffeur_id=' + COIFFEUR_ID + '&presta_id=' + prestaSelectionId + '&date_rdv=' + dateSelectionnee + '&heure_debut=' + heure)}`;
+            ? `${PAGE_ROOT}/client/reserver.php?prestataire_id=${COIFFEUR_ID}&presta_id=${prestaSelectionId}&date_rdv=${dateSelectionnee}&heure_debut=${heure}`
+            : `${PAGE_ROOT}/index.php?page=login&redirect=${encodeURIComponent(PAGE_ROOT + '/client/reserver.php?prestataire_id=' + COIFFEUR_ID + '&presta_id=' + prestaSelectionId + '&date_rdv=' + dateSelectionnee + '&heure_debut=' + heure)}`;
 
         document.getElementById('btn-continuer').href = continuerURL;
         document.getElementById('btn-continuer-wrap').style.display = 'block';

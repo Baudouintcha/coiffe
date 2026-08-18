@@ -19,8 +19,8 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
     exit();
 }
 
-$id_client    = $_SESSION['id_user'];
-$id_prestation = isset($_GET['id_prestation']) ? intval($_GET['id_prestation']) : 0;
+$client_id    = $_SESSION['id_user'];
+$id_service = isset($_GET['id_service']) ? intval($_GET['id_service']) : 0;
 $erreur       = "";
 $succes       = "";
 
@@ -30,18 +30,18 @@ $solde_test_simulation = 15000;
 
 // Chargement prestation — SQL inchangé
 $prestation = null;
-if ($id_prestation > 0 && isset($pdo)) {
+if ($id_service > 0 && isset($pdo)) {
     try {
         $stmt = $pdo->prepare("
-            SELECT p.*, u.id AS id_coiffeur, u.nom AS nom_coiffeur, u.prenom AS prenom_coiffeur,
+            SELECT p.*, u.id AS prestataire_id, u.nom AS nom_coiffeur, u.prenom AS prenom_coiffeur,
                    v.nom_ville, q.nom_quartier
             FROM prestations p
-            JOIN users u ON p.id_coiffeur = u.id
+            JOIN users u ON p.prestataire_id = u.id
             LEFT JOIN villes v ON u.ville = v.id
             LEFT JOIN quartiers q ON u.id_quartier = q.id
-            WHERE p.id_prestation = ?
+            WHERE p.id_service = ?
         ");
-        $stmt->execute([$id_prestation]);
+        $stmt->execute([$id_service]);
         $prestation = $stmt->fetch();
     } catch (Exception $e) {
         $erreur = "Erreur lors du chargement de la prestation.";
@@ -52,7 +52,7 @@ if ($id_prestation > 0 && isset($pdo)) {
 $solde_client = $solde_test_simulation;
 if (!$mode_test && isset($pdo)) {
     $stmt_wallet = $pdo->prepare("SELECT solde FROM portefeuilles WHERE user_id = ?");
-    $stmt_wallet->execute([$id_client]);
+    $stmt_wallet->execute([$client_id]);
     $wallet = $stmt_wallet->fetch();
     if ($wallet) $solde_client = $wallet['solde'];
 }
@@ -69,19 +69,19 @@ if ($prestation && $solde_client < $prix_prestation) {
 
 // Traitement POST — SQL inchangé
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($erreur)) {
-    $id_prestation_post = intval($_POST['id_prestation']);
+    $id_service_post = intval($_POST['id_service']);
     $date_rdv           = trim($_POST['date_rdv']);
     $heure_rdv          = trim($_POST['heure_rdv']);
-    $id_coiffeur        = $prestation['id_coiffeur'];
+    $prestataire_id        = $prestation['prestataire_id'];
 
     if (empty($date_rdv) || empty($heure_rdv)) {
         $erreur = "Veuillez sélectionner un jour et une heure.";
     } elseif (isset($pdo)) {
         try {
             $pdo->prepare("
-                INSERT INTO rendez_vous (id_client, id_coiffeur, id_prestation, date_rdv, heure_rdv, statut_rdv, date_creation)
+                INSERT INTO rendez_vous (client_id, prestataire_id, id_service, date_rdv, heure_rdv, statut_rdv, date_creation)
                 VALUES (?, ?, ?, ?, ?, 'en_attente', NOW())
-            ")->execute([$id_client, $id_coiffeur, $id_prestation_post, $date_rdv, $heure_rdv]);
+            ")->execute([$client_id, $prestataire_id, $id_service_post, $date_rdv, $heure_rdv]);
 
             // Notification au coiffeur — INSERT dans notifications
             $prenom_client_notif = $_SESSION['prenom'] ?? 'Un client';
@@ -89,15 +89,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($erreur)) {
             $msg_notif = "Nouvelle demande de RDV de " . $prenom_client_notif . " " . $nom_client_notif
                        . " pour le " . $date_rdv . " à " . $heure_rdv . ".";
             try {
-                $pdo->prepare("INSERT INTO notifications (id_user, message, type, statut_lecture, date_notification) VALUES (?, ?, 'info', 'non_lu', NOW())")
-                    ->execute([$id_coiffeur, $msg_notif]);
+                $pdo->prepare("INSERT INTO notifications (id_user, message, type, lu, date_notification) VALUES (?, ?, 'info', 0, NOW())")
+                    ->execute([$prestataire_id, $msg_notif]);
             } catch (Exception $e) {
                 // Notification non bloquante
             }
 
             if (!$mode_test) {
                 $nouveau_solde = $solde_client - $prix_prestation;
-                $pdo->prepare("UPDATE portefeuilles SET solde = ? WHERE user_id = ?")->execute([$nouveau_solde, $id_client]);
+                $pdo->prepare("UPDATE portefeuilles SET solde = ? WHERE user_id = ?")->execute([$nouveau_solde, $client_id]);
                 $solde_client = $nouveau_solde;
             } else {
                 $solde_client -= $prix_prestation;
@@ -235,7 +235,7 @@ endif; ?>
             <div class="prestation-recap">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <div class="prestation-name"><?= htmlspecialchars($prestation['nom_style']) ?></div>
+                        <div class="prestation-name"><?= htmlspecialchars($prestation['nom_service']) ?></div>
                         <div class="prestation-coiff">
                             <i class="bi bi-person-fill" style="color:var(--gold);" aria-hidden="true"></i>
                             <?= htmlspecialchars(strtoupper($prestation['prenom_coiffeur'] . ' ' . $prestation['nom_coiffeur'])) ?>
@@ -263,7 +263,7 @@ endif; ?>
 
             <!-- Formulaire de sélection — logique PHP/JS inchangée -->
             <form method="POST" id="formReservation" novalidate>
-                <input type="hidden" name="id_prestation" value="<?= $prestation['id_prestation'] ?>">
+                <input type="hidden" name="id_service" value="<?= $prestation['id_service'] ?>">
                 <input type="hidden" name="date_rdv"      id="input_date_rdv" required>
                 <input type="hidden" name="heure_rdv"     id="input_heure_rdv" required>
 

@@ -60,19 +60,18 @@ switch ($page) {
                         q.nom_quartier as quartier, 
                         v.nom_ville as ville,
                         u.is_approved,
-                        (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
-                        (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style,
-                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
-                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                        (SELECT MIN(s2.prix) FROM services s2 WHERE s2.id_prestataire = u.id) as prix,
+                        (SELECT s3.photo FROM services s3 WHERE s3.id_prestataire = u.id AND s3.photo IS NOT NULL LIMIT 1) as photo,
+                        (SELECT ROUND(AVG(av.note), 1) FROM avis av WHERE av.prestataire_id = u.id AND av.type = 'public') AS note_moyenne,
+                        (SELECT COUNT(av.id) FROM avis av WHERE av.prestataire_id = u.id AND av.type = 'public') AS nb_avis
                     FROM users u
-                    LEFT JOIN villes v ON u.ville = v.id
-                    LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+                    LEFT JOIN villes v ON u.id_ville = v.id
+                    LEFT JOIN zones_prestataire z ON u.id = z.id_prestataire
                     LEFT JOIN quartiers q ON u.id_quartier = q.id
-                    WHERE u.role = 'coiffeur' 
+                    WHERE u.role = 'prestataire' 
                     AND (u.is_approved = 1 OR u.is_approved = '1')
                     AND (u.statut = 'actif' OR u.statut IS NULL OR u.statut = '')
-                    AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
-                    AND u.ville = ? 
+                    AND u.id_ville = ? 
                     AND (u.id_quartier = ? OR z.id_quartier = ?)
                     ORDER BY RAND() 
                     LIMIT 9
@@ -90,18 +89,17 @@ switch ($page) {
                         q.nom_quartier as quartier, 
                         v.nom_ville as ville,
                         u.is_approved,
-                        (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
-                        (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style,
-                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
-                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                        (SELECT MIN(s2.prix) FROM services s2 WHERE s2.id_prestataire = u.id) as prix,
+                        (SELECT s3.photo FROM services s3 WHERE s3.id_prestataire = u.id AND s3.photo IS NOT NULL LIMIT 1) as photo,
+                        (SELECT ROUND(AVG(av.note), 1) FROM avis av WHERE av.prestataire_id = u.id AND av.type = 'public') AS note_moyenne,
+                        (SELECT COUNT(av.id) FROM avis av WHERE av.prestataire_id = u.id AND av.type = 'public') AS nb_avis
                     FROM users u
-                    LEFT JOIN villes v ON u.ville = v.id
+                    LEFT JOIN villes v ON u.id_ville = v.id
                     LEFT JOIN quartiers q ON u.id_quartier = q.id
-                    WHERE u.role = 'coiffeur' 
+                    WHERE u.role = 'prestataire' 
                     AND (u.is_approved = 1 OR u.is_approved = '1')
                     AND (u.statut = 'actif' OR u.statut IS NULL OR u.statut = '')
-                    AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
-                    AND u.ville = ?
+                    AND u.id_ville = ?
                     ORDER BY RAND() 
                     LIMIT 9
                 ");
@@ -118,17 +116,16 @@ switch ($page) {
                         q.nom_quartier as quartier, 
                         v.nom_ville as ville,
                         u.is_approved,
-                        (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
-                        (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style,
-                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
-                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
+                        (SELECT MIN(s2.prix) FROM services s2 WHERE s2.id_prestataire = u.id) as prix,
+                        (SELECT s3.photo FROM services s3 WHERE s3.id_prestataire = u.id AND s3.photo IS NOT NULL LIMIT 1) as photo,
+                        (SELECT ROUND(AVG(av.note), 1) FROM avis av WHERE av.prestataire_id = u.id AND av.type = 'public') AS note_moyenne,
+                        (SELECT COUNT(av.id) FROM avis av WHERE av.prestataire_id = u.id AND av.type = 'public') AS nb_avis
                     FROM users u
-                    LEFT JOIN villes v ON u.ville = v.id
+                    LEFT JOIN villes v ON u.id_ville = v.id
                     LEFT JOIN quartiers q ON u.id_quartier = q.id
-                    WHERE u.role = 'coiffeur' 
+                    WHERE u.role = 'prestataire' 
                     AND (u.is_approved = 1 OR u.is_approved = '1')
                     AND (u.statut = 'actif' OR u.statut IS NULL OR u.statut = '')
-                    AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
                     ORDER BY RAND() 
                     LIMIT 9
                 ");
@@ -172,9 +169,9 @@ switch ($page) {
 
         // Données de démo si la BDD est vide
         $coiffures_par_defaut = [
-            ['id_prestation'=>1,'id_coiffeur'=>1,'nom_style'=>'Gros Rastas Premium','prix'=>7000,'nom_coiffeur'=>'Alliance Coiffure','ville'=>'Cotonou','quartier'=>'Fidjrossè','photo_style'=>null],
-            ['id_prestation'=>2,'id_coiffeur'=>2,'nom_style'=>'Dégradé Américain / Wave','prix'=>3000,'nom_coiffeur'=>'Barber Shop Pro','ville'=>'Calavi','quartier'=>'Zogbadjè','photo_style'=>null],
-            ['id_prestation'=>3,'id_coiffeur'=>3,'nom_style'=>'Nattes Collées Graphiques','prix'=>5000,'nom_coiffeur'=>'Divine Mains','ville'=>'Porto-Novo','quartier'=>'Ouando','photo_style'=>null],
+            ['id_service'=>1,'id_prestataire'=>1,'nom_service'=>'Gros Rastas Premium','prix'=>7000,'nom_coiffeur'=>'Alliance Coiffure','ville'=>'Cotonou','quartier'=>'Fidjrossè','photo'=>null],
+            ['id_service'=>2,'id_prestataire'=>2,'nom_service'=>'Dégradé Américain / Wave','prix'=>3000,'nom_coiffeur'=>'Barber Shop Pro','ville'=>'Calavi','quartier'=>'Zogbadjè','photo'=>null],
+            ['id_service'=>3,'id_prestataire'=>3,'nom_service'=>'Nattes Collées Graphiques','prix'=>5000,'nom_coiffeur'=>'Divine Mains','ville'=>'Porto-Novo','quartier'=>'Ouando','photo'=>null],
         ];
 
         // Données pour le coiffeur connecté
@@ -185,13 +182,13 @@ switch ($page) {
                 $db_coiffeur = $chk->fetch() ?: [];
 
                 $stmt = $pdo->prepare("
-                    SELECT p.*, v.nom_ville as ville, q.nom_quartier as quartiers
-                    FROM prestations p
-                    JOIN users u ON p.id_coiffeur = u.id
-                    LEFT JOIN villes v ON u.ville = v.id
+                    SELECT s.*, v.nom_ville as ville, q.nom_quartier as quartiers
+                    FROM services s
+                    JOIN users u ON s.id_prestataire = u.id
+                    LEFT JOIN villes v ON u.id_ville = v.id
                     LEFT JOIN quartiers q ON u.id_quartier = q.id
-                    WHERE p.id_coiffeur = ?
-                    ORDER BY p.id_prestation DESC
+                    WHERE s.id_prestataire = ?
+                    ORDER BY s.id_service DESC
                 ");
                 $stmt->execute([$coiffeur_id]);
                 $mes_coiffures = $stmt->fetchAll();
@@ -206,14 +203,14 @@ switch ($page) {
             $id_quartier_client= $_SESSION['id_quartier'] ?? 0;
             try {
                 $stmt = $pdo->prepare("
-                    SELECT DISTINCT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville
-                    FROM prestations p
-                    JOIN users u ON p.id_coiffeur = u.id
-                    JOIN villes v ON u.ville = v.id
-                    INNER JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+                    SELECT DISTINCT s.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville
+                    FROM services s
+                    JOIN users u ON s.id_prestataire = u.id
+                    JOIN villes v ON u.id_ville = v.id
+                    INNER JOIN zones_prestataire z ON u.id = z.id_prestataire
                     LEFT JOIN quartiers q ON u.id_quartier = q.id
-                    WHERE u.role = 'coiffeur' AND u.abonnement_status = 1
-                    AND u.ville = ? AND z.id_quartier = ?
+                    WHERE u.role = 'prestataire'
+                    AND u.id_ville = ? AND z.id_quartier = ?
                     ORDER BY RAND() LIMIT 6
                 ");
                 $stmt->execute([$id_ville_client, $id_quartier_client]);
@@ -221,12 +218,12 @@ switch ($page) {
 
                 if (empty($coiffeurs_matching)) {
                     $stmt2 = $pdo->prepare("
-                        SELECT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville
-                        FROM prestations p
-                        JOIN users u ON p.id_coiffeur = u.id
-                        JOIN villes v ON u.ville = v.id
+                        SELECT s.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville
+                        FROM services s
+                        JOIN users u ON s.id_prestataire = u.id
+                        JOIN villes v ON u.id_ville = v.id
                         LEFT JOIN quartiers q ON u.id_quartier = q.id
-                        WHERE u.role = 'coiffeur' AND u.abonnement_status = 1 AND u.ville = ?
+                        WHERE u.role = 'prestataire' AND u.id_ville = ?
                         ORDER BY RAND() LIMIT 6
                     ");
                     $stmt2->execute([$id_ville_client]);
@@ -235,12 +232,12 @@ switch ($page) {
 
                 if (empty($coiffeurs_matching)) {
                     $coiffeurs_matching = $pdo->query("
-                        SELECT p.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville
-                        FROM prestations p
-                        JOIN users u ON p.id_coiffeur = u.id
-                        JOIN villes v ON u.ville = v.id
+                        SELECT s.*, u.nom as nom_coiffeur, q.nom_quartier as quartier, v.nom_ville as ville
+                        FROM services s
+                        JOIN users u ON s.id_prestataire = u.id
+                        JOIN villes v ON u.id_ville = v.id
                         LEFT JOIN quartiers q ON u.id_quartier = q.id
-                        WHERE u.abonnement_status = 1 ORDER BY RAND() LIMIT 6
+                        ORDER BY RAND() LIMIT 6
                     ")->fetchAll();
                 }
             } catch (Exception $e) {
@@ -253,12 +250,12 @@ switch ($page) {
         if ($role_actuel === 'invite') {
             try {
                 $catalog_demo = $pdo->query("
-                    SELECT p.*, u.nom as nom_coiffeur, v.nom_ville as ville, q.nom_quartier as quartier
-                    FROM prestations p
-                    JOIN users u ON p.id_coiffeur = u.id
-                    JOIN villes v ON u.ville = v.id
+                    SELECT s.*, u.nom as nom_coiffeur, v.nom_ville as ville, q.nom_quartier as quartier
+                    FROM services s
+                    JOIN users u ON s.id_prestataire = u.id
+                    JOIN villes v ON u.id_ville = v.id
                     LEFT JOIN quartiers q ON u.id_quartier = q.id
-                    WHERE u.abonnement_status = 1 ORDER BY RAND() LIMIT 6
+                    ORDER BY RAND() LIMIT 6
                 ")->fetchAll();
             } catch (Exception $e) { $catalog_demo = []; }
             if (empty($catalog_demo)) $catalog_demo = $coiffures_par_defaut;

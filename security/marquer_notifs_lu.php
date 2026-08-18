@@ -19,7 +19,7 @@ if (!isset($_SESSION['id_user'])) {
 
 try {
     $pdo->prepare(
-        "UPDATE notifications SET statut_lecture = 'lu' WHERE id_user = ?"
+        "UPDATE notifications SET lu = 1 WHERE user_id = ?"
     )->execute([$_SESSION['id_user']]);
 
     echo json_encode(['status' => 'ok']);

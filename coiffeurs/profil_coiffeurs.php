@@ -21,7 +21,7 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
     exit();
 }
 
-$id_coiffeur  = $_SESSION['id_user'];
+$prestataire_id  = $_SESSION['id_user'];
 $message_type = '';
 $message_text = '';
 
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['maj_profil'])) {
     $id_quartier= !empty($_POST['id_quartier']) ? intval($_POST['id_quartier']) : null;
 
     $stmt = $pdo->prepare("UPDATE users SET nom = ?, prenom = ?, email = ?, telephone = ?, id_ville = ?, id_quartier = ? WHERE id = ?");
-    if ($stmt->execute([$nom, $prenom, $email, $telephone, $id_ville, $id_quartier, $id_coiffeur])) {
+    if ($stmt->execute([$nom, $prenom, $email, $telephone, $id_ville, $id_quartier, $prestataire_id])) {
         $_SESSION['nom'] = $nom;
         $message_type = 'success';
         $message_text = 'Profil mis à jour avec succès.';
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['maj_profil'])) {
 
 // Récupération infos coiffeur avec ville et quartier actuels
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-$stmt->execute([$id_coiffeur]);
+$stmt->execute([$prestataire_id]);
 $coiffeur = $stmt->fetch();
 
 // Récupération des villes

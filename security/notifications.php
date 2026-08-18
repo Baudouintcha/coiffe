@@ -19,8 +19,8 @@ if (!function_exists('notifier')) {
     function notifier(PDO $pdo, int $id_user, string $message, string $type = 'info'): bool {
         try {
             $stmt = $pdo->prepare(
-                "INSERT INTO notifications (id_user, message, type, statut_lecture, date_notification)
-                 VALUES (?, ?, ?, 'non_lu', NOW())"
+                "INSERT INTO notifications (id_user, message, type, lu, date_notification)
+                 VALUES (?, ?, ?, 0, NOW())"
             );
             return $stmt->execute([$id_user, $message, $type]);
         } catch (Exception $e) {

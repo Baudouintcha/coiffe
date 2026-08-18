@@ -23,11 +23,11 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
 
 require_once __DIR__ . '/../security/config.php';
 
-$id_client = $_SESSION['id_user'];
+$client_id = $_SESSION['id_user'];
 
 // Paramètres GET
-$id_prestation   = isset($_GET['presta_id'])   ? intval($_GET['presta_id'])   : 0;
-$id_coiffeur     = isset($_GET['coiffeur_id']) ? intval($_GET['coiffeur_id']) : 0;
+$id_service   = isset($_GET['presta_id'])   ? intval($_GET['presta_id'])   : 0;
+$prestataire_id     = isset($_GET['prestataire_id']) ? intval($_GET['prestataire_id']) : 0;
 $date_rdv_url    = isset($_GET['date_rdv'])    ? trim($_GET['date_rdv'])      : '';
 $heure_debut_url = isset($_GET['heure_debut']) ? trim($_GET['heure_debut'])   : '';
 
@@ -35,8 +35,8 @@ $heure_debut_url = isset($_GET['heure_debut']) ? trim($_GET['heure_debut'])   : 
 $mode_recap = ($date_rdv_url !== '' && $heure_debut_url !== '');
 
 // Chargement prestation — SQL inchangé
-$presta_stmt = $pdo->prepare("SELECT * FROM prestations WHERE id_prestation = ?");
-$presta_stmt->execute([$id_prestation]);
+$presta_stmt = $pdo->prepare("SELECT * FROM prestations WHERE id_service = ?");
+$presta_stmt->execute([$id_service]);
 $prestation = $presta_stmt->fetch();
 
 $duree_coiffeur = (isset($prestation['duree']) && $prestation['duree'] > 0) ? intval($prestation['duree']) : 60;
@@ -49,12 +49,12 @@ $options_catalogue = json_decode($json_options, true) ?: [];
 
 // Chargement coiffeur (pour l'afficher dans le récap)
 $coiffeur_recap = null;
-if ($id_coiffeur > 0) {
+if ($prestataire_id > 0) {
     try {
         $stmt_c = $pdo->prepare("SELECT u.nom, u.prenom, u.photo_profil,
-            (SELECT ROUND(AVG(note),1) FROM commentaires WHERE id_coiffeur=u.id AND type_commentaire='public') AS note_moy
+            (SELECT ROUND(AVG(note),1) FROM commentaires WHERE prestataire_id=u.id AND type='public') AS note_moy
             FROM users u WHERE u.id = ?");
-        $stmt_c->execute([$id_coiffeur]);
+        $stmt_c->execute([$prestataire_id]);
         $coiffeur_recap = $stmt_c->fetch();
     } catch (Exception $e) {}
 }
@@ -71,7 +71,7 @@ $mode_test    = true;
 $solde_actuel = $mode_test ? 15000 : 0;
 if (!$mode_test) {
     $s = $pdo->prepare("SELECT solde FROM users WHERE id = ?");
-    $s->execute([$id_client]);
+    $s->execute([$client_id]);
     $solde_actuel = floatval($s->fetchColumn() ?? 0);
 }
 
@@ -116,10 +116,10 @@ if ($prestation && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confir
         $msg_type    = 'danger';
         $msg_content = 'Solde insuffisant (' . number_format($prix_total_calcule,0,',','') . ' FCFA requis, solde : ' . number_format($solde_actuel,0,',','') . ' FCFA).';
     } else {
-        $insert = $pdo->prepare("INSERT INTO rendez_vous (client_id, coiffeur_id, coiffure_id, date_rdv, heure_debut, heure_fin, statut_rdv) VALUES (?, ?, ?, ?, ?, ?, 'en_attente')");
-        if ($insert->execute([$id_client, $id_coiffeur, $id_prestation, $date_rdv, $heure_debut, $heure_fin])) {
+        $insert = $pdo->prepare("INSERT INTO rendez_vous (client_id, prestataire_id, service_id, date_rdv, heure_debut, heure_fin, statut_rdv) VALUES (?, ?, ?, ?, ?, ?, 'en_attente')");
+        if ($insert->execute([$client_id, $prestataire_id, $id_service, $date_rdv, $heure_debut, $heure_fin])) {
             if (!$mode_test) {
-                $pdo->prepare("UPDATE users SET solde = ? WHERE id = ?")->execute([$solde_actuel - $prix_total_calcule, $id_client]);
+                $pdo->prepare("UPDATE users SET solde = ? WHERE id = ?")->execute([$solde_actuel - $prix_total_calcule, $client_id]);
             }
             $solde_actuel -= $prix_total_calcule;
 
@@ -127,8 +127,8 @@ if ($prestation && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confir
             $msg_notif = "Nouvelle demande de RDV de " . ($_SESSION['prenom'] ?? 'Un client') . " " . ($_SESSION['nom'] ?? '')
                        . " pour le " . $date_rdv . " à " . $heure_debut . ".";
             try {
-                $pdo->prepare("INSERT INTO notifications (id_user, message, type, statut_lecture, date_notification) VALUES (?, ?, 'info', 'non_lu', NOW())")
-                    ->execute([$id_coiffeur, $msg_notif]);
+                $pdo->prepare("INSERT INTO notifications (id_user, message, type, lu, date_notification) VALUES (?, ?, 'info', 0, NOW())")
+                    ->execute([$prestataire_id, $msg_notif]);
             } catch (Exception $e) {}
 
             $reservation_ok  = true;
@@ -259,7 +259,7 @@ endif; ?>
         <div class="resa-card" style="margin-bottom:1.5rem;text-align:left;">
             <div class="resa-row">
                 <span class="resa-label">Style</span>
-                <span class="resa-value"><?= htmlspecialchars($prestation['nom_style']) ?></span>
+                <span class="resa-value"><?= htmlspecialchars($prestation['nom_service']) ?></span>
             </div>
             <div class="resa-row">
                 <span class="resa-label">Date</span>
@@ -309,7 +309,7 @@ endif; ?>
     <?php endif; ?>
 
     <form method="POST" id="resa-form" novalidate>
-        <input type="hidden" name="id_prestation" value="<?= (int)$id_prestation ?>">
+        <input type="hidden" name="id_service" value="<?= (int)$id_service ?>">
         <input type="hidden" id="input-prix-base" value="<?= (int)($prestation['prix'] ?? 0) ?>">
         <input type="hidden" id="input-duree" value="<?= $duree_coiffeur ?>">
 
@@ -321,7 +321,7 @@ endif; ?>
             </div>
             <div class="resa-row">
                 <span class="resa-label">Prestation</span>
-                <span class="resa-value"><?= htmlspecialchars($prestation['nom_style']) ?></span>
+                <span class="resa-value"><?= htmlspecialchars($prestation['nom_service']) ?></span>
             </div>
             <div class="resa-row">
                 <span class="resa-label">Durée</span>

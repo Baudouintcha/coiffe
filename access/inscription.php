@@ -1,10 +1,9 @@
 <?php
 /**
- * access/inscription.php — Page d'inscription
- * Migration Design System v2.0 — Parcours Visiteur — Page 3/6
- *
- * ⚠️  LOGIQUE MÉTIER INTACTE — Seuls HTML/CSS/composants ont été modifiés.
- *     Aucune requête SQL, variable PHP, session, sécurité ou traitement fichier touché.
+ * access/inscription.php — Page d'inscription COIFFEURS/PRESTATAIRES
+ * 
+ * ⚠️  INSCRIPTION COIFFEURS UNIQUEMENT
+ *     Les clients créent leur compte via le formulaire de réservation
  */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -12,84 +11,9 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/../security/csrf.php';
-require_once __DIR__ . '/../src/Services/OtpService.php';
-require_once __DIR__ . '/../src/Services/EmailService.php';
 
-// Rôle pré-défini depuis l'URL — logique PHP inchangée
-$role_predefini = isset($_GET['role']) ? trim($_GET['role']) : 'client';
-if (!in_array($role_predefini, ['client', 'coiffeur'])) {
-    $role_predefini = 'client';
-}
-
-$message = "";
-
-// ═══ HANDLE OTP VERIFICATION ═══
-$otp_verification = null;
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'verify_otp') {
-    require_once __DIR__ . '/../access/verify_otp.php';
-    // $otp_verification contains result from verify_otp.php
-    
-    if (isset($otp_verification) && $otp_verification['success']) {
-        // OTP verified successfully
-        $_SESSION['email_verified'] = true;
-        
-        // Redirect to dashboard based on role
-        $role = $_SESSION['role'] ?? 'client';
-        header("Cache-Control: no-store, no-cache, must-revalidate");
-        header("Pragma: no-cache");
-        if ($role === 'client') {
-            $redirect_url = $_SESSION['redirect_url'] ?? '/coiffons/index.php?page=dashboard';
-            unset($_SESSION['redirect_url']);
-            header("Location: " . $redirect_url);
-        } elseif ($role === 'coiffeur') {
-            $_SESSION['nouveau_coiffeur'] = true;
-            header("Location: /coiffons/coiffeurs/bienvenue.php");
-        } else {
-            header("Location: /coiffons/index.php");
-        }
-        exit();
-    } elseif (isset($otp_verification) && !$otp_verification['success']) {
-        $message = "msg-danger::" . htmlspecialchars($otp_verification['message']);
-    }
-}
-
-// ═══ HANDLE RESEND OTP ═══
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'resend_otp') {
-    csrf_verify();
-    
-    $user_id = $_SESSION['id_user'] ?? null;
-    $purpose = $_POST['otp_purpose'] ?? 'registration';
-    
-    if ($user_id) {
-        $otp_service = new OtpService($pdo);
-        $email_service = new EmailService();
-        
-        // Check if we can request a new OTP (rate limiting)
-        $can_request = $otp_service->canRequest($user_id, $purpose);
-        
-        if ($can_request['success']) {
-            // Generate new OTP
-            $otp_result = $otp_service->generate($user_id, $purpose);
-            
-            if ($otp_result['success']) {
-                // Send via email
-                $email = $_SESSION['otp_email'] ?? '';
-                $email_send_result = $email_service->sendOtpCode($email, $otp_result['code'], 5, $purpose);
-                
-                if ($email_send_result['success']) {
-                    $_SESSION['otp_resent_message'] = 'Code de vérification renvoyé avec succès.';
-                } else {
-                    $_SESSION['otp_resent_message'] = 'Erreur lors de l\'envoi du code.';
-                }
-            }
-        } else {
-            $_SESSION['otp_resent_message'] = $can_request['message'];
-        }
-        
-        header("Location: /coiffons/access/inscription.php");
-        exit();
-    }
-}
+// Forcer le rôle coiffeur
+$role_predefini = 'coiffeur';
 
 $message = "";
 
@@ -100,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (
         empty($_POST['nom']) || empty($_POST['prenom']) || empty($_POST['sexe']) ||
         empty($_POST['email']) || empty($_POST['telephone']) || empty($_POST['password']) ||
-        empty($_POST['role']) || empty($_POST['ville']) || empty($_POST['id_quartier'])
+        empty($_POST['ville']) || empty($_POST['id_quartier']) || empty($_POST['diplome_b64'])
     ) {
         $message = "msg-danger::Champs obligatoires manquants.";
     } else {
@@ -110,7 +34,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $email       = filter_var(trim($_POST['email']), FILTER_SANITIZE_EMAIL);
         $telephone   = strip_tags(trim($_POST['telephone']));
         $password    = $_POST['password'];
-        $role        = $_POST['role'];
         $id_ville    = intval($_POST['ville']);
         $id_quartier = intval($_POST['id_quartier']);
 
@@ -119,50 +42,45 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (!preg_match("/^[a-zA-ZÀ-ÿ\s\-]+$/u", $prenom))   $errors[] = "Prénom invalide (lettres uniquement).";
         if (!filter_var($email, FILTER_VALIDATE_EMAIL))        $errors[] = "Adresse email invalide.";
         if (!in_array($sexe, ['homme', 'femme']))              $errors[] = "Sexe invalide.";
-        if (!in_array($role, ['client', 'coiffeur']))          $errors[] = "Rôle invalide.";
         if (strlen($password) < 6)                             $errors[] = "Le mot de passe doit faire au moins 6 caractères.";
         if ($id_ville <= 0)                                    $errors[] = "Veuillez sélectionner une ville.";
         if (!preg_match('/^\+?[0-9\s\-]{8,20}$/', $telephone)) $errors[] = "Numéro de téléphone invalide.";
 
         if (!empty($errors)) {
             $message = "msg-danger::" . implode('<br>', array_map('htmlspecialchars', $errors));
-        } elseif ($role == 'coiffeur' && empty($_POST['diplome_b64'])) {
+        } elseif (empty($_POST['diplome_b64'])) {
             $message = "msg-danger::Le diplôme est obligatoire pour les coiffeurs.";
         } else {
             $password_hash = password_hash($password, PASSWORD_BCRYPT);
             $diplome_path  = NULL;
 
-            if ($role == 'coiffeur') {
-                if (!empty($_POST['diplome_b64'])) {
-                    $b64d = $_POST['diplome_b64'];
-                    if (preg_match('/^data:(image\/(jpeg|png|webp)|application\/pdf);base64,(.+)$/', $b64d, $md)) {
-                        $is_pdf    = $md[1] === 'application/pdf';
-                        $ext_d     = $is_pdf ? 'pdf' : ($md[2] === 'jpeg' ? 'jpg' : $md[2]);
-                        $imgData_d = base64_decode($md[3]);
-                        $diplome_path = 'uploads/diplomes/' . uniqid('', true) . '.' . $ext_d;
-                        $target = __DIR__ . '/../uploads/diplomes/';
-                        if (!is_dir($target)) mkdir($target, 0755, true);
-                        file_put_contents($target . basename($diplome_path), $imgData_d);
-                    } else {
-                        $message = "msg-danger::Format diplôme invalide (JPG, PNG, PDF).";
-                    }
+            // Traiter le diplôme
+            if (!empty($_POST['diplome_b64'])) {
+                $b64d = $_POST['diplome_b64'];
+                if (preg_match('/^data:(image\/(jpeg|png|webp)|application\/pdf);base64,(.+)$/', $b64d, $md)) {
+                    $is_pdf    = $md[1] === 'application/pdf';
+                    $ext_d     = $is_pdf ? 'pdf' : ($md[2] === 'jpeg' ? 'jpg' : $md[2]);
+                    $imgData_d = base64_decode($md[3]);
+                    $diplome_path = 'uploads/diplomes/' . uniqid('', true) . '.' . $ext_d;
+                    $target = __DIR__ . '/../uploads/diplomes/';
+                    if (!is_dir($target)) mkdir($target, 0755, true);
+                    file_put_contents($target . basename($diplome_path), $imgData_d);
                 } else {
-                    $message = "msg-danger::Le diplôme est obligatoire pour les coiffeurs.";
+                    $message = "msg-danger::Format diplôme invalide (JPG, PNG, PDF).";
                 }
             }
 
-            if (empty($message)) {
-                $photo_profil_path = null;
-                if (!empty($_POST['photo_profil_b64'])) {
-                    $b64 = $_POST['photo_profil_b64'];
-                    if (preg_match('/^data:image\/(jpeg|png|webp);base64,(.+)$/', $b64, $m)) {
-                        $ext     = $m[1] === 'jpeg' ? 'jpg' : $m[1];
-                        $imgData = base64_decode($m[2]);
-                        $photo_profil_path = 'uploads/profil/' . uniqid('', true) . '.' . $ext;
-                        $target2 = __DIR__ . '/../uploads/profil/';
-                        if (!is_dir($target2)) mkdir($target2, 0755, true);
-                        file_put_contents($target2 . basename($photo_profil_path), $imgData);
-                    }
+            // Traiter la photo de profil (optionnel)
+            $photo_profil_path = null;
+            if (!empty($message) === false && !empty($_POST['photo_profil_b64'])) {
+                $b64 = $_POST['photo_profil_b64'];
+                if (preg_match('/^data:image\/(jpeg|png|webp);base64,(.+)$/', $b64, $m)) {
+                    $ext     = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+                    $imgData = base64_decode($m[2]);
+                    $photo_profil_path = 'uploads/profil/' . uniqid('', true) . '.' . $ext;
+                    $target2 = __DIR__ . '/../uploads/profil/';
+                    if (!is_dir($target2)) mkdir($target2, 0755, true);
+                    file_put_contents($target2 . basename($photo_profil_path), $imgData);
                 }
             }
 
@@ -172,15 +90,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if ($check->rowCount() > 0) {
                     $message = "msg-danger::Cet email est déjà utilisé.";
                 } else {
-                    // Essayer d'abord avec les colonnes id_ville et id_quartier (nouveau schéma)
                     try {
                         $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, id_ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                        $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, $role, $id_ville, $id_quartier, $diplome_path, $photo_profil_path]);
+                        $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, 'coiffeur', $id_ville, $id_quartier, $diplome_path, $photo_profil_path]);
                     } catch (PDOException $e) {
-                        // Si les colonnes n'existent pas, essayer sans (ancien schéma)
+                        // Fallback ancien schéma
                         if (strpos($e->getMessage(), 'id_ville') !== false || strpos($e->getMessage(), 'id_quartier') !== false) {
                             $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                            $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, $role, $diplome_path, $photo_profil_path]);
+                            $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, 'coiffeur', $diplome_path, $photo_profil_path]);
                         } else {
                             throw $e;
                         }
@@ -190,27 +107,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_SESSION['id_user']  = $pdo->lastInsertId();
                         $_SESSION['nom']      = $nom;
                         $_SESSION['prenom']   = $prenom;
-                        $_SESSION['role']     = $role;
+                        $_SESSION['role']     = 'coiffeur';
                         $_SESSION['id_ville']    = $id_ville;
                         $_SESSION['id_quartier'] = $id_quartier;
                         $_SESSION['photo_profil'] = $photo_profil_path;
-                        $vn = $pdo->prepare("SELECT nom_ville FROM villes WHERE id = ?");
-                        $vn->execute([$id_ville]);
-                        $vd = $vn->fetch();
-                        $_SESSION['nom_ville'] = $vd ? $vd['nom_ville'] : '';
-                        
-                        // ═══ INSCRIPTION RÉUSSIE - Redirection vers le dashboard ═══
-                        // OTP désactivé temporairement pour éviter les erreurs d'envoi d'email
-                        // TODO: Configurer SMTP pour activer la vérification email
                         
                         $message = "msg-success::Inscription réussie ! Bienvenue sur Coiffe Chez Toi.";
-                        
-                        // Rediriger vers le dashboard selon le rôle
-                        if ($role === 'coiffeur') {
-                            header("Location: /coiffons/index.php?page=dashboard_coiffeur");
-                        } else {
-                            header("Location: /coiffons/index.php?page=dashboard");
-                        }
+                        header("Location: /coiffons/index.php?page=dashboard_coiffeur");
                         exit();
                     } else {
                         $message = "msg-danger::Erreur lors de l'enregistrement.";
@@ -345,15 +248,7 @@ if (!empty($message)) {
             REJOINDRE L'AVENTURE
         </h1>
         <p style="text-align:center;color:var(--text-muted);font-size:.82rem;margin-bottom:1.5rem;">
-            Compte
-            <strong style="color:var(--gold);">
-                <?= $role_predefini === 'coiffeur' ? 'Coiffeur / Prestataire' : 'Client' ?>
-            </strong>
-            &nbsp;&middot;&nbsp;
-            <a href="/coiffons/index.php?page=register&role=<?= $role_predefini === 'coiffeur' ? 'client' : 'coiffeur' ?>"
-               style="color:var(--text-disabled);text-decoration:none;">
-                Je suis <?= $role_predefini === 'coiffeur' ? 'un client' : 'un coiffeur' ?> →
-            </a>
+            Compte <strong style="color:var(--gold);">Coiffeur / Prestataire</strong>
         </p>
 
         <!-- Message d'erreur / succès — .msg-danger DS §11 -->

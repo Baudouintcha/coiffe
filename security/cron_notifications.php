@@ -27,7 +27,7 @@ try {
         "SELECT r.id, r.client_id, r.date_rdv, r.heure_debut,
                 u.prenom AS prenom_coiffeur, u.nom AS nom_coiffeur
          FROM rendez_vous r
-         JOIN users u ON r.coiffeur_id = u.id
+         JOIN users u ON r.prestataire_id = u.id
          WHERE r.date_rdv = CURDATE() + INTERVAL 1 DAY
            AND r.statut_rdv IN ('confirme', 'accepte')"
     );
@@ -81,12 +81,11 @@ try {
 // ===========================================================================
 try {
     $stmt = $pdo->query(
-        "SELECT p.id_coiffeur, COUNT(*) AS nb_rdv
+        "SELECT r.prestataire_id, COUNT(*) AS nb_rdv
          FROM rendez_vous r
-         JOIN prestations p ON r.coiffure_id = p.id_prestation
          WHERE r.date_rdv = CURDATE()
            AND r.statut_rdv IN ('confirme', 'accepte', 'en_attente')
-         GROUP BY p.id_coiffeur
+         GROUP BY r.prestataire_id
          HAVING nb_rdv > 0"
     );
     $rdvs_jour = $stmt->fetchAll();
@@ -96,7 +95,7 @@ try {
         $label   = $nb > 1 ? "rendez-vous" : "rendez-vous";
         $message = "Vous avez {$nb} {$label} aujourd'hui.";
 
-        if (notifier($pdo, (int)$row['id_coiffeur'], $message, 'info')) {
+        if (notifier($pdo, (int)$row['prestataire_id'], $message, 'info')) {
             $count++;
         }
     }

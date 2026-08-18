@@ -17,7 +17,7 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
 
 require_once __DIR__ . '/../security/config.php';
 
-$id_coiffeur = $_SESSION['id_user'];
+$prestataire_id = $_SESSION['id_user'];
 $message_type = '';
 $message_text = '';
 
@@ -30,13 +30,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_zones']))
     try {
         $pdo->beginTransaction();
 
-        $delete_stmt = $pdo->prepare("DELETE FROM zones_coiffeur WHERE id_coiffeur = ?");
-        $delete_stmt->execute([$id_coiffeur]);
+        $delete_stmt = $pdo->prepare("DELETE FROM zones_coiffeur WHERE prestataire_id = ?");
+        $delete_stmt->execute([$prestataire_id]);
 
         if (isset($_POST['quartiers_choisis']) && is_array($_POST['quartiers_choisis'])) {
-            $insert_stmt = $pdo->prepare("INSERT INTO zones_coiffeur (id_coiffeur, id_quartier) VALUES (?, ?)");
+            $insert_stmt = $pdo->prepare("INSERT INTO zones_coiffeur (prestataire_id, id_quartier) VALUES (?, ?)");
             foreach ($_POST['quartiers_choisis'] as $id_quartier) {
-                $insert_stmt->execute([$id_coiffeur, intval($id_quartier)]);
+                $insert_stmt->execute([$prestataire_id, intval($id_quartier)]);
             }
         }
 
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_zones']))
 
 // Récupération ville coiffeur — SQL CORRIGÉ : utiliser id_ville au lieu de ville
 $profile_stmt = $pdo->prepare("SELECT id_ville FROM users WHERE id = ?");
-$profile_stmt->execute([$id_coiffeur]);
+$profile_stmt->execute([$prestataire_id]);
 $id_ville_coiffeur = intval($profile_stmt->fetchColumn());
 
 if ($id_ville_coiffeur === $id_cotonou || $id_ville_coiffeur === $id_calavi) {
@@ -76,8 +76,8 @@ if ($id_ville_coiffeur === $id_cotonou || $id_ville_coiffeur === $id_calavi) {
 }
 $tous_les_quartiers = $all_quartiers_stmt->fetchAll();
 
-$mes_zones_stmt = $pdo->prepare("SELECT id_quartier FROM zones_coiffeur WHERE id_coiffeur = ?");
-$mes_zones_stmt->execute([$id_coiffeur]);
+$mes_zones_stmt = $pdo->prepare("SELECT id_quartier FROM zones_coiffeur WHERE prestataire_id = ?");
+$mes_zones_stmt->execute([$prestataire_id]);
 $raw_zones        = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 $mes_zones_actives = array_map('intval', $raw_zones);
 

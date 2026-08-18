@@ -22,7 +22,7 @@ if (empty($_SESSION['csrf_token'])) {
 
 require_once __DIR__ . '/../security/config.php';
 
-$id_client     = $_SESSION['id_user'];
+$client_id     = $_SESSION['id_user'];
 $message_flash = null;
 
 // ── Flash messages depuis traitement_avis.php et autres redirections ──
@@ -42,8 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_annuler'])) {
         $id_rdv = intval($_POST['id_rdv']);
         if (isset($pdo)) {
             try {
-                $stmt = $pdo->prepare("SELECT r.*, p.prix FROM rendez_vous r JOIN prestations p ON r.coiffure_id = p.id_prestation WHERE r.id = ? AND r.client_id = ?");
-                $stmt->execute([$id_rdv, $id_client]);
+                $stmt = $pdo->prepare("SELECT r.*, p.prix FROM rendez_vous r JOIN prestations p ON r.service_id = p.id_service WHERE r.id = ? AND r.client_id = ?");
+                $stmt->execute([$id_rdv, $client_id]);
                 $rdv = $stmt->fetch();
 
                 if ($rdv) {
@@ -72,8 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_annuler'])) {
 
                     $pdo->beginTransaction();
                     $pdo->prepare("UPDATE rendez_vous SET statut_rdv = 'annule' WHERE id = ?")->execute([$id_rdv]);
-                    if ($remboursement_client > 0)   $pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?")->execute([$remboursement_client, $id_client]);
-                    if ($dedommagement_coiffeur > 0) $pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?")->execute([$dedommagement_coiffeur, $rdv['coiffeur_id']]);
+                    if ($remboursement_client > 0)   $pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?")->execute([$remboursement_client, $client_id]);
+                    if ($dedommagement_coiffeur > 0) $pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?")->execute([$dedommagement_coiffeur, $rdv['prestataire_id']]);
                     $pdo->commit();
 
                     $message_flash = [
@@ -95,13 +95,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_annuler'])) {
 $rendezvous = [];
 if (isset($pdo)) {
     try {
-        $stmt = $pdo->prepare("SELECT r.*, p.nom_style, p.prix, u.nom AS coiffeur_nom, u.prenom AS coiffeur_prenom 
+        $stmt = $pdo->prepare("SELECT r.*, p.nom_service, p.prix, u.nom AS coiffeur_nom, u.prenom AS coiffeur_prenom 
                                FROM rendez_vous r 
-                               JOIN prestations p ON r.coiffure_id = p.id_prestation 
-                               JOIN users u ON r.coiffeur_id = u.id 
+                               JOIN prestations p ON r.service_id = p.id_service 
+                               JOIN users u ON r.prestataire_id = u.id 
                                WHERE r.client_id = ? 
                                ORDER BY r.date_rdv DESC, r.heure_debut DESC");
-        $stmt->execute([$id_client]);
+        $stmt->execute([$client_id]);
         $rendezvous = $stmt->fetchAll();
     } catch (Exception $e) {}
 }
@@ -210,7 +210,7 @@ endif; ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <span style="font-weight:700;"><?= htmlspecialchars($rdv['nom_style']) ?></span><br>
+                                        <span style="font-weight:700;"><?= htmlspecialchars($rdv['nom_service']) ?></span><br>
                                         <small style="color:var(--success-text);font-weight:700;">
                                             <?= number_format($rdv['prix'], 0, ',', ' ') ?> FCFA
                                         </small>
@@ -226,7 +226,7 @@ endif; ?>
                                             <i class="bi bi-gear me-1" aria-hidden="true"></i>Gérer
                                         </button>
                                         <?php if ($rdv['statut_rdv'] === 'termine'): ?>
-                                        <a href="/coiffons/client/laisser_avis.php?id_rdv=<?= $rdv['id'] ?>&id_coiffeur=<?= $rdv['coiffeur_id'] ?>"
+                                        <a href="/coiffons/client/laisser_avis.php?id_rdv=<?= $rdv['id'] ?>&prestataire_id=<?= $rdv['prestataire_id'] ?>"
                                            class="btn-gold btn-sm ms-1"
                                            aria-label="Laisser un avis pour ce RDV">
                                             <i class="bi bi-star me-1" aria-hidden="true"></i>Avis
@@ -251,7 +251,7 @@ endif; ?>
                             </span>
                             <?= badge_rdv($rdv['statut_rdv']) ?>
                         </div>
-                        <div class="rdv-card-style mb-1"><?= htmlspecialchars($rdv['nom_style']) ?></div>
+                        <div class="rdv-card-style mb-1"><?= htmlspecialchars($rdv['nom_service']) ?></div>
                         <div class="rdv-card-prix mb-3"><?= number_format($rdv['prix'], 0, ',', ' ') ?> FCFA</div>
                         <button class="btn-outline-gold btn-sm w-100"
                                 onclick="openModal('modal-rdv-<?= $rdv['id'] ?>')"
@@ -259,7 +259,7 @@ endif; ?>
                             <i class="bi bi-gear me-1" aria-hidden="true"></i>Gérer la réservation
                         </button>
                         <?php if ($rdv['statut_rdv'] === 'termine'): ?>
-                        <a href="/coiffons/client/laisser_avis.php?id_rdv=<?= $rdv['id'] ?>&id_coiffeur=<?= $rdv['coiffeur_id'] ?>"
+                        <a href="/coiffons/client/laisser_avis.php?id_rdv=<?= $rdv['id'] ?>&prestataire_id=<?= $rdv['prestataire_id'] ?>"
                            class="btn-gold btn-sm w-100 mt-2 d-flex align-items-center justify-content-center gap-1"
                            aria-label="Laisser un avis pour ce RDV">
                             <i class="bi bi-star" aria-hidden="true"></i>Laisser un avis
@@ -298,7 +298,7 @@ endif; ?>
         <div class="mb-4">
             <div style="border-bottom:1px solid var(--glass-border);padding-bottom:10px;margin-bottom:10px;">
                 <small style="color:var(--text-muted);display:block;">Style choisi</small>
-                <span style="font-weight:700;color:var(--gold);"><?= htmlspecialchars($rdv['nom_style']) ?></span>
+                <span style="font-weight:700;color:var(--gold);"><?= htmlspecialchars($rdv['nom_service']) ?></span>
             </div>
             <div style="border-bottom:1px solid var(--glass-border);padding-bottom:10px;margin-bottom:10px;">
                 <small style="color:var(--text-muted);display:block;">Artisan Coiffeur</small>

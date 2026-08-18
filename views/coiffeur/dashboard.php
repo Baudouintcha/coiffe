@@ -73,10 +73,10 @@ $notifs_list = [];
 try {
     // Stats du jour
     $q = $pdo->prepare("
-        SELECT COUNT(*) as nb, COALESCE(SUM(p.prix), 0) as gains
+        SELECT COUNT(*) as nb, COALESCE(SUM(s.prix), 0) as gains
         FROM rendez_vous r
-        JOIN prestations p ON r.coiffure_id = p.id_prestation
-        WHERE r.coiffeur_id = ? AND r.date_rdv = ?
+        JOIN services s ON r.service_id = s.id_service
+        WHERE r.prestataire_id = ? AND r.date_rdv = ?
         AND r.statut_rdv IN ('confirme', 'accepte', 'termine')
     ");
     $q->execute([$coiffeur_id, $today]);
@@ -87,20 +87,20 @@ try {
     // Demandes en attente
     $q2 = $pdo->prepare("
         SELECT COUNT(*) FROM rendez_vous
-        WHERE coiffeur_id = ? AND statut_rdv = 'en_attente'
+        WHERE prestataire_id = ? AND statut_rdv = 'en_attente'
     ");
     $q2->execute([$coiffeur_id]);
     $demandes_attente = intval($q2->fetchColumn());
 
     // Prochain RDV (le plus proche dans le futur)
     $q3 = $pdo->prepare("
-        SELECT r.*, p.nom_style, u.nom as client_nom, u.prenom as client_prenom,
+        SELECT r.*, s.nom_service, u.nom as client_nom, u.prenom as client_prenom,
                u.photo_profil as client_photo, u.telephone as client_tel,
                r.client_adresse_texte, r.client_gps_lat, r.client_gps_lng
         FROM rendez_vous r
-        JOIN prestations p ON r.coiffure_id = p.id_prestation
+        JOIN services s ON r.service_id = s.id_service
         JOIN users u ON r.client_id = u.id
-        WHERE r.coiffeur_id = ?
+        WHERE r.prestataire_id = ?
         AND r.statut_rdv IN ('confirme', 'accepte', 'en_attente')
         AND CONCAT(r.date_rdv, ' ', r.heure_debut) >= NOW()
         ORDER BY r.date_rdv ASC, r.heure_debut ASC
@@ -111,12 +111,12 @@ try {
 
     // Planning du jour
     $q4 = $pdo->prepare("
-        SELECT r.*, p.nom_style, p.duree, u.nom as client_nom, u.prenom as client_prenom,
+        SELECT r.*, s.nom_service, s.duree, u.nom as client_nom, u.prenom as client_prenom,
                u.photo_profil as client_photo, r.client_adresse_texte
         FROM rendez_vous r
-        JOIN prestations p ON r.coiffure_id = p.id_prestation
+        JOIN services s ON r.service_id = s.id_service
         JOIN users u ON r.client_id = u.id
-        WHERE r.coiffeur_id = ? AND r.date_rdv = ?
+        WHERE r.prestataire_id = ? AND r.date_rdv = ?
         ORDER BY r.heure_debut ASC
     ");
     $q4->execute([$coiffeur_id, $today]);
@@ -124,12 +124,12 @@ try {
 
     // Demandes en attente (liste)
     $q5 = $pdo->prepare("
-        SELECT r.*, p.nom_style, p.prix, u.nom as client_nom, u.prenom as client_prenom,
+        SELECT r.*, s.nom_service, s.prix, u.nom as client_nom, u.prenom as client_prenom,
                u.photo_profil as client_photo
         FROM rendez_vous r
-        JOIN prestations p ON r.coiffure_id = p.id_prestation
+        JOIN services s ON r.service_id = s.id_service
         JOIN users u ON r.client_id = u.id
-        WHERE r.coiffeur_id = ? AND r.statut_rdv = 'en_attente'
+        WHERE r.prestataire_id = ? AND r.statut_rdv = 'en_attente'
         ORDER BY r.date_demande DESC
         LIMIT 5
     ");
@@ -138,8 +138,8 @@ try {
 
     // Mes services (catalogue)
     $q6 = $pdo->prepare("
-        SELECT * FROM prestations WHERE id_coiffeur = ?
-        ORDER BY id_prestation DESC LIMIT 6
+        SELECT * FROM services WHERE id_prestataire = ?
+        ORDER BY id_service DESC LIMIT 6
     ");
     $q6->execute([$coiffeur_id]);
     $mes_services = $q6->fetchAll();
@@ -147,13 +147,13 @@ try {
     // Notifications
     $q7 = $pdo->prepare("
         SELECT COUNT(*) FROM notifications
-        WHERE id_user = ? AND statut_lecture = 'non_lu'
+        WHERE user_id = ? AND lu = 0
     ");
     $q7->execute([$coiffeur_id]);
     $nb_notifs = intval($q7->fetchColumn());
 
     $q8 = $pdo->prepare("
-        SELECT * FROM notifications WHERE id_user = ?
+        SELECT * FROM notifications WHERE user_id = ?
         ORDER BY date_notification DESC LIMIT 5
     ");
     $q8->execute([$coiffeur_id]);
@@ -169,15 +169,15 @@ $note_moy_dashboard = null;
 try {
     $q_avis = $pdo->prepare("
         SELECT c.*, u.nom as client_nom, u.prenom as client_prenom
-        FROM commentaires c
+        FROM avis c
         JOIN users u ON c.id_client = u.id
-        WHERE c.id_coiffeur = ? AND c.type_commentaire = 'public'
+        WHERE c.id_prestataire = ? AND c.type_commentaire = 'public'
         ORDER BY c.date_creation DESC LIMIT 3
     ");
     $q_avis->execute([$coiffeur_id]);
     $avis_recents = $q_avis->fetchAll();
 
-    $q_moy = $pdo->prepare("SELECT ROUND(AVG(note), 1) as moy FROM commentaires WHERE id_coiffeur = ? AND type_commentaire = 'public'");
+    $q_moy = $pdo->prepare("SELECT ROUND(AVG(note), 1) as moy FROM avis WHERE id_prestataire = ? AND type_commentaire = 'public'");
     $q_moy->execute([$coiffeur_id]);
     $note_moy_dashboard = $q_moy->fetchColumn() ?: null;
 } catch (Exception $e) {}
@@ -198,7 +198,7 @@ try {
     $dispo_count->execute([$coiffeur_id]);
     $checks['disponibilites'] = intval($dispo_count->fetchColumn()) > 0;
 
-    $zones_count = $pdo->prepare("SELECT COUNT(*) FROM zones_coiffeur WHERE id_coiffeur = ?");
+    $zones_count = $pdo->prepare("SELECT COUNT(*) FROM zones_prestataire WHERE id_prestataire = ?");
     $zones_count->execute([$coiffeur_id]);
     $checks['zones'] = intval($zones_count->fetchColumn()) > 0;
 } catch (Exception $e) {}
@@ -997,10 +997,10 @@ document.addEventListener('click', function(e) {
 
 <!-- ── FOOTER + IA ASSISTANT ── -->
 <?php
-include __DIR__ . '/../../views/components/footer_global.php';
-include __DIR__ . '/../../views/components/ia_assistant.php';
+include __DIR__ . '/../views/components/footer_global.php';
+include __DIR__ . '/../views/components/ia_assistant.php';
 $current_page = 'dashboard_coiffeur';
-include __DIR__ . '/../../views/components/bottom_nav_client.php';
+include __DIR__ . '/../views/components/bottom_nav_client.php';
 ?>
 
 </body>

@@ -4,7 +4,7 @@
  * Migration Design System v2.0 — Parcours Client — Page 3
  *
  * ⚠️  LOGIQUE MÉTIER INTACTE — SQL, logique propriétaire, liens inchangés.
- *     Correction : lien profil unifié sur ?id= (était ?id_coiffeur= dans les anciennes copies).
+ *     Correction : lien profil unifié sur ?id= (était ?prestataire_id= dans les anciennes copies).
  */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -13,7 +13,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../security/config.php';
 
 // Identification du rôle courant — inchangé
-$id_coiffeur_connecte = (isset($_SESSION['id_user']) && isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur')
+$prestataire_id_connecte = (isset($_SESSION['id_user']) && isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur')
     ? intval($_SESSION['id_user'])
     : null;
 
@@ -22,10 +22,10 @@ $stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone,
                             v.nom_ville AS ville,
                             q.nom_quartier AS quartier
                      FROM prestations p
-                     JOIN users u ON p.id_coiffeur = u.id
+                     JOIN users u ON p.prestataire_id = u.id
                      LEFT JOIN villes v ON u.ville = v.id
                      LEFT JOIN quartiers q ON u.id_quartier = q.id
-                     ORDER BY p.id_prestation DESC");
+                     ORDER BY p.id_service DESC");
 $prestations = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
@@ -97,23 +97,23 @@ include __DIR__ . '/../views/components/navbar_client.php';
                 <?php foreach ($prestations as $p):
                     $explode_desc         = explode("|||", $p['description']);
                     $description_affichage = $explode_desc[0] ?? '';
-                    $est_le_proprietaire  = ($id_coiffeur_connecte !== null && $id_coiffeur_connecte === intval($p['id_coiffeur']));
+                    $est_le_proprietaire  = ($prestataire_id_connecte !== null && $prestataire_id_connecte === intval($p['prestataire_id']));
                     // Lien unifié sur ?id= (conforme à profil_public.php migré)
-                    $lien_profil = '/coiffons/coiffeurs/profil_public.php?id=' . $p['id_coiffeur'];
-                    $photo_url   = (!empty($p['photo_style']) && file_exists(__DIR__ . '/../' . $p['photo_style']))
-                                   ? '/coiffons/' . $p['photo_style']
+                    $lien_profil = '/coiffons/coiffeurs/profil_public.php?id=' . $p['prestataire_id'];
+                    $photo_url   = (!empty($p['photo']) && file_exists(__DIR__ . '/../' . $p['photo']))
+                                   ? '/coiffons/' . $p['photo']
                                    : null;
                 ?>
                     <div class="col-12 col-sm-6 col-lg-4">
                         <article class="catalogue-card catalogue-card-js"
                                  data-href="<?= !$est_le_proprietaire ? htmlspecialchars($lien_profil) : '#' ?>"
-                                 aria-label="<?= htmlspecialchars($p['nom_style']) ?> — <?= htmlspecialchars($p['nom'] . ' ' . $p['prenom']) ?>">
+                                 aria-label="<?= htmlspecialchars($p['nom_service']) ?> — <?= htmlspecialchars($p['nom'] . ' ' . $p['prenom']) ?>">
 
                             <!-- Image -->
                             <?php if ($photo_url): ?>
                                 <img src="<?= htmlspecialchars($photo_url) ?>"
                                      class="catalogue-card-img"
-                                     alt="<?= htmlspecialchars($p['nom_style']) ?>"
+                                     alt="<?= htmlspecialchars($p['nom_service']) ?>"
                                      loading="lazy">
                             <?php else: ?>
                                 <div class="catalogue-card-img-placeholder" aria-hidden="true">
@@ -123,7 +123,7 @@ include __DIR__ . '/../views/components/navbar_client.php';
 
                             <!-- Body -->
                             <div class="catalogue-card-body">
-                                <div class="catalogue-card-style"><?= htmlspecialchars($p['nom_style']) ?></div>
+                                <div class="catalogue-card-style"><?= htmlspecialchars($p['nom_service']) ?></div>
                                 <div class="catalogue-card-prix"><?= number_format($p['prix'], 0, ',', ' ') ?> FCFA</div>
                                 <?php if (!empty($description_affichage)): ?>
                                     <p class="catalogue-card-desc"><?= htmlspecialchars($description_affichage) ?></p>
@@ -143,23 +143,23 @@ include __DIR__ . '/../views/components/navbar_client.php';
                             <div class="catalogue-card-footer">
                                 <?php if ($est_le_proprietaire): ?>
                                     <div class="d-flex gap-2">
-                                        <a href="/coiffons/coiffeurs/gestion_catalogue.php?ouvrir_modifier=<?= $p['id_prestation'] ?>"
+                                        <a href="/coiffons/coiffeurs/gestion_catalogue.php?ouvrir_modifier=<?= $p['id_service'] ?>"
                                            class="btn-edit-owner action-btn-js"
-                                           aria-label="Modifier <?= htmlspecialchars($p['nom_style']) ?>">
+                                           aria-label="Modifier <?= htmlspecialchars($p['nom_service']) ?>">
                                             <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Éditer
                                         </a>
-                                        <a href="/coiffons/coiffeurs/gestion_catalogue.php?supprimer=<?= $p['id_prestation'] ?>"
+                                        <a href="/coiffons/coiffeurs/gestion_catalogue.php?supprimer=<?= $p['id_service'] ?>"
                                            class="btn-del-owner action-btn-js"
                                            onclick="return confirm('Supprimer définitivement ce style ?')"
-                                           aria-label="Supprimer <?= htmlspecialchars($p['nom_style']) ?>">
+                                           aria-label="Supprimer <?= htmlspecialchars($p['nom_service']) ?>">
                                             <i class="bi bi-trash3-fill" aria-hidden="true"></i>
                                         </a>
                                     </div>
                                 <?php else: ?>
-                                    <a href="<?= htmlspecialchars($lien_profil) ?>&presta_id=<?= $p['id_prestation'] ?>"
+                                    <a href="<?= htmlspecialchars($lien_profil) ?>&presta_id=<?= $p['id_service'] ?>"
                                        class="btn-gold w-100 action-btn-js"
                                        style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;"
-                                       aria-label="Voir le profil et réserver <?= htmlspecialchars($p['nom_style']) ?>">
+                                       aria-label="Voir le profil et réserver <?= htmlspecialchars($p['nom_service']) ?>">
                                         <i class="bi bi-eye-fill" aria-hidden="true"></i>
                                         Voir le profil &amp; Réserver
                                     </a>

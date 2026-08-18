@@ -10,7 +10,7 @@
  * Usage :
  *   $payment = new PaymentService($pdo);
  *   $result  = $payment->rechargerPortefeuille($id_user, $montant, 'simulation');
- *   $result  = $payment->activerAbonnement($id_coiffeur, 1500, 30, 'simulation');
+ *   $result  = $payment->activerAbonnement($prestataire_id, 1500, 30, 'simulation');
  */
 
 class PaymentService
@@ -63,16 +63,16 @@ class PaymentService
     /**
      * Active ou renouvelle l'abonnement mensuel d'un coiffeur.
      *
-     * @param int    $id_coiffeur   ID coiffeur
+     * @param int    $prestataire_id   ID coiffeur
      * @param float  $prix          Prix de l'abonnement (FCFA)
      * @param int    $duree_jours   Durée en jours (défaut: 30)
      * @param string $mode          'simulation' | 'kkiapay'
      * @return array ['success'=>bool, 'message'=>string, 'date_expiration'=>string]
      */
-    public function activerAbonnement(int $id_coiffeur, float $prix = 1500, int $duree_jours = 30, string $mode = self::MODE_SIMULATION): array
+    public function activerAbonnement(int $prestataire_id, float $prix = 1500, int $duree_jours = 30, string $mode = self::MODE_SIMULATION): array
     {
         if ($mode === self::MODE_SIMULATION) {
-            return $this->_simulerAbonnement($id_coiffeur, $prix, $duree_jours);
+            return $this->_simulerAbonnement($prestataire_id, $prix, $duree_jours);
         }
 
         // Futur : appel Kkiapay + webhook ici
@@ -86,16 +86,16 @@ class PaymentService
     /**
      * Déduit un montant du solde client pour sécuriser une réservation.
      *
-     * @param int   $id_client ID client
+     * @param int   $client_id ID client
      * @param float $montant   Montant à geler
      * @param int   $id_rdv    ID rendez-vous
      * @return array ['success'=>bool, 'message'=>string, 'solde_restant'=>float]
      */
-    public function gelerFonds(int $id_client, float $montant, int $id_rdv): array
+    public function gelerFonds(int $client_id, float $montant, int $id_rdv): array
     {
         try {
             $stmt = $this->pdo->prepare("SELECT solde FROM users WHERE id = ?");
-            $stmt->execute([$id_client]);
+            $stmt->execute([$client_id]);
             $solde = (float)$stmt->fetchColumn();
 
             if ($solde < $montant) {
@@ -107,11 +107,11 @@ class PaymentService
 
             $this->pdo->beginTransaction();
             $this->pdo->prepare("UPDATE users SET solde = solde - ? WHERE id = ?")
-                      ->execute([$montant, $id_client]);
+                      ->execute([$montant, $client_id]);
             $this->pdo->prepare(
                 "INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_creation)
                  VALUES (?, 'gel_rdv', ?, ?, NOW())"
-            )->execute([$id_client, -$montant, "Gel fonds RDV #$id_rdv"]);
+            )->execute([$client_id, -$montant, "Gel fonds RDV #$id_rdv"]);
             $this->pdo->commit();
 
             return [
@@ -156,7 +156,7 @@ class PaymentService
         }
     }
 
-    private function _simulerAbonnement(int $id_coiffeur, float $prix, int $duree_jours): array
+    private function _simulerAbonnement(int $prestataire_id, float $prix, int $duree_jours): array
     {
         try {
             $this->pdo->beginTransaction();
@@ -166,12 +166,12 @@ class PaymentService
 
             $this->pdo->prepare(
                 "UPDATE users SET abonnement_status = 1, date_expiration_abo = ? WHERE id = ?"
-            )->execute([$nouvelle_expiration, $id_coiffeur]);
+            )->execute([$nouvelle_expiration, $prestataire_id]);
 
             $this->pdo->prepare(
                 "INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_creation)
                  VALUES (?, 'abonnement', ?, ?, NOW())"
-            )->execute([$id_coiffeur, -$prix, "Abonnement mensuel (simulation) — expire le $nouvelle_expiration"]);
+            )->execute([$prestataire_id, -$prix, "Abonnement mensuel (simulation) — expire le $nouvelle_expiration"]);
 
             $this->pdo->commit();
 
@@ -181,7 +181,7 @@ class PaymentService
                 $stmt_check = $this->pdo->prepare(
                     "SELECT id, nom, prenom, diplome, is_approved FROM users WHERE id = ?"
                 );
-                $stmt_check->execute([$id_coiffeur]);
+                $stmt_check->execute([$prestataire_id]);
                 $coiffeur_data = $stmt_check->fetch();
 
                 if ($coiffeur_data && !empty($coiffeur_data['diplome']) && !$coiffeur_data['is_approved']) {
@@ -196,8 +196,8 @@ class PaymentService
                                   . "Veuillez valider son profil dans le tableau de bord admin.";
 
                     $stmt_notif = $this->pdo->prepare(
-                        "INSERT INTO notifications (id_user, message, type, statut_lecture, date_notification)
-                         VALUES (?, ?, 'info', 'non_lu', NOW())"
+                        "INSERT INTO notifications (id_user, message, type, lu, date_notification)
+                         VALUES (?, ?, 'info', 0, NOW())"
                     );
                     foreach ($admins as $admin) {
                         $stmt_notif->execute([$admin['id'], $msg_admin]);

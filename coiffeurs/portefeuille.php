@@ -18,7 +18,7 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
     exit();
 }
 
-$id_coiffeur = $_SESSION['id_user'];
+$prestataire_id = $_SESSION['id_user'];
 
 // 2. Token CSRF — inchangé
 if (empty($_SESSION['csrf_token'])) {
@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (isset($_POST['status'])) {
         $nouveau_statut = (int)$_POST['status'];
         $stmt_update = $pdo->prepare("UPDATE users SET renouvellement_auto = ? WHERE id = ?");
-        $stmt_update->execute([$nouveau_statut, $id_coiffeur]);
+        $stmt_update->execute([$nouveau_statut, $prestataire_id]);
         header('Location: portefeuille.php');
         exit();
     }
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // 4. RÉCUPÉRATION abonnement — inchangé
 $stmt_coiffeur = $pdo->prepare("SELECT abonnement_status, date_expiration_abo, renouvellement_auto FROM users WHERE id = ?");
-$stmt_coiffeur->execute([$id_coiffeur]);
+$stmt_coiffeur->execute([$prestataire_id]);
 $info_coiffeur = $stmt_coiffeur->fetch();
 
 $date_expiration    = $info_coiffeur['date_expiration_abo'] ?? null;
@@ -77,19 +77,19 @@ $commission_pourcentage = 0.05;
 
 // 6. CALCUL SOLDE — inchangé
 $stmt_solde = $pdo->prepare("SELECT SUM(montant) AS solde_reel FROM transactions_portefeuille WHERE user_id = ?");
-$stmt_solde->execute([$id_coiffeur]);
+$stmt_solde->execute([$prestataire_id]);
 $solde_data       = $stmt_solde->fetch();
 $solde_disponible = $solde_data['solde_reel'] ?? 0;
 
 $stmt_brut = $pdo->prepare("SELECT SUM(montant) AS total_brut FROM transactions_portefeuille WHERE user_id = ? AND type_transaction = 'gain'");
-$stmt_brut->execute([$id_coiffeur]);
+$stmt_brut->execute([$prestataire_id]);
 $brut_data         = $stmt_brut->fetch();
 $total_gains_bruts = $brut_data['total_brut'] ?? 0;
 $total_commissions = $total_gains_bruts * $commission_pourcentage;
 
 // 7. HISTORIQUE — inchangé
 $stmt_complet = $pdo->prepare("SELECT * FROM transactions_portefeuille WHERE user_id = ? ORDER BY date_creation DESC");
-$stmt_complet->execute([$id_coiffeur]);
+$stmt_complet->execute([$prestataire_id]);
 $historique_complet = $stmt_complet->fetchAll();
 $historique_apercu  = array_slice($historique_complet, 0, 5);
 

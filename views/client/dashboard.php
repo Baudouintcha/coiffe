@@ -37,7 +37,7 @@ if ($photo_profil) {
 $nb_notifs = 0;
 if (isset($pdo) && $id_user > 0) {
     try {
-        $q_notifs = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE id_user = ? AND statut_lecture = 'non_lu'");
+        $q_notifs = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND lu = 0");
         $q_notifs->execute([$id_user]);
         $nb_notifs = (int)$q_notifs->fetchColumn();
     } catch (Exception $e) {}
@@ -152,7 +152,7 @@ include __DIR__ . '/../../views/components/hero_capsule.php';
                     $is_verified   = (bool)($c['is_approved'] ?? false);
                     
                     // Photo de style comme cover
-                    $photo_style_c = $c['photo_style'] ?? null;
+                    $photo_style_c = $c['photo'] ?? null;
                     $photo_cover_url = null;
                     if ($photo_style_c && file_exists(__DIR__ . '/../../uploads/' . $photo_style_c)) {
                         $photo_cover_url = '/coiffons/uploads/' . htmlspecialchars($photo_style_c);
@@ -258,10 +258,10 @@ include __DIR__ . '/../../views/components/hero_capsule.php';
      FOOTER + IA + BOTTOM NAV
      ══════════════════════════ -->
 <?php
-include __DIR__ . '/../../views/components/footer_global.php';
-include __DIR__ . '/../../views/components/ia_assistant.php';
+include __DIR__ . '/../components/footer_global.php';
+include __DIR__ . '/../components/ia_assistant.php';
 $current_page = 'dashboard';
-include __DIR__ . '/../../views/components/bottom_nav_client.php';
+include __DIR__ . '/../components/bottom_nav_client.php';
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

@@ -66,10 +66,10 @@ if ($user['role'] === 'coiffeur') {
     try { $s = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE coiffeur_id = ? AND statut_rdv = 'en_attente'"); $s->execute([$user_id]); $bloc1_val = intval($s->fetchColumn()); } catch (Exception $e) {}
 
     $bloc2_lbl = "Gains sécurisés"; $bloc2_icon = "bi-shield-lock"; $bloc2_link = "#solde-section"; $bloc2_sub = "Rendez-vous à venir";
-    try { $s = $pdo->prepare("SELECT SUM(p.prix) FROM rendez_vous r JOIN prestations p ON r.coiffure_id = p.id_prestation WHERE r.coiffeur_id = ? AND r.statut_rdv IN ('en_attente', 'accepte')"); $s->execute([$user_id]); $bloc2_val = number_format($s->fetchColumn() ?? 0, 0, ',', ' ') . " <span style='font-size:0.75rem;'>FCFA</span>"; } catch (Exception $e) { $bloc2_val = "0 FCFA"; }
+    try { $s = $pdo->prepare("SELECT SUM(s.prix) FROM rendez_vous r JOIN services s ON r.service_id = s.id_service WHERE r.prestataire_id = ? AND r.statut_rdv IN ('en_attente', 'confirme')"); $s->execute([$user_id]); $bloc2_val = number_format($s->fetchColumn() ?? 0, 0, ',', ' ') . " <span style='font-size:0.75rem;'>FCFA</span>"; } catch (Exception $e) { $bloc2_val = "0 FCFA"; }
 
     $bloc3_lbl = "Quartiers couverts"; $bloc3_icon = "bi-geo-alt"; $bloc3_link = "/coiffons/coiffeurs/mes_zones.php"; $bloc3_sub = "Modifier mes zones →";
-    try { $s = $pdo->prepare("SELECT COUNT(*) FROM zones_coiffeur WHERE id_coiffeur = ?"); $s->execute([$user_id]); $bloc3_val = intval($s->fetchColumn()) . " <span style='font-size:0.75rem;color:var(--text-muted)'>zones</span>"; } catch (Exception $e) { $bloc3_val = "0"; }
+    try { $s = $pdo->prepare("SELECT COUNT(*) FROM zones_prestataire WHERE id_prestataire = ?"); $s->execute([$user_id]); $bloc3_val = intval($s->fetchColumn()) . " <span style='font-size:0.75rem;color:var(--text-muted)'>zones</span>"; } catch (Exception $e) { $bloc3_val = "0"; }
 
     $bloc4_lbl = "Clients fidélisés"; $bloc4_icon = "bi-people"; $bloc4_link = "#"; $bloc4_sub = "Total clients uniques";
     try { $s = $pdo->prepare("SELECT COUNT(DISTINCT client_id) FROM rendez_vous WHERE coiffeur_id = ?"); $s->execute([$user_id]); $bloc4_val = intval($s->fetchColumn()); } catch (Exception $e) { $bloc4_val = 0; }
@@ -568,7 +568,7 @@ new Chart(ctxRdv, {
     data: {
         labels: ['En attente', 'Acceptés', 'Terminés', 'Annulés'],
         datasets: [{
-            data: [<?= $stats_rdv['en_attente'] ?>,<?= $stats_rdv['accepte'] ?>,<?= $stats_rdv['termine'] ?>,<?= $stats_rdv['annule'] ?>],
+            data: [<?= ($stats_rdv['en_attente'] ?? 0) ?>,<?= ($stats_rdv['accepte'] ?? 0) ?>,<?= ($stats_rdv['termine'] ?? 0) ?>,<?= ($stats_rdv['annule'] ?? 0) ?>],
             backgroundColor: ['#D4AF37','#6EE7B7','#60A5FA','#FF6B6B'],
             borderWidth: 0
         }]
