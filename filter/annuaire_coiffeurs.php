@@ -25,7 +25,7 @@ require_once __DIR__ . '/../security/config.php';
 // ─────────────────────────────────────────────
 // 1. DÉTECTION RÔLE & LOCALISATION
 // ─────────────────────────────────────────────
-$est_client_connecte = isset($_SESSION['id_user']) && ($_SESSION['role'] ?? '') === 'client';
+$est_client_connecte = isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'client';
 
 // Localisation session client
 $ville_session    = $est_client_connecte ? (int)($_SESSION['id_ville']       ?? 0) : 0;
@@ -64,13 +64,13 @@ if ($search_type === 'name') {
                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
                    FROM users u
-                   LEFT JOIN villes v ON u.ville = v.id
+                   LEFT JOIN villes v ON u.id_ville = v.id
                    LEFT JOIN quartiers q ON u.id_quartier = q.id
                    WHERE u.role = 'coiffeur'
                      AND u.is_approved = 1
                      AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')
                      AND (u.nom LIKE ? OR u.prenom LIKE ? OR CONCAT(u.prenom,' ',u.nom) LIKE ? OR CONCAT(u.nom,' ',u.prenom) LIKE ?)
-                   ORDER BY note_moyenne DESC, nb_avis DESC, u.created_at DESC";
+                   ORDER BY note_moyenne DESC, nb_avis DESC, u.date_demande DESC";
         $frag      = '%' . $q . '%';
         $params   = [$frag, $frag, $frag, $frag];
 
@@ -90,13 +90,13 @@ if ($search_type === 'name') {
                        (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
                        (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
                    FROM users u
-                   LEFT JOIN villes v ON u.ville = v.id
+                   LEFT JOIN villes v ON u.id_ville = v.id
                    LEFT JOIN quartiers q ON u.id_quartier = q.id
                    WHERE u.role = 'coiffeur'
                      AND u.is_approved = 1
                      AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')
-                     AND u.ville = ?
-                   ORDER BY note_moyenne DESC, nb_avis DESC, u.created_at DESC";
+                     AND u.id_ville = ?
+                   ORDER BY note_moyenne DESC, nb_avis DESC, u.date_demande DESC";
         $params = [$ville_filtre];
 
         try {
@@ -114,16 +114,16 @@ if ($search_type === 'name') {
                    (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
                    (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
                FROM users u
-               LEFT JOIN villes v ON u.ville = v.id
+               LEFT JOIN villes v ON u.id_ville = v.id
                LEFT JOIN quartiers q ON u.id_quartier = q.id
-               LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+               LEFT JOIN zones_prestataire z ON u.id = z.id_prestataire
                WHERE u.role = 'coiffeur'
                  AND u.is_approved = 1
                  AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')";
     $params = [];
 
     if ($ville_filtre > 0) {
-        $sql      .= " AND u.ville = ?";
+        $sql      .= " AND u.id_ville = ?";
         $params[]  = $ville_filtre;
     }
     if ($quartier_filtre > 0) {
@@ -131,7 +131,7 @@ if ($search_type === 'name') {
         $params[]  = $quartier_filtre;
         $params[]  = $quartier_filtre;
     }
-    $sql .= " ORDER BY note_moyenne DESC, nb_avis DESC, u.created_at DESC";
+    $sql .= " ORDER BY note_moyenne DESC, nb_avis DESC, u.date_demande DESC";
 
     try {
         $stmt     = $pdo->prepare($sql);

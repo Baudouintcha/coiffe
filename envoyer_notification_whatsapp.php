@@ -27,7 +27,7 @@ $sql = "
     FROM rendez_vous r
     JOIN users u ON r.id_client = u.id
     LEFT JOIN commentaires c ON r.id = c.id_rendez_vous
-    WHERE CONCAT(r.date_rdv, ' ', r.heure_rdv) < NOW()
+    WHERE CONCAT(r.date_rdv, ' ', r.heure_debut) < NOW()
       AND r.statut != 'annule'
       AND c.id_commentaire IS NULL
       AND r.whatsapp_envoye = 0

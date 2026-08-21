@@ -12,12 +12,12 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../security/config.php';
 
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'prestataire') {
     header('Location: /coiffons/index.php?page=login');
     exit();
 }
 
-$id_coiffeur = $_SESSION['id_user'];
+$id_coiffeur = $_SESSION['user_id'];
 
 // Note moyenne + total avis
 try {
@@ -58,7 +58,7 @@ try {
          WHERE c.id_coiffeur = ?
            AND c.type_commentaire = 'public'
            AND c.statut_moderation != 'rejete'
-         ORDER BY c.date_creation DESC
+         ORDER BY c.date_demande DESC
          LIMIT 20"
     );
     $stmt_avis->execute([$id_coiffeur]);
@@ -142,14 +142,14 @@ include __DIR__ . '/../views/components/action_bar.php';
             $nom_masque    = strtoupper(substr($avis['client_nom'] ?? 'C', 0, 1)) . '.';
 
             // Date relative
-            $date_obj = new DateTime($avis['date_creation'] ?? 'now');
+            $date_obj = new DateTime($avis['date_demande'] ?? 'now');
             $now_obj  = new DateTime();
             $diff_d   = (int)$now_obj->diff($date_obj)->days;
             if ($diff_d === 0)       $date_rel = "Aujourd'hui";
             elseif ($diff_d === 1)   $date_rel = "Hier";
             elseif ($diff_d < 7)     $date_rel = "Il y a $diff_d jours";
             elseif ($diff_d < 30)    $date_rel = "Il y a " . floor($diff_d / 7) . " sem.";
-            else                     $date_rel = date('d/m/Y', strtotime($avis['date_creation']));
+            else                     $date_rel = date('d/m/Y', strtotime($avis['date_demande']));
         ?>
             <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:14px;align-items:flex-start;">
                 <!-- Initiale avatar -->

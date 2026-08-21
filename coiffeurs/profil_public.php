@@ -18,7 +18,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../security/config.php';
 
-$est_connecte = isset($_SESSION['id_user']) && !empty($_SESSION['role']) && $_SESSION['role'] !== 'invite';
+$est_connecte = isset($_SESSION['user_id']) && !empty($_SESSION['role']) && $_SESSION['role'] !== 'invite';
 
 $prestataire_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT)
             ?? filter_input(INPUT_GET, 'prestataire_id', FILTER_VALIDATE_INT);
@@ -31,12 +31,13 @@ if (!$prestataire_id) {
 try {
     // Coiffeur — SQL inchangé
     $stmt = $pdo->prepare("
-        SELECT u.*, v.nom_ville, q.nom_quartier
+        SELECT u.*, v.nom_ville, q.nom_quartier, pp.abonnement_status
         FROM users u
-        LEFT JOIN villes v ON u.ville = v.id
+        LEFT JOIN profils_prestataires pp ON pp.user_id = u.id
+        LEFT JOIN villes v ON u.id_ville = v.id
         LEFT JOIN quartiers q ON u.id_quartier = q.id
         WHERE u.id = ? AND LOWER(u.role) = 'coiffeur'
-        AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')
+        AND (pp.abonnement_status = 1 OR LOWER(pp.abonnement_status) = 'actif')
     ");
     $stmt->execute([$prestataire_id]);
     $coiffeur = $stmt->fetch();
@@ -47,19 +48,18 @@ try {
     }
 
     // Prestations — SQL inchangé
-    $stmt_presta = $pdo->prepare("SELECT * FROM prestations WHERE prestataire_id = ? ORDER BY id_service ASC");
+    $stmt_presta = $pdo->prepare("SELECT * FROM services WHERE id_prestataire = ? ORDER BY id_service ASC");
     $stmt_presta->execute([$prestataire_id]);
     $prestations = $stmt_presta->fetchAll();
 
     // Avis — SQL inchangé
     try {
         $stmt_avis = $pdo->prepare("
-            SELECT c.*, u.nom as client_nom, u.prenom as client_prenom
-            FROM commentaires c
-            JOIN users u ON c.client_id = u.id
-            WHERE c.prestataire_id = ? AND c.type = 'public'
-              AND c.statut_moderation != 'rejete'
-            ORDER BY c.date_creation DESC LIMIT 5
+            SELECT a.*, u.nom as client_nom, u.prenom as client_prenom
+            FROM avis a
+            JOIN users u ON a.client_id = u.id
+            WHERE a.prestataire_id = ? AND a.type = 'public'
+            ORDER BY a.date_creation DESC LIMIT 5
         ");
         $stmt_avis->execute([$prestataire_id]);
         $avis_publics = $stmt_avis->fetchAll();
@@ -67,7 +67,7 @@ try {
 
     // Note moyenne — SQL inchangé
     try {
-        $stmt_note = $pdo->prepare("SELECT AVG(note) as moy, COUNT(*) as nb FROM commentaires WHERE prestataire_id = ?");
+        $stmt_note = $pdo->prepare("SELECT AVG(note) as moy, COUNT(*) as nb FROM avis WHERE prestataire_id = ? AND type = 'public'");
         $stmt_note->execute([$prestataire_id]);
         $stats_note   = $stmt_note->fetch();
         $note_moyenne = $stats_note['nb'] > 0 ? round($stats_note['moy'], 1) : null;
@@ -531,7 +531,7 @@ include __DIR__ . '/../views/components/navbar_client.php';
                     $note_av  = intval($avis['note'] ?? 0);
                     $init_av  = strtoupper(substr($avis['client_nom'] ?? 'C', 0, 1));
                     $masque   = strtoupper(substr($avis['client_prenom'] ?? 'C', 0, 1)) . '***';
-                    $d_av     = new DateTime($avis['date_creation'] ?? 'now');
+                    $d_av     = new DateTime($avis['date_demande'] ?? 'now');
                     $diff_av  = (new DateTime())->diff($d_av);
                     $date_r   = $diff_av->days === 0 ? "Aujourd'hui"
                               : ($diff_av->days === 1 ? "Hier" : "Il y a {$diff_av->days} jours");

@@ -107,7 +107,7 @@ try {
     $countClients = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'client'")->fetchColumn();
     echo "  → Clients : $countClients\n";
     
-    $countCoiffeurs = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'coiffeur'")->fetchColumn();
+    $countCoiffeurs = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'prestataire'")->fetchColumn();
     echo "  → Coiffeurs : $countCoiffeurs\n";
     
     $countAdmins = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();

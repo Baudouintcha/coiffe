@@ -46,9 +46,9 @@ if (!function_exists('run_notifications_cron')) {
                    AND r.statut_rdv = 'en_attente'
                    AND NOT EXISTS (
                        SELECT 1 FROM notifications n
-                       WHERE n.id_user = r.client_id
+                       WHERE n.user_id = r.client_id
                          AND n.message LIKE CONCAT('%RDV demain%', r.id, '%')
-                         AND n.date_notification >= CURDATE()
+                         AND n.date_demande >= CURDATE()
                    )"
             );
             $rdvs = $stmt->fetchAll();
@@ -71,21 +71,21 @@ if (!function_exists('run_notifications_cron')) {
     function _cron_clients_avis_non_laisse(PDO $pdo): void {
         try {
             $stmt = $pdo->query(
-                "SELECT r.client_id, r.id AS id_rdv, r.coiffeur_id
+                "SELECT r.client_id, r.id AS id_rdv, r.prestataire_id
                  FROM rendez_vous r
                  WHERE r.statut_rdv = 'termine'
                    AND r.date_rdv <= DATE_SUB(CURDATE(), INTERVAL 3 DAY)
                    AND NOT EXISTS (
                        SELECT 1 FROM avis a
                        WHERE a.client_id = r.client_id
-                         AND a.coiffeur_id = r.coiffeur_id
+                         AND a.prestataire_id = r.prestataire_id
                          AND a.rdv_id = r.id
                    )
                    AND NOT EXISTS (
                        SELECT 1 FROM notifications n
-                       WHERE n.id_user = r.client_id
+                       WHERE n.user_id = r.client_id
                          AND n.message LIKE CONCAT('%avis%', r.id, '%')
-                         AND n.date_notification >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)
+                         AND n.date_demande >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)
                    )"
             );
             $rdvs = $stmt->fetchAll();
@@ -114,14 +114,14 @@ if (!function_exists('run_notifications_cron')) {
             $stmt = $pdo->query(
                 "SELECT id, DATEDIFF(date_expiration_abo, CURDATE()) AS jours_restants
                  FROM users
-                 WHERE role = 'coiffeur'
+                 WHERE role = 'prestataire'
                    AND date_expiration_abo BETWEEN CURDATE()
                        AND DATE_ADD(CURDATE(), INTERVAL 5 DAY)
                    AND NOT EXISTS (
                        SELECT 1 FROM notifications n
-                       WHERE n.id_user = users.id
+                       WHERE n.user_id = users.id
                          AND n.message LIKE '%abonnement expire%'
-                         AND n.date_notification >= CURDATE()
+                         AND n.date_demande >= CURDATE()
                    )"
             );
             $coiffeurs = $stmt->fetchAll();
@@ -143,11 +143,11 @@ if (!function_exists('run_notifications_cron')) {
     function _cron_coiffeurs_rdv_en_attente(PDO $pdo): void {
         try {
             $stmt = $pdo->query(
-                "SELECT coiffeur_id, COUNT(*) AS nb
+                "SELECT prestataire_id, COUNT(*) AS nb
                  FROM rendez_vous
                  WHERE statut_rdv = 'en_attente'
-                   AND created_at <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
-                 GROUP BY coiffeur_id
+                   AND date_demande <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+                 GROUP BY prestataire_id
                  HAVING nb > 0"
             );
             $coiffeurs = $stmt->fetchAll();
@@ -160,12 +160,12 @@ if (!function_exists('run_notifications_cron')) {
                 // Éviter le doublon sur la même journée
                 $check = $pdo->prepare(
                     "SELECT COUNT(*) FROM notifications
-                     WHERE id_user = ? AND message LIKE '%demandes%attente%'
-                       AND date_notification >= CURDATE()"
+                     WHERE user_id = ? AND message LIKE '%demandes%attente%'
+                       AND date_demande >= CURDATE()"
                 );
-                $check->execute([(int) $c['coiffeur_id']]);
+                $check->execute([(int) $c['prestataire_id']]);
                 if ((int) $check->fetchColumn() === 0) {
-                    notifier($pdo, (int) $c['coiffeur_id'], $msg, 'warning');
+                    notifier($pdo, (int) $c['prestataire_id'], $msg, 'warning');
                 }
             }
         } catch (Exception $e) {
@@ -185,13 +185,13 @@ if (!function_exists('run_notifications_cron')) {
             $stmt = $pdo->query(
                 "SELECT id, nom, prenom
                  FROM users
-                 WHERE role = 'coiffeur'
+                 WHERE role = 'prestataire'
                    AND is_approved = 0
                    AND NOT EXISTS (
                        SELECT 1 FROM notifications n
-                       JOIN users a ON a.id = n.id_user AND a.role = 'admin'
+                       JOIN users a ON a.id = n.user_id AND a.role = 'admin'
                        WHERE n.message LIKE CONCAT('%coiffeur%', users.id, '%diplôme%')
-                         AND n.date_notification >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                         AND n.date_demande >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
                    )"
             );
             $coiffeurs = $stmt->fetchAll();

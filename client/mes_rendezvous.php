@@ -11,7 +11,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'client') {
     echo "<script>window.location.href='/coiffons/index.php?page=login';</script>";
     exit();
 }
@@ -22,7 +22,7 @@ if (empty($_SESSION['csrf_token'])) {
 
 require_once __DIR__ . '/../security/config.php';
 
-$client_id     = $_SESSION['id_user'];
+$client_id     = $_SESSION['user_id'];
 $message_flash = null;
 
 // ── Flash messages depuis traitement_avis.php et autres redirections ──
@@ -42,14 +42,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_annuler'])) {
         $id_rdv = intval($_POST['id_rdv']);
         if (isset($pdo)) {
             try {
-                $stmt = $pdo->prepare("SELECT r.*, p.prix FROM rendez_vous r JOIN prestations p ON r.service_id = p.id_service WHERE r.id = ? AND r.client_id = ?");
+                $stmt = $pdo->prepare("SELECT r.*, p.prix FROM rendez_vous r JOIN services p ON r.service_id = p.id_service WHERE r.id = ? AND r.client_id = ?");
                 $stmt->execute([$id_rdv, $client_id]);
                 $rdv = $stmt->fetch();
 
                 if ($rdv) {
-                    $date_heure_rdv  = new DateTime($rdv['date_rdv'] . ' ' . $rdv['heure_debut']);
+                    $date_heure_debut  = new DateTime($rdv['date_rdv'] . ' ' . $rdv['heure_debut']);
                     $maintenant      = new DateTime();
-                    $interval        = $maintenant->diff($date_heure_rdv);
+                    $interval        = $maintenant->diff($date_heure_debut);
                     $heures_restantes = ($interval->days * 24) + $interval->h;
                     if ($interval->invert) $heures_restantes = -1;
 
@@ -97,7 +97,7 @@ if (isset($pdo)) {
     try {
         $stmt = $pdo->prepare("SELECT r.*, p.nom_service, p.prix, u.nom AS coiffeur_nom, u.prenom AS coiffeur_prenom 
                                FROM rendez_vous r 
-                               JOIN prestations p ON r.service_id = p.id_service 
+                               JOIN services p ON r.service_id = p.id_service 
                                JOIN users u ON r.prestataire_id = u.id 
                                WHERE r.client_id = ? 
                                ORDER BY r.date_rdv DESC, r.heure_debut DESC");

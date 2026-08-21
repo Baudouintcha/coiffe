@@ -8,13 +8,13 @@
  * La génération dynamique des boutons est gérée côté JS (selectionnerJour).
  *
  * Variables attendues :
- *   $sc_coiffeur_id — ID du coiffeur (injecté en JS)
+ *   $sc_prestataire_id — ID du coiffeur (injecté en JS)
  *   $sc_busy_slots  — array PHP des créneaux occupés (clés = 'Y-m-d H:i')
  *   $sc_presta_id   — ID de la prestation présélectionnée (optionnel)
  *   $page_root      — chemin racine (ex: '/coiffons')
  */
 
-$sc_coiffeur_id = $sc_coiffeur_id ?? 0;
+$sc_prestataire_id = $sc_prestataire_id ?? 0;
 $sc_busy_slots  = $sc_busy_slots  ?? [];
 $sc_presta_id   = $sc_presta_id   ?? '';
 $page_root      = $page_root      ?? '/coiffons';
@@ -36,7 +36,7 @@ $page_root      = $page_root      ?? '/coiffons';
 <script>
 (function() {
     const slotsOccupes = <?= json_encode($sc_busy_slots) ?>;
-    const coiffeurId   = <?= (int)$sc_coiffeur_id ?>;
+    const coiffeurId   = <?= (int)$sc_prestataire_id ?>;
     const prestaId     = <?= json_encode((string)$sc_presta_id) ?>;
     const pageRoot     = <?= json_encode($page_root) ?>;
 
@@ -79,7 +79,7 @@ $page_root      = $page_root      ?? '/coiffons';
                 btn.textContent = slotHeure;
             } else {
                 btn.className  = 'btn-outline-gold btn-sm';
-                btn.href = `${pageRoot}/client/reserver.php?coiffeur_id=${coiffeurId}&presta_id=${prestaId}&date_rdv=${dateChoisie}&heure_debut=${slotHeure}`;
+                btn.href = `${pageRoot}/client/reserver.php?prestataire_id=${coiffeurId}&presta_id=${prestaId}&date_rdv=${dateChoisie}&heure_debut=${slotHeure}`;
                 btn.textContent = slotHeure;
             }
             container.appendChild(btn);
@@ -89,4 +89,4 @@ $page_root      = $page_root      ?? '/coiffons';
     };
 })();
 </script>
-<?php unset($sc_coiffeur_id, $sc_busy_slots, $sc_presta_id, $page_root); ?>
+<?php unset($sc_prestataire_id, $sc_busy_slots, $sc_presta_id, $page_root); ?>

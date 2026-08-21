@@ -12,8 +12,8 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/../security/csrf.php';
 
-// Forcer le rôle coiffeur
-$role_predefini = 'coiffeur';
+// Forcer le rôle prestataire
+$role_predefini = 'prestataire';
 
 $message = "";
 
@@ -91,29 +91,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $message = "msg-danger::Cet email est déjà utilisé.";
                 } else {
                     try {
-                        $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, id_ville, id_quartier, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                        $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, 'coiffeur', $id_ville, $id_quartier, $diplome_path, $photo_profil_path]);
+                        $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, id_ville, id_quartier, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, 'prestataire', $id_ville, $id_quartier, $photo_profil_path]);
                     } catch (PDOException $e) {
                         // Fallback ancien schéma
                         if (strpos($e->getMessage(), 'id_ville') !== false || strpos($e->getMessage(), 'id_quartier') !== false) {
-                            $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, diplome, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                            $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, 'coiffeur', $diplome_path, $photo_profil_path]);
+                            $ins = $pdo->prepare("INSERT INTO users (nom, prenom, sexe, email, telephone, password, role, photo_profil) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                            $ins->execute([$nom, $prenom, $sexe, $email, $telephone, $password_hash, 'prestataire', $photo_profil_path]);
                         } else {
                             throw $e;
                         }
                     }
                     
                     if (isset($ins) && $ins->rowCount() > 0) {
-                        $_SESSION['id_user']  = $pdo->lastInsertId();
+                        $_SESSION['user_id']  = $pdo->lastInsertId();
                         $_SESSION['nom']      = $nom;
                         $_SESSION['prenom']   = $prenom;
-                        $_SESSION['role']     = 'coiffeur';
+                        $_SESSION['role']     = 'prestataire';
                         $_SESSION['id_ville']    = $id_ville;
                         $_SESSION['id_quartier'] = $id_quartier;
                         $_SESSION['photo_profil'] = $photo_profil_path;
                         
                         $message = "msg-success::Inscription réussie ! Bienvenue sur Coiffe Chez Toi.";
-                        header("Location: /coiffons/index.php?page=dashboard_coiffeur");
+                        header("Location: /coiffons/index.php?metier=coiffure&page=dashboard_coiffeur");
                         exit();
                     } else {
                         $message = "msg-danger::Erreur lors de l'enregistrement.";
@@ -286,6 +286,7 @@ if (!empty($message)) {
         <?php else: ?>
             <!-- ══ REGISTRATION FORM (original) ══ -->
         <form method="POST"
+              action="/coiffons/access/inscription.php"
               enctype="multipart/form-data"
               id="inscriptionForm"
               novalidate>
@@ -406,7 +407,7 @@ if (!empty($message)) {
             </div>
 
             <!-- ── SECTION DIPLÔME (coiffeur uniquement) ── -->
-            <?php if ($role_predefini === 'coiffeur'): ?>
+            <?php if ($role_predefini === 'prestataire'): ?>
             <div class="form-section-title">Certification professionnelle</div>
             <div class="diplome-block mb-3">
                 <label for="diplome_input" class="form-label-cct">

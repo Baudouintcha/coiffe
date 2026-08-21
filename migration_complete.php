@@ -125,12 +125,12 @@ $special_mappings = [
         'columns_map' => ['valide' => 'is_approved'] // Mapping si besoin
     ],
     'disponibilites' => [
-        'columns_ignore' => ['coiffeur_id'],
-        'columns_map' => ['coiffeur_id' => 'prestataire_id']
+        'columns_ignore' => ['prestataire_id'],
+        'columns_map' => ['prestataire_id' => 'prestataire_id']
     ],
     'rendez_vous' => [
-        'columns_ignore' => ['coiffeur_id'],
-        'columns_map' => ['coiffeur_id' => 'prestataire_id']
+        'columns_ignore' => ['prestataire_id'],
+        'columns_map' => ['prestataire_id' => 'prestataire_id']
     ]
 ];
 

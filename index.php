@@ -110,14 +110,15 @@ if (isset($_GET['metier'])) {
     exit();
 }
 
-// ── REDIRECTION UTILISATEURS CONNECTÉS VERS LEURS DASHBOARDS ──
-if (isset($_SESSION['id_user'])) {
+// ── REDIRECTION UTILISATEURS CONNECTÉS VERS LEURS DASHBOARDS (SAUF SI ?metier) ──
+// Cette redirection ne s'exécute que si on n'a pas de ?metier
+if (isset($_SESSION['user_id'])) {
     $role_session = $_SESSION['role'] ?? 'client';
-    if ($role_session === 'coiffeur') {
-        header("Location: /coiffons/index.php?page=dashboard_coiffeur");
+    if ($role_session === 'prestataire') {
+        header("Location: /coiffons/index.php?metier=coiffure&page=dashboard_coiffeur");
         exit();
     } elseif ($role_session === 'client') {
-        header("Location: /coiffons/index.php?page=dashboard");
+        header("Location: /coiffons/index.php?metier=coiffure&page=dashboard");
         exit();
     } elseif ($role_session === 'admin') {
         header("Location: /coiffons/first/admin_dashboard.php");

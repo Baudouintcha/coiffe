@@ -3,7 +3,7 @@ r <?php
  * coiffeurs/profil_coiffeurs.php — Profil et paramètres du coiffeur
  * Migration Design System v2.0 — Parcours Coiffeur — Page 6
  *
- * ✅ BUG CORRIGÉ : $_SESSION['user_id'] → $_SESSION['id_user']
+ * ✅ BUG CORRIGÉ : $_SESSION['user_id'] → $_SESSION['user_id']
  * ✅ layout/header.php → layout/header_coiffeur.php
  * ✅ layout/footer.php → layout/footer_coiffeur.php
  * ⚠️  LOGIQUE MÉTIER INTACTE — SQL, sessions, mise à jour profil : inchangés.
@@ -15,13 +15,13 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../security/config.php';
 
-// Sécurité — BUG CORRIGÉ : $_SESSION['user_id'] → $_SESSION['id_user']
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+// Sécurité — BUG CORRIGÉ : $_SESSION['user_id'] → $_SESSION['user_id']
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'prestataire') {
     header('Location: /coiffons/access/connexion.php');
     exit();
 }
 
-$prestataire_id  = $_SESSION['id_user'];
+$prestataire_id  = $_SESSION['user_id'];
 $message_type = '';
 $message_text = '';
 
@@ -59,7 +59,7 @@ try {
 }
 
 // Récupération des quartiers de la ville actuelle du coiffeur
-$id_ville_actuelle = $coiffeur['ville'] ?? null; // Note: 'ville' stocke l'ID de la ville
+$id_ville_actuelle = $coiffeur['id_ville'] ?? null; // Note: 'id_ville' stocke l'ID de la ville
 $quartiers = [];
 if ($id_ville_actuelle) {
     try {
@@ -125,7 +125,7 @@ endif; ?>
                     <select name="ville" id="villeSelect" class="fc-dark" required onchange="chargerQuartiers(this.value)">
                         <option value="">— Choisir une ville —</option>
                         <?php foreach ($villes as $v): ?>
-                            <option value="<?= $v['id'] ?>" <?= ($coiffeur['ville'] ?? '') == $v['id'] ? 'selected' : '' ?>>
+                            <option value="<?= $v['id'] ?>" <?= ($coiffeur['id_ville'] ?? '') == $v['id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($v['nom_ville']) ?>
                             </option>
                         <?php endforeach; ?>

@@ -54,23 +54,23 @@ try {
 // 4b. DIPLÔMES EN ATTENTE (section critique admin)
 try {
     $diplomes_attente = $bdd->query("
-        SELECT id, nom, prenom, telephone, diplome, created_at
+        SELECT id, nom, prenom, telephone, diplome, date_demande
         FROM users
         WHERE role = 'coiffeur'
           AND is_approved = 0
           AND diplome IS NOT NULL
           AND diplome != ''
-        ORDER BY created_at ASC
+        ORDER BY date_demande ASC
         LIMIT 20
     ")->fetchAll();
 } catch (Exception $e) { $diplomes_attente = []; }
 
 // 4c. NOTIFICATIONS ADMIN non lues
 try {
-    $admin_id = $_SESSION['id_user'] ?? 0;
+    $admin_id = $_SESSION['user_id'] ?? 0;
     $nb_notifs_admin = 0;
     if ($admin_id > 0) {
-        $nb_notifs_admin = (int)$bdd->query("SELECT COUNT(*) FROM notifications WHERE id_user = $admin_id AND statut_lecture = 'non_lu'")->fetchColumn();
+        $nb_notifs_admin = (int)$bdd->query("SELECT COUNT(*) FROM notifications WHERE id = $admin_id AND lu = 'non_lu'")->fetchColumn();
     }
 } catch (Exception $e) { $nb_notifs_admin = 0; }
 
@@ -80,11 +80,11 @@ try {
 } catch (Exception $e) { $data_sexe = []; }
 
 try {
-    $top_coiffeurs = $bdd->query("SELECT u.nom, u.prenom, COUNT(r.id) as total_rdv FROM rendez_vous r JOIN users u ON r.coiffeur_id = u.id GROUP BY r.coiffeur_id ORDER BY total_rdv DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
+    $top_coiffeurs = $bdd->query("SELECT u.nom, u.prenom, COUNT(r.id) as total_rdv FROM rendez_vous r JOIN users u ON r.prestataire_id = u.id GROUP BY r.prestataire_id ORDER BY total_rdv DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) { $top_coiffeurs = []; }
 
 try {
-    $top_prestations = $bdd->query("SELECT p.nom_style, COUNT(r.id) as nb_demandes FROM rendez_vous r JOIN prestations p ON r.coiffure_id = p.id_prestation GROUP BY r.coiffure_id ORDER BY nb_demandes DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
+    $top_prestations = $bdd->query("SELECT p.nom_service, COUNT(r.id) as nb_demandes FROM rendez_vous r JOIN services p ON r.service_id = p.id_service GROUP BY r.service_id ORDER BY nb_demandes DESC LIMIT 4")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) { $top_prestations = []; }
 
 // 6. MODULES WHATSAPP & DIAGNOSTICS RÉELS
@@ -92,7 +92,7 @@ try {
     $relances_coiffeurs = $bdd->query("
         SELECT r.*, uc.nom as nom_coiffeur, uc.prenom as prenom_coiffeur, uc.telephone as tel_coiffeur, ucl.nom as nom_client, ucl.prenom as prenom_client
         FROM rendez_vous r
-        JOIN users uc ON r.coiffeur_id = uc.id
+        JOIN users uc ON r.prestataire_id = uc.id
         JOIN users ucl ON r.client_id = ucl.id
         WHERE r.statut_rdv = 'en_attente'
         ORDER BY r.date_demande ASC
@@ -107,7 +107,7 @@ try {
                uc.nom as nom_coiffeur, uc.prenom as prenom_coiffeur
         FROM rendez_vous r
         JOIN users ucl ON r.client_id = ucl.id
-        JOIN users uc ON r.coiffeur_id = uc.id
+        JOIN users uc ON r.prestataire_id = uc.id
         WHERE r.statut_rdv = 'en_attente'
           AND r.date_demande < DATE_SUB(NOW(), INTERVAL 30 MINUTE)
         ORDER BY r.date_demande DESC
@@ -117,7 +117,7 @@ try {
 
 // Diagnostics d'activité — tables réelles
 try {
-    $coiffeurs_inactifs = $bdd->query("SELECT nom, prenom, telephone FROM users WHERE role = 'coiffeur' AND id NOT IN (SELECT DISTINCT coiffeur_id FROM rendez_vous)")->fetchAll();
+    $coiffeurs_inactifs = $bdd->query("SELECT nom, prenom, telephone FROM users WHERE role = 'coiffeur' AND id NOT IN (SELECT DISTINCT prestataire_id FROM rendez_vous)")->fetchAll();
 } catch (Exception $e) { $coiffeurs_inactifs = []; }
 
 try {
@@ -130,7 +130,7 @@ try {
 
 // 7. COMPTES & AVIS SIGNALÉS
 try {
-    $users_list = $bdd->query("SELECT id, nom, prenom, role, email, telephone, statut, is_approved, created_at FROM users ORDER BY id DESC LIMIT 50")->fetchAll();
+    $users_list = $bdd->query("SELECT id, nom, prenom, role, email, telephone, statut, is_approved, date_demande FROM users ORDER BY id DESC LIMIT 50")->fetchAll();
 } catch (Exception $e) { $users_list = []; }
 
 try {
@@ -139,7 +139,7 @@ try {
         FROM commentaires c
         JOIN users u ON c.id_client = u.id
         WHERE c.type_commentaire IN ('plainte', 'public')
-        ORDER BY c.date_creation DESC
+        ORDER BY c.date_demande DESC
         LIMIT 30
     ")->fetchAll();
 } catch (Exception $e) { $commentaires = []; }
@@ -151,7 +151,7 @@ try {
         FROM users
         WHERE role = 'coiffeur'
           AND (abonnement_status = 0 OR date_expiration_abo < CURDATE() OR date_expiration_abo IS NULL)
-        ORDER BY created_at DESC
+        ORDER BY date_demande DESC
         LIMIT 20
     ")->fetchAll();
 } catch (Exception $e) { $abonnements_attente = []; }
@@ -162,7 +162,7 @@ try {
         FROM transactions_portefeuille t
         JOIN users u ON t.user_id = u.id
         WHERE t.type_transaction = 'retrait'
-        ORDER BY t.date_creation DESC
+        ORDER BY t.date_demande DESC
         LIMIT 20
     ")->fetchAll();
 } catch (Exception $e) { $retraits_attente = []; }
@@ -577,7 +577,7 @@ try {
                                                 <tr>
                                                     <td class="fw-bold text-gold"><?php echo htmlspecialchars($dip['nom'] . ' ' . $dip['prenom']); ?></td>
                                                     <td class="text-warning"><?php echo htmlspecialchars($dip['telephone']); ?></td>
-                                                    <td class="text-secondary small"><?php echo date('d/m/Y', strtotime($dip['created_at'])); ?></td>
+                                                    <td class="text-secondary small"><?php echo date('d/m/Y', strtotime($dip['date_demande'])); ?></td>
                                                     <td>
                                                         <?php 
                                                             // Construire le chemin complet du diplôme
@@ -669,7 +669,7 @@ try {
                                                     <td class="fw-bold"><?php echo htmlspecialchars($ret['nom'] . ' ' . $ret['prenom']); ?><br><small class="text-muted">MM: <?php echo htmlspecialchars($ret['telephone']); ?></small></td>
                                                     <td class="text-gold fw-bold"><?php echo number_format(abs($ret['montant_net']), 0, ',', ' '); ?> F</td>
                                                     <td>
-                                                        <a href="admin_actions.php?action=valider_retrait&id=<?php echo $ret['id_transaction']; ?>" class="btn btn-warning btn-sm text-dark fw-bold">
+                                                        <a href="admin_actions.php?action=valider_retrait&id=<?php echo $ret['id']; ?>" class="btn btn-warning btn-sm text-dark fw-bold">
                                                             <i class="bi bi-send-check-fill"></i> Effectué
                                                         </a>
                                                     </td>
@@ -700,7 +700,7 @@ try {
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small text-secondary">Coiffeur à Bannir (ID)</label>
-                            <input type="number" name="coiffeur_id" class="form-control bg-black text-white border-secondary" required placeholder="Ex: 14">
+                            <input type="number" name="prestataire_id" class="form-control bg-black text-white border-secondary" required placeholder="Ex: 14">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small text-secondary">Client à Créditer +2000F (ID)</label>
@@ -744,7 +744,7 @@ try {
                                         </td>
                                         <td>
                                             <form action="admin_actions.php?action=toggle_bannissement" method="POST" class="d-inline">
-                                                <input type="hidden" name="id_user" value="<?php echo $u['id']; ?>">
+                                                <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
                                                 <input type="hidden" name="raison_ban" value="Manquement aux règles">
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">
                                                     <?php echo $u['statut'] === 'actif' ? 'Bannir' : 'Réactiver'; ?>

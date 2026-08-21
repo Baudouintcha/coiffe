@@ -54,7 +54,7 @@ try {
     $stmt = $pdo->query(
         "SELECT id, prenom, nom, date_expiration_abo
          FROM users
-         WHERE role = 'coiffeur'
+         WHERE role = 'prestataire'
            AND date_expiration_abo BETWEEN CURDATE() AND CURDATE() + INTERVAL 5 DAY"
     );
     $coiffeurs_exp = $stmt->fetchAll();

@@ -22,7 +22,7 @@ $prenom_client = htmlspecialchars($_SESSION['prenom'] ?? 'Client');
 $nom_client    = htmlspecialchars($_SESSION['nom']    ?? '');
 $initiale      = strtoupper(substr($prenom_client, 0, 1));
 $photo_profil  = $_SESSION['photo_profil'] ?? null;
-$id_user       = (int)($_SESSION['id_user'] ?? 0);
+$user_id       = (int)($_SESSION['user_id'] ?? 0);
 
 // ── Photo profil : vérification physique ──
 $photo_url_nav = null;
@@ -35,20 +35,20 @@ if ($photo_profil) {
 
 // ── Notifications non lues ──
 $nb_notifs = 0;
-if (isset($pdo) && $id_user > 0) {
+if (isset($pdo) && $user_id > 0) {
     try {
         $q_notifs = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND lu = 0");
-        $q_notifs->execute([$id_user]);
+        $q_notifs->execute([$user_id]);
         $nb_notifs = (int)$q_notifs->fetchColumn();
     } catch (Exception $e) {}
 }
 
 // ── Statistique client (RDV terminés) ──
 $nb_rdv_termines = 0;
-if (isset($pdo) && $id_user > 0) {
+if (isset($pdo) && $user_id > 0) {
     try {
         $q_rdv = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE client_id = ? AND statut_rdv = 'termine'");
-        $q_rdv->execute([$id_user]);
+        $q_rdv->execute([$user_id]);
         $nb_rdv_termines = (int)$q_rdv->fetchColumn();
     } catch (Exception $e) {}
 }

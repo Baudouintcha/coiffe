@@ -139,12 +139,12 @@ try {
         $new_code = $result['code'];
         
         // Essayer 5 codes incorrects
-        $wrong_attempts = 0;
+        $wrong_tentatives = 0;
         for ($i = 0; $i < 5; $i++) {
             $wrong_code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
             if ($wrong_code !== $new_code) {
                 $verify_result = $otp_service->verify($test_user_id, 'password_reset', $wrong_code);
-                $wrong_attempts++;
+                $wrong_tentatives++;
             }
         }
 

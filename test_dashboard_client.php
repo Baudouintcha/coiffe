@@ -20,8 +20,8 @@ echo "<h1>🔍 Test Dashboard Client</h1>";
 // 1. Vérifier la session
 echo "<div class='section'>";
 echo "<h2>1. Session Active</h2>";
-if (isset($_SESSION['id_user'])) {
-    echo "<p class='success'>✓ Utilisateur connecté : ID=" . $_SESSION['id_user'] . "</p>";
+if (isset($_SESSION['user_id'])) {
+    echo "<p class='success'>✓ Utilisateur connecté : ID=" . $_SESSION['user_id'] . "</p>";
     echo "<p>Nom : " . ($_SESSION['nom'] ?? 'N/A') . "</p>";
     echo "<p>Prénom : " . ($_SESSION['prenom'] ?? 'N/A') . "</p>";
     echo "<p>Rôle : " . ($_SESSION['role'] ?? 'N/A') . "</p>";
@@ -33,7 +33,7 @@ if (isset($_SESSION['id_user'])) {
 }
 echo "</div>";
 
-if (isset($_SESSION['id_user']) && $_SESSION['role'] === 'client') {
+if (isset($_SESSION['user_id']) && $_SESSION['role'] === 'client') {
     $id_ville_client = $_SESSION['id_ville'] ?? 0;
     $id_quartier_client = $_SESSION['id_quartier'] ?? 0;
     
@@ -48,7 +48,7 @@ if (isset($_SESSION['id_user']) && $_SESSION['role'] === 'client') {
                    SUM(CASE WHEN is_approved = 1 THEN 1 ELSE 0 END) as approuves,
                    SUM(CASE WHEN abonnement_status = 'actif' OR abonnement_status = 1 THEN 1 ELSE 0 END) as avec_abo,
                    SUM(CASE WHEN statut = 'actif' THEN 1 ELSE 0 END) as actifs
-            FROM users WHERE role = 'coiffeur'
+            FROM users WHERE role = 'prestataire'
         ");
         $stats = $stmt_all->fetch();
         
@@ -65,7 +65,7 @@ if (isset($_SESSION['id_user']) && $_SESSION['role'] === 'client') {
             $stmt_ville = $pdo->prepare("
                 SELECT COUNT(*) as total
                 FROM users u
-                WHERE u.role = 'coiffeur' 
+                WHERE u.role = 'prestataire' 
                 AND u.ville = ?
             ");
             $stmt_ville->execute([$id_ville_client]);
@@ -76,12 +76,12 @@ if (isset($_SESSION['id_user']) && $_SESSION['role'] === 'client') {
             // Coiffeurs qui remplissent tous les critères
             $stmt_eligibles = $pdo->prepare("
                 SELECT u.id, u.nom, u.prenom, u.is_approved, u.abonnement_status, u.statut, 
-                       u.ville, u.id_quartier, v.nom_ville, q.nom_quartier
+                       u.id_ville, u.id_quartier, v.nom_ville, q.nom_quartier
                 FROM users u
-                LEFT JOIN villes v ON u.ville = v.id
+                LEFT JOIN villes v ON u.id_ville = v.id
                 LEFT JOIN quartiers q ON u.id_quartier = q.id
-                WHERE u.role = 'coiffeur' 
-                AND u.ville = ?
+                WHERE u.role = 'prestataire' 
+                AND u.id_ville = ?
             ");
             $stmt_eligibles->execute([$id_ville_client]);
             $coiffeurs_ville = $stmt_eligibles->fetchAll();
@@ -135,14 +135,14 @@ if (isset($_SESSION['id_user']) && $_SESSION['role'] === 'client') {
                 (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
                 (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
             FROM users u
-            LEFT JOIN villes v ON u.ville = v.id
-            LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+            LEFT JOIN villes v ON u.id_ville = v.id
+            LEFT JOIN zones_prestataire z ON u.id = z.id_prestataire
             LEFT JOIN quartiers q ON u.id_quartier = q.id
             WHERE u.role = 'coiffeur' 
             AND u.is_approved = 1
             AND u.statut = 'actif'
             AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
-            AND u.ville = ? 
+            AND u.id_ville = ? 
             AND (u.id_quartier = ? OR z.id_quartier = ?)
             ORDER BY RAND() 
             LIMIT 9
@@ -179,13 +179,13 @@ if (isset($_SESSION['id_user']) && $_SESSION['role'] === 'client') {
                     (SELECT ROUND(AVG(c.note), 1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
                     (SELECT COUNT(c.id_commentaire) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
                 FROM users u
-                LEFT JOIN villes v ON u.ville = v.id
+                LEFT JOIN villes v ON u.id_ville = v.id
                 LEFT JOIN quartiers q ON u.id_quartier = q.id
-                WHERE u.role = 'coiffeur' 
+                WHERE u.role = 'prestataire' 
                 AND u.is_approved = 1
                 AND u.statut = 'actif'
                 AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
-                AND u.ville = ?
+                AND u.id_ville = ?
                 ORDER BY RAND() 
                 LIMIT 9
             ");

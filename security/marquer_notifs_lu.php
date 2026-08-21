@@ -11,7 +11,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../security/config.php';
 
-if (!isset($_SESSION['id_user'])) {
+if (!isset($_SESSION['user_id'])) {
     http_response_code(403);
     echo json_encode(['status' => 'error', 'message' => 'Non autorisé']);
     exit();
@@ -20,7 +20,7 @@ if (!isset($_SESSION['id_user'])) {
 try {
     $pdo->prepare(
         "UPDATE notifications SET lu = 1 WHERE user_id = ?"
-    )->execute([$_SESSION['id_user']]);
+    )->execute([$_SESSION['user_id']]);
 
     echo json_encode(['status' => 'ok']);
 } catch (Exception $e) {

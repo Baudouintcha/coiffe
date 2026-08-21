@@ -64,7 +64,7 @@ return [
     'password_updated' => 'Votre mot de passe a été mis à jour avec succès.',
     'password_reset_success' => 'Votre mot de passe a été réinitialisé avec succès. Connectez-vous avec votre nouveau mot de passe.',
     
-    'too_many_attempts' => 'Trop de tentatives. Réessayez dans :minutes minutes.',
+    'too_many_tentatives' => 'Trop de tentatives. Réessayez dans :minutes minutes.',
     'invalid_credentials' => 'Identifiants incorrects. Tentative :attempt/5.',
     'account_suspended' => 'Ce compte a été suspendu.',
     'invalid_role' => 'Rôle invalide.',

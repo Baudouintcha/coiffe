@@ -3,9 +3,9 @@
  * traitement_avis.php — Traitement POST du formulaire d'avis
  *
  * CORRECTIONS APPLIQUÉES :
- * 1. $_SESSION['id_client'] → $_SESSION['id_user'] (cohérence système)
+ * 1. $_SESSION['id_client'] → $_SESSION['user_id'] (cohérence système)
  * 2. Connexion PDO locale supprimée → security/config.php
- * 3. Noms de colonnes alignés sur la vraie BDD : id_rdv, message, date_creation
+ * 3. Noms de colonnes alignés sur la vraie BDD : id_rdv, message, date_demande
  * 4. Vérification anti-doublon avant INSERT
  * 5. Plainte gérée via type_commentaire = 'plainte' (pas de table séparée)
  * 6. Redirection vers mes_rendezvous.php (fichier existant)
@@ -17,13 +17,13 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/security/config.php';
 
-// Sécurité — corrigé : id_client → id_user
-if (!isset($_SESSION['id_user']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
+// Sécurité — corrigé : id_client → user_id
+if (!isset($_SESSION['user_id']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: /coiffons/index.php?page=login');
     exit();
 }
 
-$id_client   = $_SESSION['id_user'];
+$id_client   = $_SESSION['user_id'];
 $id_rdv      = intval($_POST['id_rendez_vous']);
 $id_coiffeur = intval($_POST['id_coiffeur']);
 $note        = intval($_POST['note']);

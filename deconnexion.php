@@ -2,7 +2,7 @@
 // 1. On initialise la session pour pouvoir la manipuler
 session_start();
 
-// 2. On vide TOUTES les variables de session (id_user, role, nom, etc.)
+// 2. On vide TOUTES les variables de session (user_id, role, nom, etc.)
 $_SESSION = array();
 
 // 3. Si un cookie de session existe, on le détruit aussi (sécurité pro)

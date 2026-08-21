@@ -44,7 +44,7 @@ if (isset($_POST['confirm']) && $_POST['confirm'] === 'yes') {
         $coiffeurs = $pdo->query("
             SELECT u.id, u.nom, u.prenom, v.nom_ville, q.nom_quartier
             FROM users u
-            LEFT JOIN villes v ON u.ville = v.id
+            LEFT JOIN villes v ON u.id_ville = v.id
             LEFT JOIN quartiers q ON u.id_quartier = q.id
             WHERE u.role = 'coiffeur'
             ORDER BY u.id

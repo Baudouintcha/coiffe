@@ -49,7 +49,7 @@ if (isset($ins) && $ins->rowCount() > 0) {
                 $_SESSION['otp_email'] = $user_email;
                 
                 // Compte créé mais non encore activé
-                $_SESSION['id_user']  = $user_id;
+                $_SESSION['user_id']  = $user_id;
                 $_SESSION['nom']      = $nom;
                 $_SESSION['prenom']   = $prenom;
                 $_SESSION['role']     = $role;
@@ -103,7 +103,7 @@ if (isset($ins) && $ins->rowCount() > 0) {
                     
                     if ($role === 'client') {
                         header("Location: /coiffons/index.php?page=dashboard");
-                    } elseif ($role === 'coiffeur') {
+                    } elseif ($role === 'prestataire') {
                         $_SESSION['nouveau_coiffeur'] = true;
                         header("Location: /coiffons/coiffeurs/bienvenue.php");
                     }
@@ -401,7 +401,7 @@ if ($step === 'newpassword' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 // Enregistrer avant suppression
                 $pdo->prepare(
-                    "INSERT INTO suppressions_comptes (id_user_supprime, nom, prenom, email, role, supprime_par, date_demande)
+                    "INSERT INTO suppressions_comptes (user_id_supprime, nom, prenom, email, role, supprime_par, date_demande)
                      VALUES (?, ?, ?, ?, ?, NULL, NOW())"
                 )->execute([$user_id, $user['nom'], $user['prenom'], $user['email'], $user['role']]);
                 

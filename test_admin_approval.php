@@ -20,12 +20,12 @@ require_once __DIR__ . '/security/config.php';
 // Récupérer les diplômes en attente
 try {
     $diplomes_attente = $pdo->query("
-        SELECT id, nom, prenom, telephone, diplome, created_at, is_approved
+        SELECT id, nom, prenom, telephone, diplome, date_demande, is_approved
         FROM users
-        WHERE role = 'coiffeur'
+        WHERE role = 'prestataire'
           AND diplome IS NOT NULL
           AND diplome != ''
-        ORDER BY created_at ASC
+        ORDER BY date_demande ASC
         LIMIT 20
     ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
@@ -37,7 +37,7 @@ try {
     $coiffeurs_status = $pdo->query("
         SELECT id, nom, prenom, is_approved, abonnement_status
         FROM users
-        WHERE role = 'coiffeur'
+        WHERE role = 'prestataire'
         ORDER BY id DESC
     ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {

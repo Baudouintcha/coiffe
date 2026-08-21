@@ -4,7 +4,7 @@
  * Migration Design System v2.0 — Parcours Client — Page 4
  *
  * CORRECTIONS CRITIQUES APPLIQUÉES :
- * 1. $SESSION['id_client'] → $_SESSION['id_user'] (bug identifié dans l'audit)
+ * 1. $SESSION['id_client'] → $_SESSION['user_id'] (bug identifié dans l'audit)
  * 2. Connexion PDO locale supprimée → utilisation de security/config.php
  * 3. HTML/CSS entièrement migré vers le DS v2.0
  * 4. Logique métier (requêtes SQL, vérifications sécurité) : INCHANGÉE
@@ -16,13 +16,13 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../security/config.php';
 
-// ── SÉCURITÉ — corrigé : id_client → id_user ──
-if (!isset($_SESSION['id_user'])) {
+// ── SÉCURITÉ — corrigé : id_client → user_id ──
+if (!isset($_SESSION['user_id'])) {
     header('Location: /coiffons/index.php?page=login');
     exit();
 }
 
-$id_client = $_SESSION['id_user'];
+$id_client = $_SESSION['user_id'];
 
 // Vérification ID RDV — accepte ?rdv= ou ?id_rdv=
 if (!isset($_GET['rdv']) && !isset($_GET['id_rdv'])) {
@@ -34,9 +34,9 @@ $id_rdv = intval($_GET['rdv'] ?? $_GET['id_rdv'] ?? 0);
 
 // Requête de sécurité — SQL corrigé + vérification anti-doublon
 $query = "
-    SELECT r.id, r.coiffeur_id AS id_coiffeur, u.nom AS nom_coiffeur
+    SELECT r.id, r.prestataire_id AS id_coiffeur, u.nom AS nom_coiffeur
     FROM rendez_vous r
-    JOIN users u ON r.coiffeur_id = u.id
+    JOIN users u ON r.prestataire_id = u.id
     LEFT JOIN commentaires c ON r.id = c.id_rdv AND c.id_client = ? AND c.type_commentaire = 'public'
     WHERE r.id = ? AND r.client_id = ? AND CONCAT(r.date_rdv, ' ', r.heure_debut) < NOW()
     AND c.id_commentaire IS NULL

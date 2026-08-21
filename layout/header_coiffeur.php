@@ -8,14 +8,14 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 // Sécurité : coiffeur uniquement
-if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'coiffeur') {
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'prestataire') {
     header('Location: /coiffons/index.php?page=login');
     exit();
 }
 
 require_once __DIR__ . '/../security/config.php';
 
-$coiffeur_id   = $_SESSION['id_user'];
+$prestataire_id   = $_SESSION['user_id'];
 $prenom_nav    = htmlspecialchars($_SESSION['prenom'] ?? 'Coiffeur');
 $initiale_nav  = strtoupper(substr($prenom_nav, 0, 1));
 $photo_nav     = $_SESSION['photo_profil'] ?? null;
@@ -24,8 +24,8 @@ $current_page  = basename($_SERVER['PHP_SELF']);
 // Notifications non lues
 $nb_notifs_nav = 0;
 try {
-    $q = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE id_user = ? AND statut_lecture = 'non_lu'");
-    $q->execute([$coiffeur_id]);
+    $q = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE id = ? AND lu = 'non_lu'");
+    $q->execute([$prestataire_id]);
     $nb_notifs_nav = intval($q->fetchColumn());
 } catch (Exception $e) {}
 ?>

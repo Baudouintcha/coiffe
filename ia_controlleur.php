@@ -32,7 +32,7 @@ if (empty($message_utilisateur) && empty($image_data)) {
 $role_actuel = $_SESSION['role']    ?? 'invite';
 $nom_user    = htmlspecialchars($_SESSION['nom']    ?? 'Visiteur');
 $prenom_user = htmlspecialchars($_SESSION['prenom'] ?? '');
-$id_user     = isset($_SESSION['id_user']) ? (int)$_SESSION['id_user'] : null;
+$user_id     = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
 $ville_user  = $_SESSION['id_ville'] ?? 0;
 
 $message_lower = mb_strtolower($message_utilisateur, 'UTF-8');
@@ -72,9 +72,9 @@ if ($role_actuel === 'invite') {
     try {
         $stmt = $pdo->query(
             "SELECT u.id, u.nom, u.prenom, v.nom_ville,
-                    (SELECT p.nom_style FROM prestations p WHERE p.id_coiffeur = u.id LIMIT 1) AS prestation
+                    (SELECT p.nom_service FROM services p WHERE p.id_prestataire = u.id LIMIT 1) AS prestation
              FROM users u
-             LEFT JOIN villes v ON u.ville = v.id
+             LEFT JOIN villes v ON u.id_ville = v.id
              WHERE u.role = 'coiffeur' AND u.abonnement_status = 1 AND u.is_approved = 1
              ORDER BY RAND() LIMIT 6"
         );
@@ -112,10 +112,10 @@ if ($role_actuel === 'invite') {
     $contexte_systeme .= "  - **termine** = la prestation a été réalisée\n\n";
 
     // Solde
-    if ($id_user) {
+    if ($user_id) {
         try {
             $stmt = $pdo->prepare("SELECT solde FROM users WHERE id = ?");
-            $stmt->execute([$id_user]);
+            $stmt->execute([$user_id]);
             $solde = (float)$stmt->fetchColumn();
             $contexte_systeme .= "Solde portefeuille : **" . number_format($solde, 0, ',', ' ') . " FCFA**\n";
         } catch (Exception $e) {}
@@ -123,21 +123,21 @@ if ($role_actuel === 'invite') {
         // 3 derniers RDV
         try {
             $stmt = $pdo->prepare(
-                "SELECT r.id, r.date_rdv, r.heure_rdv, r.statut_rdv,
-                        u.nom AS coiffeur_nom, u.prenom AS coiffeur_prenom, u.id AS id_coiffeur
+                "SELECT r.id, r.date_rdv, r.heure_debut, r.statut_rdv,
+                        u.nom AS coiffeur_nom, u.prenom AS coiffeur_prenom, u.id AS prestataire_id
                  FROM rendez_vous r
-                 JOIN users u ON r.coiffeur_id = u.id
+                 JOIN users u ON r.prestataire_id = u.id
                  WHERE r.client_id = ?
                  ORDER BY r.date_rdv DESC LIMIT 3"
             );
-            $stmt->execute([$id_user]);
+            $stmt->execute([$user_id]);
             $rdvs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if (!empty($rdvs)) {
                 $contexte_systeme .= "Vos 3 derniers RDV :\n";
                 foreach ($rdvs as $r) {
-                    $lien_profil = "/coiffons/coiffeurs/profil_public.php?id={$r['id_coiffeur']}";
-                    $contexte_systeme .= "  - {$r['date_rdv']} à {$r['heure_rdv']} avec [{$r['coiffeur_nom']} {$r['coiffeur_prenom']}]($lien_profil) — **{$r['statut_rdv']}**\n";
+                    $lien_profil = "/coiffons/coiffeurs/profil_public.php?id={$r['prestataire_id']}";
+                    $contexte_systeme .= "  - {$r['date_rdv']} à {$r['heure_debut']} avec [{$r['coiffeur_nom']} {$r['coiffeur_prenom']}]($lien_profil) — **{$r['statut_rdv']}**\n";
                 }
             } else {
                 $contexte_systeme .= "Aucun RDV encore. Invitez-le à réserver sur l'annuaire.\n";
@@ -147,7 +147,7 @@ if ($role_actuel === 'invite') {
         // RDV en attente
         try {
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE client_id = ? AND statut_rdv = 'en_attente'");
-            $stmt->execute([$id_user]);
+            $stmt->execute([$user_id]);
             $nb_attente = (int)$stmt->fetchColumn();
             if ($nb_attente > 0) {
                 $contexte_systeme .= "**$nb_attente RDV en attente** de confirmation coiffeur.\n";
@@ -168,7 +168,7 @@ if ($role_actuel === 'invite') {
 // =============================================================================
 // BLOC COIFFEUR
 // =============================================================================
-} elseif ($role_actuel === 'coiffeur') {
+} elseif ($role_actuel === 'prestataire') {
 
     $nomIA = "Victor";
     $contexte_systeme .= "## Contexte : COIFFEUR PARTENAIRE\n";
@@ -180,11 +180,11 @@ if ($role_actuel === 'invite') {
     $contexte_systeme .= "- Portefeuille : [Mes gains](/coiffons/coiffeurs/portefeuille.php)\n";
     $contexte_systeme .= "- Zones : [Mes zones](/coiffons/coiffeurs/mes_zones.php)\n\n";
 
-    if ($id_user) {
+    if ($user_id) {
         // Statut abonnement + solde
         try {
             $stmt = $pdo->prepare("SELECT abonnement_status, solde, date_expiration_abo FROM users WHERE id = ?");
-            $stmt->execute([$id_user]);
+            $stmt->execute([$user_id]);
             $coiffeur = $stmt->fetch(PDO::FETCH_ASSOC);
             $abo       = ($coiffeur['abonnement_status'] ?? 0) ? '✅ ACTIF' : '🔴 INACTIF';
             $solde_c   = number_format((float)($coiffeur['solde'] ?? 0), 0, ',', ' ');
@@ -201,10 +201,10 @@ if ($role_actuel === 'invite') {
                         u.nom AS client_nom, u.prenom AS client_prenom
                  FROM rendez_vous r
                  JOIN users u ON r.client_id = u.id
-                 WHERE r.coiffeur_id = ? AND r.date_rdv = ?
+                 WHERE r.prestataire_id = ? AND r.date_rdv = ?
                  ORDER BY r.heure_debut ASC"
             );
-            $stmt->execute([$id_user, $aujourd_hui]);
+            $stmt->execute([$user_id, $aujourd_hui]);
             $rdvs_jour = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if (!empty($rdvs_jour)) {
@@ -219,16 +219,16 @@ if ($role_actuel === 'invite') {
 
         // Demandes en attente
         try {
-            $stmt = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE coiffeur_id = ? AND statut_rdv = 'en_attente'");
-            $stmt->execute([$id_user]);
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE prestataire_id = ? AND statut_rdv = 'en_attente'");
+            $stmt->execute([$user_id]);
             $nb_attente = (int)$stmt->fetchColumn();
             $contexte_systeme .= "**$nb_attente demande(s) en attente** de validation.\n";
         } catch (Exception $e) {}
 
         // Nombre de services dans le catalogue
         try {
-            $stmt = $pdo->prepare("SELECT COUNT(*) FROM prestations WHERE id_coiffeur = ?");
-            $stmt->execute([$id_user]);
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM services WHERE id_prestataire = ?");
+            $stmt->execute([$user_id]);
             $nb_services = (int)$stmt->fetchColumn();
             $contexte_systeme .= "Catalogue : **$nb_services service(s)** enregistré(s).\n\n";
         } catch (Exception $e) {}

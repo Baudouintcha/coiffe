@@ -16,8 +16,8 @@ foreach ($images as $img) {
 $hp_title              = 'COIFFE CHEZ TOI';
 $hp_subtitle           = 'Réservez un coiffeur professionnel qui se déplace directement chez vous.';
 $hp_role_client_href   = '/coiffons/filter/annuaire_coiffeurs.php';
-$hp_role_coiffeur_href = '/coiffons/index.php?page=register&role=coiffeur';
-$hp_login_href         = '/coiffons/index.php?page=login';
+$hp_role_coiffeur_href = '/coiffons/index.php?metier=coiffure&page=register&role=coiffeur';
+$hp_login_href         = '/coiffons/index.php?metier=coiffure&page=login';
 $hp_show_roles         = true;
 
 // ── Coiffeurs populaires — SQL inchangé ──
@@ -28,9 +28,9 @@ try {
                (SELECT ROUND(AVG(c.note),1) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS note_moyenne,
                (SELECT COUNT(*) FROM commentaires c WHERE c.id_coiffeur = u.id AND c.type_commentaire = 'public') AS nb_avis
         FROM users u
-        LEFT JOIN villes v ON u.ville = v.id
+        LEFT JOIN villes v ON u.id_ville = v.id
         LEFT JOIN quartiers q ON u.id_quartier = q.id
-        WHERE u.role = 'coiffeur' AND u.abonnement_status = 1 AND u.is_approved = 1
+        WHERE u.role = 'prestataire' AND u.abonnement_status = 1 AND u.is_approved = 1
         ORDER BY nb_avis DESC, note_moyenne DESC
         LIMIT 6
     ");
@@ -43,7 +43,7 @@ try {
 $avis_recents = [];
 try {
     $stmt = $pdo->query("
-        SELECT c.message, c.note, c.date_creation,
+        SELECT c.message, c.note, c.date_demande,
                uc.nom AS client_nom, uc.prenom AS client_prenom,
                uco.nom AS coiffeur_nom
         FROM commentaires c
@@ -51,7 +51,7 @@ try {
         JOIN users uco ON c.id_coiffeur = uco.id
         WHERE c.type_commentaire = 'public' AND c.statut_moderation != 'rejete'
           AND c.message != ''
-        ORDER BY c.date_creation DESC
+        ORDER BY c.date_demande DESC
         LIMIT 6
     ");
     $avis_recents = $stmt->fetchAll();
@@ -236,7 +236,7 @@ try {
                     // Stats dynamiques ou fallback
                     $nb_coiffeurs = 0; $nb_clients = 0; $nb_rdv = 0; $note_plateforme = 0;
                     try {
-                        $nb_coiffeurs     = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='coiffeur' AND abonnement_status=1")->fetchColumn();
+                        $nb_coiffeurs     = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='prestataire' AND abonnement_status=1")->fetchColumn();
                         $nb_clients       = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='client'")->fetchColumn();
                         $nb_rdv           = (int)$pdo->query("SELECT COUNT(*) FROM rendez_vous WHERE statut_rdv='termine'")->fetchColumn();
                         $r = $pdo->query("SELECT ROUND(AVG(note),1) FROM commentaires WHERE type_commentaire='public'")->fetchColumn();
@@ -375,7 +375,7 @@ try {
                 $note_av    = intval($av['note'] ?? 5);
                 $initiale_av = strtoupper(substr($av['client_prenom'] ?? 'C', 0, 1));
                 $prenom_masque = strtoupper(substr($av['client_prenom'] ?? 'C', 0, 1)) . '***';
-                $date_av = !empty($av['date_creation']) ? date('d/m/Y', strtotime($av['date_creation'])) : '';
+                $date_av = !empty($av['date_demande']) ? date('d/m/Y', strtotime($av['date_demande'])) : '';
             ?>
             <article class="rv-home-card" role="listitem">
                 <div class="rv-head">

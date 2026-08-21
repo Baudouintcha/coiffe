@@ -38,18 +38,20 @@ echo '</pre>';
 $expiration = date('Y-m-d', strtotime('+30 days'));
 $diplome_fictif = 'uploads/diplomes/test_diplome.jpg'; // chemin fictif pour la démo
 
-$stmt = $pdo->prepare("
-    UPDATE users
-    SET abonnement_status   = 1,
-        date_expiration_abo = ?,
-        diplome = CASE
-            WHEN (diplome IS NULL OR diplome = '') THEN ?
-            ELSE diplome
+// Mise à jour dans profils_prestataires (pour abonnement_status)
+$stmt_profil = $pdo->prepare("
+    UPDATE profils_prestataires pp
+    INNER JOIN users u ON u.id = pp.user_id
+    SET pp.abonnement_status = 'actif',
+        pp.date_expiration_abo = ?,
+        pp.diplome = CASE
+            WHEN (pp.diplome IS NULL OR pp.diplome = '') THEN ?
+            ELSE pp.diplome
         END
-    WHERE role = 'coiffeur' AND is_approved = 0
+    WHERE u.role = 'coiffeur' AND u.is_approved = 0
 ");
-$stmt->execute([$expiration, $diplome_fictif]);
-$nb = $stmt->rowCount();
+$stmt_profil->execute([$expiration, $diplome_fictif]);
+$nb = $stmt_profil->rowCount();
 
 echo "<p class='ok'>✅ {$nb} coiffeur(s) préparés : abonnement activé + diplôme enregistré.</p>";
 echo "<p style='color:#aaa;font-size:.85em;'>Les coiffeurs sans diplôme réel ont reçu un diplôme fictif pour la démo.</p>";
@@ -59,7 +61,7 @@ try {
     $admins = $pdo->query("SELECT id FROM users WHERE role='admin'")->fetchAll();
     if (!empty($admins)) {
         $msg = '📋 ' . $nb . ' coiffeur(s) ont payé leur abonnement et soumis un diplôme. Veuillez valider leurs profils dans l\'onglet Validations.';
-        $stmt_notif = $pdo->prepare("INSERT INTO notifications (id_user, message, type, statut_lecture, date_notification) VALUES (?, ?, 'info', 'non_lu', NOW())");
+        $stmt_notif = $pdo->prepare("INSERT INTO notifications (user_id, message, type, lu, date_demande) VALUES (?, ?, 'info', 0, NOW())");
         foreach ($admins as $admin) {
             $stmt_notif->execute([$admin['id'], $msg]);
         }

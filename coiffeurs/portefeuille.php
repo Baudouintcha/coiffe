@@ -13,12 +13,12 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../security/config.php';
 
 // 1. SÉCURITÉ
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'prestataire') {
     header('Location: /coiffons/access/connexion.php');
     exit();
 }
 
-$prestataire_id = $_SESSION['id_user'];
+$prestataire_id = $_SESSION['user_id'];
 
 // 2. Token CSRF — inchangé
 if (empty($_SESSION['csrf_token'])) {
@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     if (isset($_POST['status'])) {
         $nouveau_statut = (int)$_POST['status'];
-        $stmt_update = $pdo->prepare("UPDATE users SET renouvellement_auto = ? WHERE id = ?");
+        $stmt_update = $pdo->prepare("UPDATE profils_prestataires SET abonnement_status = ? WHERE user_id = ?");
         $stmt_update->execute([$nouveau_statut, $prestataire_id]);
         header('Location: portefeuille.php');
         exit();
@@ -40,12 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // 4. RÉCUPÉRATION abonnement — inchangé
-$stmt_coiffeur = $pdo->prepare("SELECT abonnement_status, date_expiration_abo, renouvellement_auto FROM users WHERE id = ?");
+$stmt_coiffeur = $pdo->prepare("SELECT pp.abonnement_status, pp.date_expiration_abo FROM profils_prestataires pp WHERE pp.user_id = ?");
 $stmt_coiffeur->execute([$prestataire_id]);
 $info_coiffeur = $stmt_coiffeur->fetch();
 
 $date_expiration    = $info_coiffeur['date_expiration_abo'] ?? null;
-$renouvellement_auto = $info_coiffeur['renouvellement_auto'] ?? 1;
 
 // 5. LOGIQUE ABONNEMENT — inchangée
 $abonnement_expire    = false;
@@ -88,7 +87,7 @@ $total_gains_bruts = $brut_data['total_brut'] ?? 0;
 $total_commissions = $total_gains_bruts * $commission_pourcentage;
 
 // 7. HISTORIQUE — inchangé
-$stmt_complet = $pdo->prepare("SELECT * FROM transactions_portefeuille WHERE user_id = ? ORDER BY date_creation DESC");
+$stmt_complet = $pdo->prepare("SELECT * FROM transactions_portefeuille WHERE user_id = ? ORDER BY date_demande DESC");
 $stmt_complet->execute([$prestataire_id]);
 $historique_complet = $stmt_complet->fetchAll();
 $historique_apercu  = array_slice($historique_complet, 0, 5);
@@ -172,7 +171,7 @@ else:
         $texte_actif .= ' — ' . $jours_restants . ' jour(s) restant';
     }
 
-    if ($renouvellement_auto == 1) {
+    if ($info_coiffeur['renouvellement_auto']) {
         $btn_label  = 'Désactiver renouvellement auto';
         $btn_status = 0;
     } else {
@@ -215,7 +214,7 @@ endif; ?>
             $tl = [
                 'type'    => $t['type_transaction'] === 'gain' ? 'gain' : 'debit',
                 'label'   => $t['motif'] ?? $t['type_transaction'],
-                'date'    => date('d/m/Y H:i', strtotime($t['date_creation'])),
+                'date'    => date('d/m/Y H:i', strtotime($t['date_demande'])),
                 'montant' => number_format(abs($t['montant']), 0, ',', ' '),
                 'unite'   => 'FCFA',
             ];
@@ -239,7 +238,7 @@ foreach ($historique_complet as $t):
     $tl = [
         'type'    => $t['type_transaction'] === 'gain' ? 'gain' : 'debit',
         'label'   => $t['motif'] ?? $t['type_transaction'],
-        'date'    => date('d/m/Y H:i', strtotime($t['date_creation'])),
+        'date'    => date('d/m/Y H:i', strtotime($t['date_demande'])),
         'montant' => number_format(abs($t['montant']), 0, ',', ' '),
         'unite'   => 'FCFA',
     ];

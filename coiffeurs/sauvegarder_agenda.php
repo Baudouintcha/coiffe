@@ -11,11 +11,11 @@ if (session_status() === PHP_SESSION_NONE) {
 // Inclusion de la sécurité et de la base de données
 require_once __DIR__ . '/../security/config.php';
 
-$coiffeur_id = $_SESSION['id_user'] ?? null;
+$coiffeur_id = $_SESSION['user_id'] ?? null;
 $role_actuel = $_SESSION['role'] ?? 'invite';
 
 // Sécurisation stricte de l'accès
-if (!$coiffeur_id || $role_actuel !== 'coiffeur') {
+if (!$coiffeur_id || $role_actuel !== 'prestataire') {
     header('Location: /coiffons/access/connexion.php');
     exit();
 }

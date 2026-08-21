@@ -13,7 +13,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['id_user'])) {
+if (!isset($_SESSION['user_id'])) {
     header("Location: /coiffons/index.php?page=login");
     exit();
 }
@@ -23,7 +23,7 @@ require_once __DIR__ . '/security/csrf.php';
 require_once __DIR__ . '/src/Services/OtpService.php';
 require_once __DIR__ . '/src/Services/EmailService.php';
 
-$user_id = $_SESSION['id_user'];
+$user_id = $_SESSION['user_id'];
 
 // Récupération quartiers — SQL inchangé
 try {

@@ -31,9 +31,9 @@ switch ($page) {
         exit();
 
     case 'dashboard_coiffeur':
-        // Dashboard coiffeur — uniquement pour les coiffeurs connectés
-        if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'coiffeur') {
-            header("Location: /coiffons/index.php?page=login");
+        // Dashboard coiffeur — uniquement pour les prestataires connectés
+        if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'prestataire') {
+            header("Location: /coiffons/index.php?metier=coiffure&page=login");
             exit();
         }
         include __DIR__ . '/views/coiffeur/dashboard.php';
@@ -41,8 +41,8 @@ switch ($page) {
 
     case 'dashboard':
         // Dashboard client — uniquement pour les clients connectés
-        if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'client') {
-            header("Location: /coiffons/index.php?page=login");
+        if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'client') {
+            header("Location: /coiffons/index.php?metier=coiffure&page=login");
             exit();
         }
         // Prépare les données de matching pour la vue
@@ -54,7 +54,7 @@ switch ($page) {
             if ($id_quartier_client > 0) {
                 // Priorité 1 : même ville ET même quartier
                 $stmt = $pdo->prepare("
-                    SELECT DISTINCT u.id as id_coiffeur, 
+                    SELECT DISTINCT u.id as id_prestataire, 
                         u.nom as nom_coiffeur,
                         u.photo_profil as photo_profil_coiffeur,
                         q.nom_quartier as quartier, 
@@ -83,7 +83,7 @@ switch ($page) {
             // Fallback 1 : si aucun résultat ou pas de quartier, chercher dans toute la ville
             if ((empty($coiffeurs_matching) || $id_quartier_client == 0) && $id_ville_client > 0) {
                 $stmt2 = $pdo->prepare("
-                    SELECT DISTINCT u.id as id_coiffeur, 
+                    SELECT DISTINCT u.id as id_prestataire, 
                         u.nom as nom_coiffeur,
                         u.photo_profil as photo_profil_coiffeur,
                         q.nom_quartier as quartier, 
@@ -110,7 +110,7 @@ switch ($page) {
             // Fallback 2 : si toujours rien, afficher tous les coiffeurs approuvés
             if (empty($coiffeurs_matching)) {
                 $stmt3 = $pdo->prepare("
-                    SELECT DISTINCT u.id as id_coiffeur, 
+                    SELECT DISTINCT u.id as id_prestataire, 
                         u.nom as nom_coiffeur,
                         u.photo_profil as photo_profil_coiffeur,
                         q.nom_quartier as quartier, 
@@ -142,13 +142,13 @@ switch ($page) {
     case 'home':
     default:
         // Si l'utilisateur est déjà connecté, redirige vers son dashboard
-        if (isset($_SESSION['id_user'])) {
+        if (isset($_SESSION['user_id'])) {
             $role_session = $_SESSION['role'] ?? 'client';
-            if ($role_session === 'coiffeur') {
-                header("Location: /coiffons/app.php?page=dashboard_coiffeur");
+            if ($role_session === 'prestataire') {
+                header("Location: /coiffons/index.php?metier=coiffure&page=dashboard_coiffeur");
                 exit();
             } elseif ($role_session === 'client') {
-                header("Location: /coiffons/app.php?page=dashboard");
+                header("Location: /coiffons/index.php?metier=coiffure&page=dashboard");
                 exit();
             } elseif ($role_session === 'admin') {
                 header("Location: /coiffons/first/admin_dashboard.php");
@@ -159,7 +159,7 @@ switch ($page) {
         // Invité — affiche la page d'accueil avec le slider
 
         $role_actuel  = $_SESSION['role'] ?? 'invite';
-        $coiffeur_id  = $_SESSION['id_user'] ?? null;
+        $prestataire_id  = $_SESSION['user_id'] ?? null;
         $nom_affichage_client = $_SESSION['nom'] ?? $_SESSION['prenom'] ?? null;
         $mes_coiffures   = [];
         $db_coiffeur     = [];
@@ -175,10 +175,10 @@ switch ($page) {
         ];
 
         // Données pour le coiffeur connecté
-        if ($coiffeur_id && $role_actuel === 'coiffeur') {
+        if ($prestataire_id && $role_actuel === 'coiffeur') {
             try {
                 $chk = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-                $chk->execute([$coiffeur_id]);
+                $chk->execute([$prestataire_id]);
                 $db_coiffeur = $chk->fetch() ?: [];
 
                 $stmt = $pdo->prepare("
@@ -190,7 +190,7 @@ switch ($page) {
                     WHERE s.id_prestataire = ?
                     ORDER BY s.id_service DESC
                 ");
-                $stmt->execute([$coiffeur_id]);
+                $stmt->execute([$prestataire_id]);
                 $mes_coiffures = $stmt->fetchAll();
             } catch (Exception $e) {
                 $mes_coiffures = [];
@@ -266,7 +266,7 @@ switch ($page) {
             $all_comments = $pdo->query("
                 SELECT c.*, u.nom FROM commentaires c
                 JOIN users u ON c.id_client = u.id
-                ORDER BY c.date_creation DESC LIMIT 6
+                ORDER BY c.date_demande DESC LIMIT 6
             ")->fetchAll();
         } catch (Exception $e) { $all_comments = []; }
 

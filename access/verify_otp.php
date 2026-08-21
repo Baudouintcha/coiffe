@@ -54,7 +54,7 @@ try {
 }
 
 // Récupérer les données
-$user_id = $_SESSION['id_user'] ?? null;
+$user_id = $_SESSION['user_id'] ?? null;
 $purpose = $_POST['otp_purpose'] ?? '';
 $code = $_POST['otp_code'] ?? '';
 

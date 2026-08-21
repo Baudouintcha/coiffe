@@ -24,16 +24,16 @@ if ($photo_profil && file_exists($_SERVER['DOCUMENT_ROOT'] . $page_root . '/' . 
 
 // Charger les 5 dernières notifications non lues pour le dropdown
 $_navbar_notifs = [];
-if (isset($pdo) && isset($_SESSION['id_user'])) {
+if (isset($pdo) && isset($_SESSION['user_id'])) {
     try {
         $stmt_nav = $pdo->prepare(
-            "SELECT id_notif, message, type, date_notification
+            "SELECT id_notif, message, type, date_demande
              FROM notifications
-             WHERE id_user = ? AND statut_lecture = 'non_lu'
-             ORDER BY date_notification DESC
+             WHERE id = ? AND lu = 'non_lu'
+             ORDER BY date_demande DESC
              LIMIT 5"
         );
-        $stmt_nav->execute([(int)$_SESSION['id_user']]);
+        $stmt_nav->execute([(int)$_SESSION['user_id']]);
         foreach ($stmt_nav->fetchAll() as $row) {
             $type_n = $row['type'];
             $icon_map = [
@@ -48,7 +48,7 @@ if (isset($pdo) && isset($_SESSION['id_user'])) {
                 'message' => $row['message'],
                 'icone'   => $icon_map[$type_n] ?? 'bi-bell',
                 'lien'    => $page_root . '/client/notifications.php',
-                'date'    => date('d/m H:i', strtotime($row['date_notification'])),
+                'date'    => date('d/m H:i', strtotime($row['date_demande'])),
             ];
         }
         // Mettre à jour le compteur avec la vraie valeur BDD

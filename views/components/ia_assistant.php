@@ -64,7 +64,7 @@ if (isset($_SESSION['sexe'])) {
                 <button class="chat-suggestion-btn" onclick="sendQuick('Montre-moi mes rendez-vous')">📅 Mes RDV</button>
                 <button class="chat-suggestion-btn" onclick="sendQuick('Quel est mon solde ?')">💰 Mon solde</button>
                 <button class="chat-suggestion-btn" onclick="sendQuick('Comment réserver un coiffeur ?')">✂️ Réserver</button>
-            <?php elseif (($role_actuel ?? '') === 'coiffeur'): ?>
+            <?php elseif (($role_actuel ?? '') === 'prestataire'): ?>
                 <button class="chat-suggestion-btn" onclick="sendQuick('Combien ai-je de demandes en attente ?')">⏳ Demandes en attente</button>
                 <button class="chat-suggestion-btn" onclick="sendQuick('Quels sont mes RDV du jour ?')">📅 RDV du jour</button>
                 <button class="chat-suggestion-btn" onclick="sendQuick('Quel est mon solde ?')">💰 Mon solde</button>

@@ -10,7 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Sécurité : coiffeur connecté uniquement
-if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'coiffeur') {
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'prestataire') {
     header('Location: /coiffons/index.php?page=login');
     exit();
 }

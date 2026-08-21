@@ -12,18 +12,18 @@ require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/../security/notifications.php';
 
 // ── Authentification ──────────────────────────────────────────────────────────
-if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'client') {
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'client') {
     header('Location: /coiffons/access/connexion.php');
     exit();
 }
 
-$id_user = (int) $_SESSION['id_user'];
+$user_id = (int) $_SESSION['user_id'];
 
 // ── Marquer TOUTES comme lues à l'ouverture ───────────────────────────────────
 try {
     $pdo->prepare(
-        "UPDATE notifications SET statut_lecture = 'lu' WHERE id_user = ? AND statut_lecture = 'non_lu'"
-    )->execute([$id_user]);
+        "UPDATE notifications SET lu = 'lu' WHERE id = ? AND lu = 'non_lu'"
+    )->execute([$user_id]);
 } catch (Exception $e) {
     // Non-bloquant
 }
@@ -32,13 +32,13 @@ try {
 $notifications = [];
 try {
     $stmt = $pdo->prepare(
-        "SELECT id_notif, message, type, statut_lecture, date_notification
+        "SELECT id_notif, message, type, lu, date_demande
          FROM notifications
-         WHERE id_user = ?
-         ORDER BY date_notification DESC
+         WHERE id = ?
+         ORDER BY date_demande DESC
          LIMIT 50"
     );
-    $stmt->execute([$id_user]);
+    $stmt->execute([$user_id]);
     $notifications = $stmt->fetchAll();
 } catch (Exception $e) {
     $notifications = [];
@@ -161,7 +161,7 @@ $prenom_client = htmlspecialchars($_SESSION['prenom'] ?? 'Client');
         <?php else: ?>
             <?php foreach ($notifications as $notif):
                 $cfg   = $type_config[$notif['type']] ?? $type_default;
-                $date_r = date_relative_notif($notif['date_notification']);
+                $date_r = date_relative_notif($notif['date_demande']);
             ?>
                 <div class="notif-card"
                      style="background:<?= $cfg['bg'] ?>;border-color:<?= $cfg['border'] ?>;">

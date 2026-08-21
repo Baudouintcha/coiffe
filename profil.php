@@ -14,18 +14,18 @@ require_once __DIR__ . '/security/csrf.php';
 require_once __DIR__ . '/src/Services/OtpService.php';
 require_once __DIR__ . '/src/Services/EmailService.php';
 
-if (!isset($_SESSION['id_user'])) {
+if (!isset($_SESSION['user_id'])) {
     header("Location: /coiffons/index.php?page=login");
     exit();
 }
 
-$user_id = $_SESSION['id_user'];
+$user_id = $_SESSION['user_id'];
 
 // SQL inchangé — jointure villes + quartiers
 $stmt = $pdo->prepare("
     SELECT u.*, v.nom_ville AS nom_ville_clean, q.nom_quartier AS nom_quartier_clean
     FROM users u
-    LEFT JOIN villes v ON u.ville = v.id
+    LEFT JOIN villes v ON u.id_ville = v.id
     LEFT JOIN quartiers q ON u.id_quartier = q.id
     WHERE u.id = ?
 ");
@@ -47,15 +47,15 @@ $commentaires = [];
 $note_moyenne = 0;
 $total_avis = 0;
 
-if ($user['role'] === 'coiffeur') {
+if ($user['role'] === 'prestataire') {
     try {
-        $stmt_com = $pdo->prepare("SELECT r.date_creation, r.commentaire, r.note, u.nom, u.prenom FROM rendez_vous r JOIN users u ON r.client_id = u.id WHERE r.coiffeur_id = ? AND r.commentaire IS NOT NULL ORDER BY r.date_creation DESC LIMIT 10");
+        $stmt_com = $pdo->prepare("SELECT r.date_demande, r.commentaire, r.note, u.nom, u.prenom FROM rendez_vous r JOIN users u ON r.client_id = u.id WHERE r.prestataire_id = ? AND r.commentaire IS NOT NULL ORDER BY r.date_demande DESC LIMIT 10");
         $stmt_com->execute([$user_id]);
         $commentaires = $stmt_com->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {}
 
     try {
-        $stmt_note = $pdo->prepare("SELECT AVG(note) as moyenne, COUNT(*) as total FROM rendez_vous WHERE coiffeur_id = ? AND note IS NOT NULL");
+        $stmt_note = $pdo->prepare("SELECT AVG(note) as moyenne, COUNT(*) as total FROM rendez_vous WHERE prestataire_id = ? AND note IS NOT NULL");
         $stmt_note->execute([$user_id]);
         $note_data = $stmt_note->fetch();
         $note_moyenne = $note_data['moyenne'] ?? 0;
@@ -63,7 +63,7 @@ if ($user['role'] === 'coiffeur') {
     } catch (Exception $e) {}
 
     $bloc1_lbl = "Demandes en attente"; $bloc1_icon = "bi-calendar-check"; $bloc1_link = "/coiffons/coiffeurs/valider_rendezvous.php"; $bloc1_sub = "Voir les demandes →";
-    try { $s = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE coiffeur_id = ? AND statut_rdv = 'en_attente'"); $s->execute([$user_id]); $bloc1_val = intval($s->fetchColumn()); } catch (Exception $e) {}
+    try { $s = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE prestataire_id = ? AND statut_rdv = 'en_attente'"); $s->execute([$user_id]); $bloc1_val = intval($s->fetchColumn()); } catch (Exception $e) {}
 
     $bloc2_lbl = "Gains sécurisés"; $bloc2_icon = "bi-shield-lock"; $bloc2_link = "#solde-section"; $bloc2_sub = "Rendez-vous à venir";
     try { $s = $pdo->prepare("SELECT SUM(s.prix) FROM rendez_vous r JOIN services s ON r.service_id = s.id_service WHERE r.prestataire_id = ? AND r.statut_rdv IN ('en_attente', 'confirme')"); $s->execute([$user_id]); $bloc2_val = number_format($s->fetchColumn() ?? 0, 0, ',', ' ') . " <span style='font-size:0.75rem;'>FCFA</span>"; } catch (Exception $e) { $bloc2_val = "0 FCFA"; }
@@ -72,25 +72,101 @@ if ($user['role'] === 'coiffeur') {
     try { $s = $pdo->prepare("SELECT COUNT(*) FROM zones_prestataire WHERE id_prestataire = ?"); $s->execute([$user_id]); $bloc3_val = intval($s->fetchColumn()) . " <span style='font-size:0.75rem;color:var(--text-muted)'>zones</span>"; } catch (Exception $e) { $bloc3_val = "0"; }
 
     $bloc4_lbl = "Clients fidélisés"; $bloc4_icon = "bi-people"; $bloc4_link = "#"; $bloc4_sub = "Total clients uniques";
-    try { $s = $pdo->prepare("SELECT COUNT(DISTINCT client_id) FROM rendez_vous WHERE coiffeur_id = ?"); $s->execute([$user_id]); $bloc4_val = intval($s->fetchColumn()); } catch (Exception $e) { $bloc4_val = 0; }
+    try { $s = $pdo->prepare("SELECT COUNT(DISTINCT client_id) FROM rendez_vous WHERE prestataire_id = ?"); $s->execute([$user_id]); $bloc4_val = intval($s->fetchColumn()); } catch (Exception $e) { $bloc4_val = 0; }
 
 } else {
-    try { $s = $pdo->prepare("SELECT r.date_creation, r.commentaire, r.note, u.nom, u.prenom FROM rendez_vous r JOIN users u ON r.coiffeur_id = u.id WHERE r.client_id = ? AND r.commentaire IS NOT NULL ORDER BY r.date_creation DESC LIMIT 10"); $s->execute([$user_id]); $commentaires = $s->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
+    try { $s = $pdo->prepare("SELECT r.date_demande, r.commentaire, r.note, u.nom, u.prenom FROM rendez_vous r JOIN users u ON r.prestataire_id = u.id WHERE r.client_id = ? AND r.commentaire IS NOT NULL ORDER BY r.date_demande DESC LIMIT 10"); $s->execute([$user_id]); $commentaires = $s->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) {}
 
     $bloc1_lbl = "Rendez-vous prévus"; $bloc1_icon = "bi-calendar3"; $bloc1_link = "/coiffons/client/mes_rendezvous.php"; $bloc1_sub = "Consulter mon agenda →";
     try { $s = $pdo->prepare("SELECT COUNT(*) FROM rendez_vous WHERE client_id = ? AND statut_rdv IN ('en_attente', 'accepte')"); $s->execute([$user_id]); $bloc1_val = intval($s->fetchColumn()); } catch (Exception $e) {}
 
     $bloc2_lbl = "Fonds en attente"; $bloc2_icon = "bi-lock-fill"; $bloc2_link = "#solde-section"; $bloc2_sub = "Paiements sécurisés";
-    try { $s = $pdo->prepare("SELECT SUM(p.prix) as total_gele FROM rendez_vous r JOIN prestations p ON r.coiffure_id = p.id_prestation WHERE r.client_id = ? AND r.statut_rdv = 'en_attente'"); $s->execute([$user_id]); $r2 = $s->fetch(); $argent_gele = $r2['total_gele'] ?? 0; $bloc2_val = number_format($argent_gele, 0, ',', ' ') . " <span style='font-size:0.75rem;'>FCFA</span>"; } catch (Exception $e) { $bloc2_val = "0 FCFA"; }
+    try { $s = $pdo->prepare("SELECT SUM(s.prix) as total_gele FROM rendez_vous r JOIN services s ON r.service_id = s.id_service WHERE r.client_id = ? AND r.statut_rdv = 'en_attente'"); $s->execute([$user_id]); $r2 = $s->fetch(); $argent_gele = $r2['total_gele'] ?? 0; $bloc2_val = number_format($argent_gele, 0, ',', ' ') . " <span style='font-size:0.75rem;'>FCFA</span>"; } catch (Exception $e) { $bloc2_val = "0 FCFA"; }
 
     $bloc3_lbl = "Coiffeurs testés"; $bloc3_icon = "bi-scissors"; $bloc3_link = "/coiffons/index.php"; $bloc3_sub = "Prendre un nouveau RDV →";
-    try { $s = $pdo->prepare("SELECT COUNT(DISTINCT coiffeur_id) FROM rendez_vous WHERE client_id = ? AND statut_rdv = 'termine'"); $s->execute([$user_id]); $bloc3_val = intval($s->fetchColumn()); } catch (Exception $e) {}
+    try { $s = $pdo->prepare("SELECT COUNT(DISTINCT prestataire_id) FROM rendez_vous WHERE client_id = ? AND statut_rdv = 'termine'"); $s->execute([$user_id]); $bloc3_val = intval($s->fetchColumn()); } catch (Exception $e) {}
 
     $bloc4_val = "<span style='color:var(--success-text);font-weight:700;'><i class='bi bi-circle-fill me-1' style='font-size:7px;'></i> ACTIF</span>";
     $bloc4_lbl = "Statut du compte"; $bloc4_icon = "bi-shield-check"; $bloc4_link = "#"; $bloc4_sub = "Profil vérifié";
 }
 
-$lien_rendezvous = ($user['role'] === 'client') ? "/coiffons/client/mes_rendezvous.php" : "/coiffons/coiffeurs/agenda_coiffeurs.php";
+$lien_rendezvous = ($user['role'] === 'client') ? "/coiffons/client/mes_rendezvous.php" : "/coiffons/coiffeurs/valider_rendezvous.php";
+
+// ═══ STATISTIQUES POUR GRAPHIQUES ═══
+// Initialiser les stats par défaut
+$stats_rdv = ['en_attente' => 0, 'accepte' => 0, 'termine' => 0, 'annule' => 0];
+$stats_villes = [];
+$stats_mensuelles = array_fill(0, 12, 0);
+
+try {
+    if ($user['role'] === 'prestataire') {
+        // Stats RDV pour coiffeur
+        $stmt_stats = $pdo->prepare("
+            SELECT 
+                SUM(CASE WHEN statut_rdv = 'en_attente' THEN 1 ELSE 0 END) as en_attente,
+                SUM(CASE WHEN statut_rdv = 'accepte' THEN 1 ELSE 0 END) as accepte,
+                SUM(CASE WHEN statut_rdv = 'termine' THEN 1 ELSE 0 END) as termine,
+                SUM(CASE WHEN statut_rdv = 'annule' THEN 1 ELSE 0 END) as annule
+            FROM rendez_vous 
+            WHERE prestataire_id = ?
+        ");
+        $stmt_stats->execute([$user_id]);
+        $result = $stmt_stats->fetch();
+        $stats_rdv = [
+            'en_attente' => intval($result['en_attente'] ?? 0),
+            'accepte' => intval($result['accepte'] ?? 0),
+            'termine' => intval($result['termine'] ?? 0),
+            'annule' => intval($result['annule'] ?? 0)
+        ];
+
+        // Stats villes pour coiffeur (quartiers couverts)
+        $stmt_villes = $pdo->prepare("
+            SELECT zp.id_quartier, q.nom_quartier, COUNT(*) as total
+            FROM zones_prestataire zp
+            LEFT JOIN quartiers q ON zp.id_quartier = q.id
+            WHERE zp.id_prestataire = ?
+            GROUP BY zp.id_quartier, q.nom_quartier
+            LIMIT 12
+        ");
+        $stmt_villes->execute([$user_id]);
+        $stats_villes = $stmt_villes->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        // Stats RDV pour client
+        $stmt_stats = $pdo->prepare("
+            SELECT 
+                SUM(CASE WHEN statut_rdv = 'en_attente' THEN 1 ELSE 0 END) as en_attente,
+                SUM(CASE WHEN statut_rdv = 'accepte' THEN 1 ELSE 0 END) as accepte,
+                SUM(CASE WHEN statut_rdv = 'termine' THEN 1 ELSE 0 END) as termine,
+                SUM(CASE WHEN statut_rdv = 'annule' THEN 1 ELSE 0 END) as annule
+            FROM rendez_vous 
+            WHERE client_id = ?
+        ");
+        $stmt_stats->execute([$user_id]);
+        $result = $stmt_stats->fetch();
+        $stats_rdv = [
+            'en_attente' => intval($result['en_attente'] ?? 0),
+            'accepte' => intval($result['accepte'] ?? 0),
+            'termine' => intval($result['termine'] ?? 0),
+            'annule' => intval($result['annule'] ?? 0)
+        ];
+
+        // Stats mensuelles pour client (nombre de RDV par mois)
+        $year = date('Y');
+        for ($month = 1; $month <= 12; $month++) {
+            $month_str = str_pad($month, 2, '0', STR_PAD_LEFT);
+            $stmt_month = $pdo->prepare("
+                SELECT COUNT(*) as count
+                FROM rendez_vous
+                WHERE client_id = ? AND DATE_FORMAT(date_rdv, '%Y-%m') = ?
+            ");
+            $stmt_month->execute([$user_id, "{$year}-{$month_str}"]);
+            $result_month = $stmt_month->fetch();
+            $stats_mensuelles[$month - 1] = intval($result_month['count'] ?? 0);
+        }
+    }
+} catch (Exception $e) {
+    // En cas d'erreur, garder les valeurs par défaut
+}
 
 // ═══ ACCOUNT DELETION WITH OTP ═══
 $account_deletion_step = 1; // Step 1: Confirmation, Step 2: OTP, Step 3: Final confirmation
@@ -141,9 +217,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     if (isset($_SESSION['account_deletion_step']) && $_SESSION['account_deletion_step'] === 3) {
         // Log deletion
-        $raison = htmlspecialchars(trim($_POST['raison_depart'] ?? 'Suppression via formulaire'));
-        $pdo->prepare("INSERT INTO suppressions_comptes (nom_utilisateur, email_utilisateur, role_utilisateur, raison) VALUES (?, ?, ?, ?)")
-            ->execute([$user['nom'], $user['email'], $user['role'], $raison]);
+        $motif_suppression = htmlspecialchars(trim($_POST['raison_depart'] ?? 'Suppression via formulaire'));
+        $pdo->prepare("INSERT INTO suppressions_comptes (user_id_supprime, nom, prenom, email, role, motif, supprime_par) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            ->execute([$user_id, $user['nom'], $user['prenom'], $user['email'], $user['role'], $motif_suppression, $user_id]);
         
         // Delete user
         $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$user_id]);
@@ -228,11 +304,11 @@ include __DIR__ . '/views/components/navbar_client.php';
                     <?= htmlspecialchars(strtoupper($user['nom'])) . ' ' . htmlspecialchars($user['prenom']) ?>
                 </h3>
                 <span class="badge-muted" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.5px;">
-                    <i class="bi <?= $user['role'] === 'coiffeur' ? 'bi-scissors' : 'bi-person-fill' ?> me-1" style="color:var(--gold);" aria-hidden="true"></i>
+                    <i class="bi <?= $user['role'] === 'prestataire' ? 'bi-scissors' : 'bi-person-fill' ?> me-1" style="color:var(--gold);" aria-hidden="true"></i>
                     COMPTE // <?= strtoupper($user['role']) ?>
                 </span>
 
-                <?php if ($user['role'] === 'coiffeur'): ?>
+                <?php if ($user['role'] === 'prestataire'): ?>
                     <div class="metric-box metric-highlight text-center mt-3 mb-3">
                         <span class="metric-label">Réputation globale</span>
                         <div class="d-flex align-items-center justify-content-center gap-2">
@@ -253,7 +329,7 @@ include __DIR__ . '/views/components/navbar_client.php';
                     </a>
                     <button type="button" class="btn-outline-gold" style="padding:8px;font-size:0.72rem;" onclick="openModal('modal-avis')">
                         <span class="pulse-dot"></span>
-                        <?= $user['role'] === 'coiffeur' ? 'HISTORIQUE DES AVIS REÇUS' : 'MES DERNIERS AVIS LAISSÉS' ?>
+                        <?= $user['role'] === 'prestataire' ? 'HISTORIQUE DES AVIS REÇUS' : 'MES DERNIERS AVIS LAISSÉS' ?>
                     </button>
                     <a href="<?= $lien_rendezvous ?>" class="btn-outline-gold" style="padding:8px;font-size:0.72rem;">
                         <i class="bi bi-calendar3 me-2" aria-hidden="true"></i> MES RENDEZ-VOUS
@@ -339,7 +415,7 @@ include __DIR__ . '/views/components/navbar_client.php';
                     </div>
                 </div>
 
-                <?php if ($user['role'] === 'coiffeur'): ?>
+                <?php if ($user['role'] === 'prestataire'): ?>
                 <!-- Statut professionnel coiffeur -->
                 <h5 style="font-size:0.72rem;font-weight:700;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:1rem;">
                     <i class="bi bi-patch-check me-2" aria-hidden="true"></i>STATUT PROFESSIONNEL
@@ -510,7 +586,7 @@ ob_start();
     <table class="table-dark-cct">
         <thead>
             <tr>
-                <th><?= $user['role'] === 'coiffeur' ? 'Client' : 'Coiffeur' ?></th>
+                <th><?= $user['role'] === 'prestataire' ? 'Client' : 'Coiffeur' ?></th>
                 <th>Note</th>
                 <th>Commentaire</th>
                 <th class="text-end">Date</th>
@@ -523,7 +599,7 @@ ob_start();
                         <td style="font-weight:700;"><?= htmlspecialchars(($com['prenom'] ?? '') . ' ' . ($com['nom'] ?? '')) ?></td>
                         <td style="color:var(--gold);"><?php for($i=1;$i<=5;$i++) echo $i<=($com['note']??0)?'★':'☆'; ?></td>
                         <td style="color:var(--text-muted);font-size:0.78rem;">"<?= htmlspecialchars($com['commentaire'] ?? '') ?>"</td>
-                        <td class="text-end" style="font-size:0.7rem;font-family:monospace;color:var(--text-muted);"><?= htmlspecialchars($com['date_creation'] ?? '') ?></td>
+                        <td class="text-end" style="font-size:0.7rem;font-family:monospace;color:var(--text-muted);"><?= htmlspecialchars($com['date_demande'] ?? '') ?></td>
                     </tr>
                 <?php endforeach; ?>
             <?php else: ?>
@@ -535,13 +611,13 @@ ob_start();
 <?php
 $modal_content = ob_get_clean();
 $modal_id = 'modal-avis';
-$modal_title = $user['role'] === 'coiffeur' ? 'Avis reçus (max 10)' : 'Mes derniers avis laissés (max 10)';
+$modal_title = $user['role'] === 'prestataire' ? 'Avis reçus (max 10)' : 'Mes derniers avis laissés (max 10)';
 $modal_width = '700px';
 include __DIR__ . '/views/components/modal.php';
 unset($modal_content, $modal_id, $modal_title, $modal_width);
 ?>
 
-<?php if ($user['role'] === 'coiffeur' && !empty($user['diplome']) && pathinfo($user['diplome'], PATHINFO_EXTENSION) !== 'pdf'): ?>
+<?php if ($user['role'] === 'prestataire' && !empty($user['diplome']) && pathinfo($user['diplome'], PATHINFO_EXTENSION) !== 'pdf'): ?>
 <?php
 ob_start();
 echo '<img src="' . htmlspecialchars($user['diplome']) . '" class="img-fluid" style="border-radius:8px;" alt="Diplôme grand format">';
@@ -580,7 +656,7 @@ new Chart(ctxRdv, {
 });
 
 const ctxDyna = document.getElementById('chartDynamiqueRole').getContext('2d');
-<?php if ($user['role'] === 'coiffeur'): ?>
+<?php if ($user['role'] === 'prestataire'): ?>
 new Chart(ctxDyna, {
     type: 'bar',
     data: {

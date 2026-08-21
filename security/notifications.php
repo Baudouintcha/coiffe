@@ -11,18 +11,18 @@ if (!function_exists('notifier')) {
      * Architecture extensible : ajouter email/push/sms ici quand disponible
      *
      * @param PDO    $pdo     Connexion PDO
-     * @param int    $id_user Destinataire
+     * @param int    $user_id Destinataire
      * @param string $message Texte de la notification
      * @param string $type    info | success | danger | warning
      * @return bool
      */
-    function notifier(PDO $pdo, int $id_user, string $message, string $type = 'info'): bool {
+    function notifier(PDO $pdo, int $user_id, string $message, string $type = 'info'): bool {
         try {
             $stmt = $pdo->prepare(
-                "INSERT INTO notifications (id_user, message, type, lu, date_notification)
+                "INSERT INTO notifications (user_id, message, type, lu, date_demande)
                  VALUES (?, ?, ?, 0, NOW())"
             );
-            return $stmt->execute([$id_user, $message, $type]);
+            return $stmt->execute([$user_id, $message, $type]);
         } catch (Exception $e) {
             return false; // Non-bloquant
         }

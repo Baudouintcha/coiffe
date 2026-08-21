@@ -24,7 +24,7 @@ class PaymentService {
         try {
             $this->pdo->beginTransaction();
             $this->pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?")->execute([$montant, $userId]);
-            $this->pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_creation) VALUES (?, 'recharge', ?, ?, NOW())")->execute([$userId, $montant, $motif . ($this->simulationMode ? ' (simulation)' : '')]);
+            $this->pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_demande) VALUES (?, 'recharge', ?, ?, NOW())")->execute([$userId, $montant, $motif . ($this->simulationMode ? ' (simulation)' : '')]);
             $this->pdo->commit();
             return ['success' => true, 'message' => number_format($montant, 0, ',', ' ') . ' FCFA ajoutés'];
         } catch (Exception $e) {
@@ -49,7 +49,7 @@ class PaymentService {
             }
             
             $this->pdo->prepare("UPDATE users SET solde = solde - ? WHERE id = ?")->execute([$montant, $userId]);
-            $this->pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_creation) VALUES (?, 'gel', ?, ?, NOW())")->execute([$userId, $montant, $motif]);
+            $this->pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_demande) VALUES (?, 'gel', ?, ?, NOW())")->execute([$userId, $montant, $motif]);
             $this->pdo->commit();
             return ['success' => true, 'solde_restant' => $solde - $montant];
         } catch (Exception $e) {
@@ -77,11 +77,11 @@ class PaymentService {
             }
             
             $expiration = date('Y-m-d', strtotime('+30 days'));
-            $this->pdo->prepare("UPDATE users SET abonnement_status = 1, date_expiration_abo = ? WHERE id = ?")->execute([$expiration, $coiffeurId]);
+            $this->pdo->prepare("UPDATE profils_prestataires SET abonnement_status = 'actif', date_expiration_abo = ? WHERE user_id = ?")->execute([$expiration, $coiffeurId]);
             
             if ($solde >= $montant) {
                 $this->pdo->prepare("UPDATE users SET solde = solde - ? WHERE id = ?")->execute([$montant, $coiffeurId]);
-                $this->pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_creation) VALUES (?, 'abonnement', ?, 'Abonnement mensuel', NOW())")->execute([$coiffeurId, $montant]);
+                $this->pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_demande) VALUES (?, 'abonnement', ?, 'Abonnement mensuel', NOW())")->execute([$coiffeurId, $montant]);
             }
             
             $this->pdo->commit();

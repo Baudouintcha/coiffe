@@ -91,7 +91,7 @@ echo "</div><div class='test-group'>
 
 try {
     $total = $pdo->query("SELECT COUNT(*) FROM notifications")->fetchColumn();
-    $nonlues = $pdo->query("SELECT COUNT(*) FROM notifications WHERE statut_lecture = 'non_lu'")->fetchColumn();
+    $nonlues = $pdo->query("SELECT COUNT(*) FROM notifications WHERE lu = 'non_lu'")->fetchColumn();
     
     echo "<div class='test-item'>
     <div class='test-status status-ok'>✓</div>
@@ -103,16 +103,16 @@ try {
         $derniers = $pdo->query("
             SELECT n.*, u.prenom, u.nom, u.role 
             FROM notifications n
-            LEFT JOIN users u ON n.id_user = u.id
-            WHERE n.statut_lecture = 'non_lu'
-            ORDER BY n.date_notification DESC
+            LEFT JOIN users u ON n.user_id = u.id
+            WHERE n.lu = 'non_lu'
+            ORDER BY n.date_demande DESC
             LIMIT 5
         ")->fetchAll();
         
         foreach ($derniers as $n) {
             echo htmlspecialchars($n['prenom'] . ' ' . $n['nom'] . ' (' . $n['role'] . ')') . "<br>";
             echo "Message : " . htmlspecialchars(substr($n['message'], 0, 60) . '...') . "<br>";
-            echo "Date : " . $n['date_notification'] . "<br><br>";
+            echo "Date : " . $n['date_demande'] . "<br><br>";
         }
         echo "</div>";
     }
@@ -148,7 +148,7 @@ echo "</div><div class='test-group'>
 try {
     $demandes = $pdo->query("
         SELECT COUNT(*) as total,
-               COUNT(DISTINCT r.coiffeur_id) as coiffeurs_affectes
+               COUNT(DISTINCT r.prestataire_id) as coiffeurs_affectes
         FROM rendez_vous r
         WHERE r.statut_rdv = 'en_attente'
     ")->fetch();
@@ -165,7 +165,7 @@ try {
             FROM rendez_vous r
             JOIN users u ON r.client_id = u.id
             JOIN prestations p ON r.coiffure_id = p.id_prestation
-            JOIN users c ON r.coiffeur_id = c.id
+            JOIN users c ON r.prestataire_id = c.id
             WHERE r.statut_rdv = 'en_attente'
             ORDER BY r.date_demande DESC
             LIMIT 3
@@ -190,11 +190,11 @@ try {
 echo "</div><div class='test-group'>
 <h2 style='margin-bottom: 1rem; font-size: 1rem; color: #D4AF37;'>Test 6 : Session utilisateur</h2>";
 
-if (isset($_SESSION['id_user'])) {
+if (isset($_SESSION['user_id'])) {
     $user_role = $_SESSION['role'] ?? 'unknown';
     echo "<div class='test-item'>
     <div class='test-status status-ok'>✓</div>
-    <div class='test-message'>Utilisateur connecté : ID=" . $_SESSION['id_user'] . " | Rôle=$user_role</div>
+    <div class='test-message'>Utilisateur connecté : ID=" . $_SESSION['user_id'] . " | Rôle=$user_role</div>
     </div>";
 } else {
     echo "<div class='test-item'>

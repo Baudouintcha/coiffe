@@ -9,7 +9,7 @@
  *
  * Usage :
  *   $payment = new PaymentService($pdo);
- *   $result  = $payment->rechargerPortefeuille($id_user, $montant, 'simulation');
+ *   $result  = $payment->rechargerPortefeuille($user_id, $montant, 'simulation');
  *   $result  = $payment->activerAbonnement($prestataire_id, 1500, 30, 'simulation');
  */
 
@@ -33,13 +33,13 @@ class PaymentService
     /**
      * Crédite le solde d'un utilisateur et enregistre la transaction.
      *
-     * @param int    $id_user  ID utilisateur
+     * @param int    $user_id  ID utilisateur
      * @param float  $montant  Montant à créditer (FCFA)
      * @param string $mode     'simulation' | 'kkiapay'
      * @param string $motif    Libellé de la transaction
      * @return array ['success'=>bool, 'message'=>string, 'nouveau_solde'=>float]
      */
-    public function rechargerPortefeuille(int $id_user, float $montant, string $mode = self::MODE_SIMULATION, string $motif = 'Recharge portefeuille'): array
+    public function rechargerPortefeuille(int $user_id, float $montant, string $mode = self::MODE_SIMULATION, string $motif = 'Recharge portefeuille'): array
     {
         if ($montant < 500) {
             return ['success' => false, 'message' => 'Montant minimum : 500 FCFA.'];
@@ -49,7 +49,7 @@ class PaymentService
         }
 
         if ($mode === self::MODE_SIMULATION) {
-            return $this->_simulerRecharge($id_user, $montant, $motif);
+            return $this->_simulerRecharge($user_id, $montant, $motif);
         }
 
         // Futur : appel Kkiapay ici
@@ -109,7 +109,7 @@ class PaymentService
             $this->pdo->prepare("UPDATE users SET solde = solde - ? WHERE id = ?")
                       ->execute([$montant, $client_id]);
             $this->pdo->prepare(
-                "INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_creation)
+                "INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_demande)
                  VALUES (?, 'gel_rdv', ?, ?, NOW())"
             )->execute([$client_id, -$montant, "Gel fonds RDV #$id_rdv"]);
             $this->pdo->commit();
@@ -129,20 +129,20 @@ class PaymentService
     // MÉTHODES INTERNES — SIMULATION
     // ═══════════════════════════════════════════════════════
 
-    private function _simulerRecharge(int $id_user, float $montant, string $motif): array
+    private function _simulerRecharge(int $user_id, float $montant, string $motif): array
     {
         try {
             $this->pdo->beginTransaction();
             $this->pdo->prepare("UPDATE users SET solde = solde + ? WHERE id = ?")
-                      ->execute([$montant, $id_user]);
+                      ->execute([$montant, $user_id]);
             $this->pdo->prepare(
-                "INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_creation)
+                "INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_demande)
                  VALUES (?, 'recharge', ?, ?, NOW())"
-            )->execute([$id_user, $montant, $motif . ' (simulation)']);
+            )->execute([$user_id, $montant, $motif . ' (simulation)']);
             $this->pdo->commit();
 
             $stmt = $this->pdo->prepare("SELECT solde FROM users WHERE id = ?");
-            $stmt->execute([$id_user]);
+            $stmt->execute([$user_id]);
             $nouveau_solde = (float)$stmt->fetchColumn();
 
             return [
@@ -164,12 +164,13 @@ class PaymentService
             // Date d'expiration = aujourd'hui + durée
             $nouvelle_expiration = date('Y-m-d', strtotime("+{$duree_jours} days"));
 
+            // Mise à jour de l'abonnement dans profils_prestataires
             $this->pdo->prepare(
-                "UPDATE users SET abonnement_status = 1, date_expiration_abo = ? WHERE id = ?"
+                "UPDATE profils_prestataires SET abonnement_status = 'actif', date_expiration_abo = ? WHERE user_id = ?"
             )->execute([$nouvelle_expiration, $prestataire_id]);
 
             $this->pdo->prepare(
-                "INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_creation)
+                "INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif, date_demande)
                  VALUES (?, 'abonnement', ?, ?, NOW())"
             )->execute([$prestataire_id, -$prix, "Abonnement mensuel (simulation) — expire le $nouvelle_expiration"]);
 
@@ -196,7 +197,7 @@ class PaymentService
                                   . "Veuillez valider son profil dans le tableau de bord admin.";
 
                     $stmt_notif = $this->pdo->prepare(
-                        "INSERT INTO notifications (id_user, message, type, lu, date_notification)
+                        "INSERT INTO notifications (user_id, message, type, lu, date_demande)
                          VALUES (?, ?, 'info', 0, NOW())"
                     );
                     foreach ($admins as $admin) {

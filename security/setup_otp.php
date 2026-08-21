@@ -53,7 +53,7 @@ try {
     ];
 
     foreach ($columns_to_check as $col => $def) {
-        $check = $pdo->query("SHOW COLUMNS FROM users WHERE Field = '$col'")->fetch();
+        $check = $pdo->query("SHOW COLUMNS FROM users LIKE '$col'")->fetch();
         if (!$check) {
             $pdo->exec("ALTER TABLE users ADD COLUMN $col $def");
             echo "✅ Colonne $col ajoutée.\n";

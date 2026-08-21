@@ -117,7 +117,7 @@ class OtpService
 
             // Insérer le nouvel OTP
             $this->pdo->prepare(
-                "INSERT INTO otp_codes (user_id, purpose, code_hash, expires_at, attempts)
+                "INSERT INTO otp_codes (user_id, purpose, code_hash, expires_at, tentatives)
                  VALUES (?, ?, ?, ?, 0)"
             )->execute([$user_id, $purpose, $otp_hash, $expires_at]);
 
@@ -173,7 +173,7 @@ class OtpService
         try {
             // Chercher l'OTP actif
             $stmt = $this->pdo->prepare(
-                "SELECT id, code_hash, expires_at, attempts, used_at
+                "SELECT id, code_hash, expires_at, tentatives, used_at
                  FROM otp_codes
                  WHERE user_id = ? AND purpose = ? AND used_at IS NULL
                  LIMIT 1"
@@ -202,7 +202,7 @@ class OtpService
             }
 
             // Vérifier le nombre de tentatives
-            if ($otp['attempts'] >= self::MAX_ATTEMPTS) {
+            if ($otp['tentatives'] >= self::MAX_ATTEMPTS) {
                 // OTP bloqué après 5 tentatives
                 return [
                     'success' => false,
@@ -213,13 +213,13 @@ class OtpService
             // Vérifier le code contre le hash
             if (!password_verify($code, $otp['code_hash'])) {
                 // Code incorrect — incrémenter les tentatives
-                $new_attempts = $otp['attempts'] + 1;
+                $new_tentatives = $otp['tentatives'] + 1;
                 $this->pdo->prepare(
-                    "UPDATE otp_codes SET attempts = ? WHERE id = ?"
-                )->execute([$new_attempts, $otp['id']]);
+                    "UPDATE otp_codes SET tentatives = ? WHERE id = ?"
+                )->execute([$new_tentatives, $otp['id']]);
 
                 // Si >= 5 tentatives, invalider l'OTP
-                if ($new_attempts >= self::MAX_ATTEMPTS) {
+                if ($new_tentatives >= self::MAX_ATTEMPTS) {
                     $this->pdo->prepare(
                         "UPDATE otp_codes SET used_at = CURRENT_TIMESTAMP WHERE id = ?"
                     )->execute([$otp['id']]);
@@ -270,15 +270,15 @@ class OtpService
         try {
             // Chercher le dernier OTP généré (peu importe l'état)
             $stmt = $this->pdo->prepare(
-                "SELECT created_at FROM otp_codes
+                "SELECT date_demande FROM otp_codes
                  WHERE user_id = ? AND purpose = ?
-                 ORDER BY created_at DESC LIMIT 1"
+                 ORDER BY date_demande DESC LIMIT 1"
             );
             $stmt->execute([$user_id, $purpose]);
             $last_otp = $stmt->fetch();
 
             if ($last_otp) {
-                $last_created = strtotime($last_otp['created_at']);
+                $last_created = strtotime($last_otp['date_demande']);
                 $now = time();
                 $seconds_elapsed = $now - $last_created;
 
@@ -297,7 +297,7 @@ class OtpService
             $one_hour_ago = date('Y-m-d H:i:s', time() - 3600);
             $count_stmt = $this->pdo->prepare(
                 "SELECT COUNT(*) FROM otp_codes
-                 WHERE user_id = ? AND purpose = ? AND created_at > ?"
+                 WHERE user_id = ? AND purpose = ? AND date_demande > ?"
             );
             $count_stmt->execute([$user_id, $purpose, $one_hour_ago]);
             $count = (int)$count_stmt->fetchColumn();
@@ -379,7 +379,7 @@ class OtpService
     {
         try {
             $stmt = $this->pdo->prepare(
-                "SELECT id, expires_at, attempts, created_at
+                "SELECT id, expires_at, tentatives, date_demande
                  FROM otp_codes
                  WHERE user_id = ? AND purpose = ? AND used_at IS NULL
                  LIMIT 1"
@@ -394,10 +394,10 @@ class OtpService
             return [
                 'found' => true,
                 'expires_at' => $otp['expires_at'],
-                'attempts' => $otp['attempts'],
+                'tentatives' => $otp['tentatives'],
                 'is_expired' => strtotime($otp['expires_at']) < time(),
-                'is_blocked' => $otp['attempts'] >= self::MAX_ATTEMPTS,
-                'created_at' => $otp['created_at'],
+                'is_blocked' => $otp['tentatives'] >= self::MAX_ATTEMPTS,
+                'date_demande' => $otp['date_demande'],
             ];
         } catch (Exception $e) {
             error_log("OtpService::getActiveOtpInfo error: " . $e->getMessage());

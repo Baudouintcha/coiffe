@@ -3,21 +3,21 @@
  * coiffeurs/mes_zones.php — Sélection des zones géographiques d'intervention
  * Migration Design System v2.0 — Parcours Coiffeur — Page 5
  *
- * ⚠️  LOGIQUE MÉTIER INTACTE — SQL, quartiers, zones_coiffeur : inchangés.
+ * ⚠️  LOGIQUE MÉTIER INTACTE — SQL, quartiers, zones_prestataire : inchangés.
  */
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'prestataire') {
     header("Location: /coiffons/access/connexion.php");
     exit();
 }
 
 require_once __DIR__ . '/../security/config.php';
 
-$prestataire_id = $_SESSION['id_user'];
+$prestataire_id = $_SESSION['user_id'];
 $message_type = '';
 $message_text = '';
 
@@ -30,11 +30,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_zones']))
     try {
         $pdo->beginTransaction();
 
-        $delete_stmt = $pdo->prepare("DELETE FROM zones_coiffeur WHERE prestataire_id = ?");
+        $delete_stmt = $pdo->prepare("DELETE FROM zones_prestataire WHERE id_prestataire = ?");
         $delete_stmt->execute([$prestataire_id]);
 
         if (isset($_POST['quartiers_choisis']) && is_array($_POST['quartiers_choisis'])) {
-            $insert_stmt = $pdo->prepare("INSERT INTO zones_coiffeur (prestataire_id, id_quartier) VALUES (?, ?)");
+            $insert_stmt = $pdo->prepare("INSERT INTO zones_prestataire (id_prestataire, id_quartier) VALUES (?, ?)");
             foreach ($_POST['quartiers_choisis'] as $id_quartier) {
                 $insert_stmt->execute([$prestataire_id, intval($id_quartier)]);
             }
@@ -76,7 +76,7 @@ if ($id_ville_coiffeur === $id_cotonou || $id_ville_coiffeur === $id_calavi) {
 }
 $tous_les_quartiers = $all_quartiers_stmt->fetchAll();
 
-$mes_zones_stmt = $pdo->prepare("SELECT id_quartier FROM zones_coiffeur WHERE prestataire_id = ?");
+$mes_zones_stmt = $pdo->prepare("SELECT id_quartier FROM zones_prestataire WHERE id_prestataire = ?");
 $mes_zones_stmt->execute([$prestataire_id]);
 $raw_zones        = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 $mes_zones_actives = array_map('intval', $raw_zones);

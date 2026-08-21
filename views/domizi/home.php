@@ -494,7 +494,7 @@
 
             data.metiers.forEach(m => {
                 list.innerHTML += `
-                    <a href="/coiffons/app.php?metier=${m.slug}" class="metier-item">
+                    <a href="/coiffons/index.php?metier=${m.slug}" class="metier-item">
                         <div class="mi-icon">
                             <i class="bi ${m.icone || 'bi-grid'}"></i>
                         </div>

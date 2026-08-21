@@ -7,28 +7,28 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../security/config.php';
 
-$est_connecte = isset($_SESSION['id_user']);
-$role_utilisateur = $_SESSION['role'] ?? 'invite';
-$nom_utilisateur = $_SESSION['nom'] ?? 'INVITÉ';
+$est_connecte = isset($_SESSION['user_id']);
+$role = $_SESSION['role'] ?? 'invite';
+$nom = $_SESSION['nom'] ?? 'INVITÉ';
 
 $nb_notifs = 0;
 $liste_notifs = [];
 
 if ($est_connecte) {
-    $user_logge_id = $_SESSION['id_user'];
+    $user_logge_id = $_SESSION['user_id'];
 
     // 1. Compte des notifications non lues en Base de Données
-    $stmt_count = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE id_user = ? AND statut_lecture = 'non_lu'");
+    $stmt_count = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE id = ? AND lu = 'non_lu'");
     $stmt_count->execute([$user_logge_id]);
     $nb_notifs = $stmt_count->fetchColumn();
 
     // 2. Liste des 5 dernières notifications en Base de Données
-    $stmt_list = $pdo->prepare("SELECT * FROM notifications WHERE id_user = ? ORDER BY date_notification DESC LIMIT 5");
+    $stmt_list = $pdo->prepare("SELECT * FROM notifications WHERE id = ? ORDER BY date_demande DESC LIMIT 5");
     $stmt_list->execute([$user_logge_id]);
     $liste_notifs = $stmt_list->fetchAll();
 
     // 3. Ajustement du compteur global si une notification de session (Abonnement) est active
-    if ($role_utilisateur === 'coiffeur' && isset($_SESSION['alerte_abo_cloche'])) {
+    if ($role === 'prestataire' && isset($_SESSION['alerte_abo_cloche'])) {
         $nb_notifs++;
     }
 }
@@ -36,7 +36,7 @@ if ($est_connecte) {
 // Action : Marquer tout comme lu
 if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
     if ($est_connecte) {
-        $pdo->prepare("UPDATE notifications SET statut_lecture = 'lu' WHERE id_user = ?")->execute([$_SESSION['id_user']]);
+        $pdo->prepare("UPDATE notifications SET lu = 'lu' WHERE id = ?")->execute([$_SESSION['user_id']]);
         header("Location: " . strtok($_SERVER["REQUEST_URI"], '?'));
         exit();
     }
@@ -91,13 +91,13 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
     
     <div class="px-4 mb-3 text-center">
         <h5 class="text-warning small mb-0">BIENVENUE</h5>
-        <p class="fw-bold mb-2"><?php echo strtoupper($nom_utilisateur); ?></p>
+        <p class="fw-bold mb-2"><?php echo strtoupper($nom); ?></p>
         <hr class="border-warning my-1">
     </div>
 
     <a href="/coiffons/index.php"><i class="bi bi-house-door me-2"></i> Accueil</a>
 
-    <?php if ($role_utilisateur == 'coiffeur'): ?>
+    <?php if ($role == 'prestataire'): ?>
         <div class="accordion accordion-flush" id="accordionSidebar">
             <div class="accordion-item">
                 <h2 class="accordion-header">
@@ -141,7 +141,7 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
                 </div>
             </div>
         </div>
-    <?php elseif ($role_utilisateur == 'client'): ?>
+    <?php elseif ($role == 'client'): ?>
         <a href="/coiffons/filter/annuaire_coiffeurs.php"><i class="bi bi-search-heart me-2"></i> Trouver un coiffeur</a>
         <a href="/coiffons/client/mes_rendezvous.php"><i class="bi bi-calendar-check me-2"></i> Mes RDV</a>
         <a href="/coiffons/client/catalogue.php"><i class="bi bi-scissors me-2"></i> Catalogue des styles</a>
@@ -177,7 +177,7 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
 
             <div class="d-flex align-items-center gap-2 gap-sm-3 flex-shrink-0">
                 
-                <?php if ($role_utilisateur == 'client'): ?>
+                <?php if ($role == 'client'): ?>
                     <a href="/coiffons/filter/annuaire_coiffeurs.php" class="btn btn-outline-warning btn-sm d-flex align-items-center px-2 py-1 fw-bold" title="Trouver un coiffeur" style="font-size: 0.85rem;">
                         <i class="bi bi-search <?php echo $est_connecte ? 'me-md-1' : 'me-1'; ?>"></i> 
                         <span class="d-none d-md-inline">Trouver un coiffeur</span>
@@ -202,7 +202,7 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
 
                             <?php
                             $toutes_les_notifs = [];
-                            if ($role_utilisateur === 'coiffeur' && isset($_SESSION['alerte_abo_cloche'])) {
+                            if ($role === 'prestataire' && isset($_SESSION['alerte_abo_cloche'])) {
                                 $toutes_les_notifs[] = [
                                     'type'   => 'danger',
                                     'message'=> $_SESSION['alerte_abo_cloche'],
@@ -214,11 +214,11 @@ if (isset($_GET['action_notif']) && $_GET['action_notif'] === 'marquer_lu') {
 
                             foreach ($liste_notifs as $n) {
                                 $toutes_les_notifs[] = [
-                                    'type'   => ($n['statut_lecture'] == 'non_lu') ? 'info' : 'standard',
+                                    'type'   => ($n['lu'] == 'non_lu') ? 'info' : 'standard',
                                     'message'=> $n['message'],
                                     'icone'  => 'bi-info-circle',
                                     'lien'   => '#', 
-                                    'date'   => date('d/m H:i', strtotime($n['date_notification']))
+                                    'date'   => date('d/m H:i', strtotime($n['date_demande']))
                                 ];
                             }
                             ?>

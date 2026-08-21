@@ -402,7 +402,7 @@ class AccountDeletionFlowTest extends TestCase
      */
     public function testDifferentRolesRecordedInAudit(): void
     {
-        $roles = ['client', 'coiffeur'];
+        $roles = ['client', 'prestataire'];
 
         foreach ($roles as $role) {
             TestDatabaseHelper::clearDatabase();

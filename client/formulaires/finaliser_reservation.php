@@ -21,7 +21,7 @@ require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/../security/csrf.php';
 
 // Si déjà connecté → rediriger vers réservation directe
-if (isset($_SESSION['id_user'])) {
+if (isset($_SESSION['user_id'])) {
     $id_service = isset($_GET['id_service']) ? intval($_GET['id_service']) : 0;
     if ($id_service > 0) {
         header("Location: /coiffons/client/creer_rendezvous.php?id_service=" . $id_service);
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['finaliser_reservation
 
                 $ins = $pdo->prepare("
                     INSERT INTO users 
-                    (nom, prenom, sexe, email, telephone, password, role, id_ville, id_quartier, statut, is_approved, created_at)
+                    (nom, prenom, sexe, email, telephone, password, role, id_ville, id_quartier, statut, is_approved, date_demande)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ");
 
@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['finaliser_reservation
                     $new_user_id = $pdo->lastInsertId();
 
                     // Créer session automatiquement
-                    $_SESSION['id_user'] = $new_user_id;
+                    $_SESSION['user_id'] = $new_user_id;
                     $_SESSION['nom'] = $nom;
                     $_SESSION['prenom'] = $prenom;
                     $_SESSION['role'] = 'client';

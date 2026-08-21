@@ -16,12 +16,12 @@ require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/../security/PaymentService.php';
 
 // Sécurité
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'prestataire') {
     header('Location: /coiffons/index.php?page=login');
     exit();
 }
 
-$id_coiffeur = (int)$_SESSION['id_user'];
+$id_coiffeur = (int)$_SESSION['user_id'];
 $prix_abo    = 1500;
 $duree_jours = 30;
 $result      = null;

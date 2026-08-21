@@ -28,7 +28,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT u.id, u.nom, u.prenom, u.photo_profil, v.nom_ville
         FROM users u
-        LEFT JOIN villes v ON u.ville = v.id
+        LEFT JOIN villes v ON u.id_ville = v.id
         WHERE u.role = 'coiffeur'
           AND u.is_approved = 1
           AND (u.abonnement_status = 1 OR LOWER(u.abonnement_status) = 'actif')

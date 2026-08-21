@@ -11,12 +11,12 @@
  */
 
 // ── Sécurité : coiffeur connecté uniquement ──
-if (!isset($_SESSION['id_user']) || ($_SESSION['role'] ?? '') !== 'coiffeur') {
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'prestataire') {
     header("Location: /coiffons/index.php?page=login");
     exit();
 }
 
-$coiffeur_id  = $_SESSION['id_user'];
+$prestataire_id  = $_SESSION['user_id'];
 $prenom       = htmlspecialchars($_SESSION['prenom'] ?? 'Coiffeur');
 $initiale     = strtoupper(substr($prenom, 0, 1));
 $photo_profil = $_SESSION['photo_profil'] ?? null;
@@ -33,7 +33,7 @@ $solde_disponible = 0;
 
 try {
     $stmt_user = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-    $stmt_user->execute([$coiffeur_id]);
+    $stmt_user->execute([$prestataire_id]);
     $coiffeur_data = $stmt_user->fetch();
 
     if ($coiffeur_data) {
@@ -79,7 +79,7 @@ try {
         WHERE r.prestataire_id = ? AND r.date_rdv = ?
         AND r.statut_rdv IN ('confirme', 'accepte', 'termine')
     ");
-    $q->execute([$coiffeur_id, $today]);
+    $q->execute([$prestataire_id, $today]);
     $stats = $q->fetch();
     $rdv_aujourd_hui   = intval($stats['nb'] ?? 0);
     $gains_aujourd_hui = floatval($stats['gains'] ?? 0);
@@ -89,7 +89,7 @@ try {
         SELECT COUNT(*) FROM rendez_vous
         WHERE prestataire_id = ? AND statut_rdv = 'en_attente'
     ");
-    $q2->execute([$coiffeur_id]);
+    $q2->execute([$prestataire_id]);
     $demandes_attente = intval($q2->fetchColumn());
 
     // Prochain RDV (le plus proche dans le futur)
@@ -106,7 +106,7 @@ try {
         ORDER BY r.date_rdv ASC, r.heure_debut ASC
         LIMIT 1
     ");
-    $q3->execute([$coiffeur_id]);
+    $q3->execute([$prestataire_id]);
     $prochain_rdv = $q3->fetch();
 
     // Planning du jour
@@ -119,7 +119,7 @@ try {
         WHERE r.prestataire_id = ? AND r.date_rdv = ?
         ORDER BY r.heure_debut ASC
     ");
-    $q4->execute([$coiffeur_id, $today]);
+    $q4->execute([$prestataire_id, $today]);
     $planning_jour = $q4->fetchAll();
 
     // Demandes en attente (liste)
@@ -133,7 +133,7 @@ try {
         ORDER BY r.date_demande DESC
         LIMIT 5
     ");
-    $q5->execute([$coiffeur_id]);
+    $q5->execute([$prestataire_id]);
     $demandes = $q5->fetchAll();
 
     // Mes services (catalogue)
@@ -141,7 +141,7 @@ try {
         SELECT * FROM services WHERE id_prestataire = ?
         ORDER BY id_service DESC LIMIT 6
     ");
-    $q6->execute([$coiffeur_id]);
+    $q6->execute([$prestataire_id]);
     $mes_services = $q6->fetchAll();
 
     // Notifications
@@ -149,14 +149,14 @@ try {
         SELECT COUNT(*) FROM notifications
         WHERE user_id = ? AND lu = 0
     ");
-    $q7->execute([$coiffeur_id]);
+    $q7->execute([$prestataire_id]);
     $nb_notifs = intval($q7->fetchColumn());
 
     $q8 = $pdo->prepare("
         SELECT * FROM notifications WHERE user_id = ?
-        ORDER BY date_notification DESC LIMIT 5
+        ORDER BY date_demande DESC LIMIT 5
     ");
-    $q8->execute([$coiffeur_id]);
+    $q8->execute([$prestataire_id]);
     $notifs_list = $q8->fetchAll();
 
 } catch (Exception $e) {
@@ -172,13 +172,13 @@ try {
         FROM avis c
         JOIN users u ON c.id_client = u.id
         WHERE c.id_prestataire = ? AND c.type_commentaire = 'public'
-        ORDER BY c.date_creation DESC LIMIT 3
+        ORDER BY c.date_demande DESC LIMIT 3
     ");
-    $q_avis->execute([$coiffeur_id]);
+    $q_avis->execute([$prestataire_id]);
     $avis_recents = $q_avis->fetchAll();
 
     $q_moy = $pdo->prepare("SELECT ROUND(AVG(note), 1) as moy FROM avis WHERE id_prestataire = ? AND type_commentaire = 'public'");
-    $q_moy->execute([$coiffeur_id]);
+    $q_moy->execute([$prestataire_id]);
     $note_moy_dashboard = $q_moy->fetchColumn() ?: null;
 } catch (Exception $e) {}
 
@@ -194,12 +194,12 @@ $checks = [
 ];
 
 try {
-    $dispo_count = $pdo->prepare("SELECT COUNT(*) FROM disponibilites WHERE coiffeur_id = ?");
-    $dispo_count->execute([$coiffeur_id]);
+    $dispo_count = $pdo->prepare("SELECT COUNT(*) FROM disponibilites WHERE prestataire_id = ?");
+    $dispo_count->execute([$prestataire_id]);
     $checks['disponibilites'] = intval($dispo_count->fetchColumn()) > 0;
 
     $zones_count = $pdo->prepare("SELECT COUNT(*) FROM zones_prestataire WHERE id_prestataire = ?");
-    $zones_count->execute([$coiffeur_id]);
+    $zones_count->execute([$prestataire_id]);
     $checks['zones'] = intval($zones_count->fetchColumn()) > 0;
 } catch (Exception $e) {}
 
@@ -624,7 +624,7 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
         <a href="/coiffons/coiffeurs/mes_zones.php" class="nav-item"><i class="bi bi-geo-alt"></i> Mes zones</a>
         <a href="/coiffons/coiffeurs/portefeuille.php" class="nav-item"><i class="bi bi-wallet2"></i> Portefeuille</a>
         <a href="/coiffons/coiffeurs/mes_avis.php" class="nav-item"><i class="bi bi-star-half"></i> Mes avis</a>
-        <a href="/coiffons/coiffeurs/profil_public.php?id=<?= $coiffeur_id ?>" class="nav-item"><i class="bi bi-person-badge"></i> Mon profil public</a>
+        <a href="/coiffons/coiffeurs/profil_public.php?id=<?= $prestataire_id ?>" class="nav-item"><i class="bi bi-person-badge"></i> Mon profil public</a>
     </nav>
     <div class="sidebar-footer">
         <a href="/coiffons/profil.php"><i class="bi bi-gear"></i> Paramètres</a>
@@ -946,7 +946,7 @@ body { background:var(--dark); color:#fff; font-family:'Inter',sans-serif; min-h
                     <?php foreach ($avis_recents as $av):
                         $note_av = intval($av['note'] ?? 0);
                         $extrait = mb_strimwidth($av['message'] ?? '', 0, 50, '…');
-                        $date_av = date('d/m/Y', strtotime($av['date_creation'] ?? 'now'));
+                        $date_av = date('d/m/Y', strtotime($av['date_demande'] ?? 'now'));
                     ?>
                         <div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -997,10 +997,11 @@ document.addEventListener('click', function(e) {
 
 <!-- ── FOOTER + IA ASSISTANT ── -->
 <?php
-include __DIR__ . '/../views/components/footer_global.php';
-include __DIR__ . '/../views/components/ia_assistant.php';
+$page_root = '/coiffons';
+include __DIR__ . '/../../views/components/footer_global.php';
+include __DIR__ . '/../../views/components/ia_assistant.php';
 $current_page = 'dashboard_coiffeur';
-include __DIR__ . '/../views/components/bottom_nav_client.php';
+include __DIR__ . '/../../views/components/bottom_nav_client.php';
 ?>
 
 </body>

@@ -72,7 +72,7 @@ $errors = [];
                 if ($file_exists) {
                     // Mettre à jour la BD
                     try {
-                        $update = $pdo->prepare("UPDATE users SET diplome = ? WHERE id = ?");
+                        $update = $pdo->prepare("UPDATE users SET /* diplome removed */ ? WHERE id = ?");
                         $update->execute([$new_path, $coiffeur['id']]);
                         echo "<span class='success'>✅ Mis à jour (fichier trouvé)</span>";
                         $fixed_count++;

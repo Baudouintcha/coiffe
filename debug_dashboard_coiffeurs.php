@@ -26,7 +26,7 @@ echo "<hr>";
 
 // 1. Vérifier la session
 echo "<h2>1️⃣ SESSION UTILISATEUR</h2>";
-if (!isset($_SESSION['id_user'])) {
+if (!isset($_SESSION['user_id'])) {
     echo "<p class='error'>❌ Aucun utilisateur connecté</p>";
     echo "<p>👉 <a href='/coiffons/access/connexion.php' style='color:#0ff;'>Se connecter</a></p>";
     exit;
@@ -34,7 +34,7 @@ if (!isset($_SESSION['id_user'])) {
 
 echo "<table>";
 echo "<tr><th>Clé</th><th>Valeur</th></tr>";
-$session_keys = ['id_user', 'nom', 'prenom', 'role', 'id_ville', 'id_quartier', 'photo_profil'];
+$session_keys = ['user_id', 'nom', 'prenom', 'role', 'id_ville', 'id_quartier', 'photo_profil'];
 foreach ($session_keys as $key) {
     $value = $_SESSION[$key] ?? '<span class="error">NON DÉFINI</span>';
     $class = isset($_SESSION[$key]) ? 'success' : 'error';
@@ -111,10 +111,10 @@ echo "<hr>";
 echo "<h2>4️⃣ LISTE DES COIFFEURS</h2>";
 try {
     $coiffeurs = $pdo->query("
-        SELECT u.id, u.nom, u.prenom, u.ville, u.id_quartier, u.is_approved, 
+        SELECT u.id, u.nom, u.prenom, u.id_ville, u.id_quartier, u.is_approved, 
                u.statut, u.abonnement_status, v.nom_ville, q.nom_quartier
         FROM users u
-        LEFT JOIN villes v ON u.ville = v.id
+        LEFT JOIN villes v ON u.id_ville = v.id
         LEFT JOIN quartiers q ON u.id_quartier = q.id
         WHERE u.role = 'coiffeur'
         ORDER BY u.id
@@ -136,7 +136,7 @@ try {
             echo "<tr class='$row_class'>";
             echo "<td>{$c['id']}</td>";
             echo "<td>{$c['prenom']} {$c['nom']}</td>";
-            echo "<td>{$c['nom_ville']} (ID:{$c['ville']})</td>";
+            echo "<td>{$c['nom_ville']} (ID:{$c['id_ville']})</td>";
             echo "<td>{$c['nom_quartier']} (ID:{$c['id_quartier']})</td>";
             echo "<td>" . ($approved ? '✓' : '✗') . "</td>";
             echo "<td>{$c['statut']}</td>";
@@ -169,14 +169,14 @@ try {
             (SELECT MIN(p2.prix) FROM prestations p2 WHERE p2.id_coiffeur = u.id) as prix,
             (SELECT p3.photo_style FROM prestations p3 WHERE p3.id_coiffeur = u.id AND p3.photo_style IS NOT NULL LIMIT 1) as photo_style
         FROM users u
-        LEFT JOIN villes v ON u.ville = v.id
-        LEFT JOIN zones_coiffeur z ON u.id = z.id_coiffeur
+        LEFT JOIN villes v ON u.id_ville = v.id
+        LEFT JOIN zones_prestataire z ON u.id = z.id_prestataire
         LEFT JOIN quartiers q ON u.id_quartier = q.id
         WHERE u.role = 'coiffeur' 
         AND u.is_approved = 1
         AND u.statut = 'actif'
         AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
-        AND u.ville = ? 
+        AND u.id_ville = ? 
         AND (u.id_quartier = ? OR z.id_quartier = ?)
         LIMIT 9
     ");
@@ -195,13 +195,13 @@ try {
                 v.nom_ville as ville,
                 q.nom_quartier as quartier
             FROM users u
-            LEFT JOIN villes v ON u.ville = v.id
+            LEFT JOIN villes v ON u.id_ville = v.id
             LEFT JOIN quartiers q ON u.id_quartier = q.id
             WHERE u.role = 'coiffeur' 
             AND u.is_approved = 1
             AND u.statut = 'actif'
             AND (u.abonnement_status = 'actif' OR u.abonnement_status = 1)
-            AND u.ville = ?
+            AND u.id_ville = ?
             LIMIT 9
         ");
         $stmt2->execute([$id_ville_client]);

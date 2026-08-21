@@ -23,18 +23,18 @@ if (isset($_SESSION['password_reset_success']) && $_SESSION['password_reset_succ
 }
 
 // ── PROTECTION BRUTE FORCE ── (inchangé)
-if (!isset($_SESSION['login_attempts'])) {
-    $_SESSION['login_attempts'] = 0;
+if (!isset($_SESSION['login_tentatives'])) {
+    $_SESSION['login_tentatives'] = 0;
     $_SESSION['login_last_attempt'] = 0;
 }
 $now = time();
 $blocked = false;
-if ($_SESSION['login_attempts'] >= 5 && ($now - $_SESSION['login_last_attempt']) < 900) {
+if ($_SESSION['login_tentatives'] >= 5 && ($now - $_SESSION['login_last_attempt']) < 900) {
     $blocked = true;
     $error = "Trop de tentatives. Réessayez dans " . ceil((900 - ($now - $_SESSION['login_last_attempt'])) / 60) . " minutes.";
 }
 if (($now - $_SESSION['login_last_attempt']) >= 900) {
-    $_SESSION['login_attempts'] = 0;
+    $_SESSION['login_tentatives'] = 0;
 }
 
 if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexion'])) {
@@ -48,37 +48,37 @@ if (!$blocked && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['connexio
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || empty($password)) {
         $error = "Email ou mot de passe invalide.";
     } else {
-        $stmt = $pdo->prepare("SELECT id, nom, prenom, role, sexe, photo_profil, password, statut, ville, id_quartier FROM users WHERE email = ? LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id, nom, prenom, role, sexe, photo_profil, password, statut, id_ville, id_quartier FROM users WHERE email = ? LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
         if ($user && isset($user['statut']) && $user['statut'] === 'banni') {
             $error = "Ce compte a été suspendu.";
         } elseif ($user && password_verify($password, $user['password'])) {
-            $_SESSION['login_attempts'] = 0;
-            $_SESSION['id_user']        = $user['id'];
+            $_SESSION['login_tentatives'] = 0;
+            $_SESSION['user_id']        = $user['id'];
             $_SESSION['nom']            = $user['nom'];
             $_SESSION['prenom']         = $user['prenom'];
             $_SESSION['role']           = $user['role'];
             $_SESSION['sexe']           = $user['sexe'];
             $_SESSION['photo_profil']   = $user['photo_profil'] ?? null;
-            $_SESSION['id_ville']       = $user['ville'] ?? 0;
+            $_SESSION['id_ville']       = $user['id_ville'] ?? 0;
             $_SESSION['id_quartier']    = $user['id_quartier'] ?? 0;
 
             if ($user['role'] === 'admin') {
                 header("Location: /coiffons/first/admin_dashboard.php");
             } elseif ($user['role'] === 'client') {
-                header("Location: /coiffons/index.php?page=dashboard");
-            } elseif ($user['role'] === 'coiffeur') {
-                header("Location: /coiffons/index.php?page=dashboard_coiffeur");
+                header("Location: /coiffons/index.php?metier=coiffure&page=dashboard");
+            } elseif ($user['role'] === 'prestataire') {
+                header("Location: /coiffons/index.php?metier=coiffure&page=dashboard_coiffeur");
             } else {
-                header("Location: /coiffons/index.php");
+                header("Location: /coiffons/index.php?metier=coiffure");
             }
             exit();
         } else {
-            $_SESSION['login_attempts']++;
+            $_SESSION['login_tentatives']++;
             $_SESSION['login_last_attempt'] = $now;
-            $error = "Identifiants incorrects. Tentative " . $_SESSION['login_attempts'] . "/5.";
+            $error = "Identifiants incorrects. Tentative " . $_SESSION['login_tentatives'] . "/5.";
         }
     }
 }

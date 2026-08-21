@@ -16,14 +16,14 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'client') {
     echo "<script>window.location.href='/coiffons/index.php?page=login';</script>";
     exit();
 }
 
 require_once __DIR__ . '/../security/config.php';
 
-$client_id = $_SESSION['id_user'];
+$client_id = $_SESSION['user_id'];
 
 // Paramètres GET
 $id_service   = isset($_GET['presta_id'])   ? intval($_GET['presta_id'])   : 0;
@@ -35,7 +35,7 @@ $heure_debut_url = isset($_GET['heure_debut']) ? trim($_GET['heure_debut'])   : 
 $mode_recap = ($date_rdv_url !== '' && $heure_debut_url !== '');
 
 // Chargement prestation — SQL inchangé
-$presta_stmt = $pdo->prepare("SELECT * FROM prestations WHERE id_service = ?");
+$presta_stmt = $pdo->prepare("SELECT * FROM services WHERE id_service = ?");
 $presta_stmt->execute([$id_service]);
 $prestation = $presta_stmt->fetch();
 
@@ -127,7 +127,7 @@ if ($prestation && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confir
             $msg_notif = "Nouvelle demande de RDV de " . ($_SESSION['prenom'] ?? 'Un client') . " " . ($_SESSION['nom'] ?? '')
                        . " pour le " . $date_rdv . " à " . $heure_debut . ".";
             try {
-                $pdo->prepare("INSERT INTO notifications (id_user, message, type, lu, date_notification) VALUES (?, ?, 'info', 0, NOW())")
+                $pdo->prepare("INSERT INTO notifications (user_id, message, type, lu, date_demande) VALUES (?, ?, 'info', 0, NOW())")
                     ->execute([$prestataire_id, $msg_notif]);
             } catch (Exception $e) {}
 

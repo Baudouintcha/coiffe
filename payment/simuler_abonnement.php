@@ -15,12 +15,12 @@ require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/PaymentService.php';
 
 // Sécurité : coiffeur uniquement
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'prestataire') {
     header('Location: /coiffons/index.php?page=login');
     exit();
 }
 
-$id_coiffeur  = $_SESSION['id_user'];
+$id_coiffeur  = $_SESSION['user_id'];
 $prenom       = htmlspecialchars($_SESSION['prenom'] ?? 'Coiffeur');
 $montant_abo  = 1500;
 

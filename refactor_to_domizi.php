@@ -49,11 +49,11 @@ $replacements = [
     '`portefeuilles`' => '/* N/A - solde dans users */',
     
     // Colonnes rendez_vous
-    '.coiffeur_id' => '.prestataire_id',
-    'r.coiffeur_id' => 'r.prestataire_id',
-    'rdv.coiffeur_id' => 'rdv.prestataire_id',
-    '`coiffeur_id`' => '`prestataire_id`',
-    "r . coiffeur_id" => "r . prestataire_id",
+    '.prestataire_id' => '.prestataire_id',
+    'r.prestataire_id' => 'r.prestataire_id',
+    'rdv.prestataire_id' => 'rdv.prestataire_id',
+    '`prestataire_id`' => '`prestataire_id`',
+    "r . prestataire_id" => "r . prestataire_id",
     
     'coiffure_id' => 'service_id',
     'coiffure_id,' => 'service_id,',
@@ -67,19 +67,19 @@ $replacements = [
     'photo_style' => 'photo',
     
     // Colonnes disponibilites
-    'coiffeur_id' => 'prestataire_id',
+    'prestataire_id' => 'prestataire_id',
     
     // Colonnes users - abonnement
     "'abonnement_status'" => "'abonnement_status'", // Garder mais colonne existe
     
     // Colonnes notifications
-    "'statut_lecture'" => "'lu'",
-    '"statut_lecture"' => '"lu"',
-    'statut_lecture' => 'lu',
+    "'lu'" => "'lu'",
+    '"lu"' => '"lu"',
+    'lu' => 'lu',
     "'non_lu'" => "0",
     "'lu'" => "1",
-    "'date_notification'" => "'date_creation'",
-    '"date_notification"' => '"date_creation"',
+    "'date_creation'" => "'date_demande'",
+    '"date_creation"' => '"date_demande"',
     
     // Colonnes avis
     'type_commentaire' => 'type',

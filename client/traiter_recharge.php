@@ -10,12 +10,12 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/../security/PaymentService.php';
 
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'client') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'client') {
     header('Location: /coiffons/index.php?page=login');
     exit();
 }
 
-$id_client = (int)$_SESSION['id_user'];
+$id_client = (int)$_SESSION['user_id'];
 $montant   = intval($_POST['montant'] ?? 0);
 
 $payment = new PaymentService($pdo);

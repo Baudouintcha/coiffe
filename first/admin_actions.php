@@ -40,12 +40,12 @@ switch ($action) {
     // ACTION 2 : Exclure définitivement un utilisateur de la plateforme
     // =================================================================
     case 'supprimer_user':
-        $id_user = intval($_GET['id'] ?? 0);
+        $user_id = intval($_GET['id'] ?? 0);
 
-        if ($id_user > 0) {
-            // ✅ BUG CORRIGÉ : id_user → id (colonne réelle de la table users)
+        if ($user_id > 0) {
+            // ✅ BUG CORRIGÉ : user_id → id (colonne réelle de la table users)
             $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
-            $stmt->execute([$id_user]);
+            $stmt->execute([$user_id]);
 
             header("Location: admin_dashboard.php?success=user_supprime");
             exit();
@@ -71,11 +71,11 @@ switch ($action) {
     // ACTION 4 : Nettoyer/Supprimer un log de l'historique des suppressions
     // =================================================================
     case 'supprimer_log_suppression':
-        $id_suppression = intval($_GET['id'] ?? 0);
+        $id = intval($_GET['id'] ?? 0);
 
-        if ($id_suppression > 0) {
-            $stmt = $pdo->prepare("DELETE FROM suppressions_comptes WHERE id_suppression = ?");
-            $stmt->execute([$id_suppression]);
+        if ($id > 0) {
+            $stmt = $pdo->prepare("DELETE FROM suppressions_comptes WHERE id = ?");
+            $stmt->execute([$id]);
 
             header("Location: admin_dashboard.php?success=log_nettoye");
             exit();
@@ -104,17 +104,17 @@ switch ($action) {
     // ACTION 6 : Valider ou suspendre l'approbation publique d'un coiffeur
     // =================================================================
     case 'toggle_approbation':
-        $id_user = intval($_GET['id'] ?? 0);
-        if ($id_user > 0) {
-            // On récupère le statut actuel — ✅ BUG CORRIGÉ : id_user → id
+        $user_id = intval($_GET['id'] ?? 0);
+        if ($user_id > 0) {
+            // On récupère le statut actuel — ✅ BUG CORRIGÉ : user_id → id
             $stmt = $pdo->prepare("SELECT is_approved FROM users WHERE id = ?");
-            $stmt->execute([$id_user]);
+            $stmt->execute([$user_id]);
             $user = $stmt->fetch();
 
             if ($user) {
                 $nouveau_statut = $user['is_approved'] ? 0 : 1;
                 $update = $pdo->prepare("UPDATE users SET is_approved = ? WHERE id = ?");
-                $update->execute([$nouveau_statut, $id_user]);
+                $update->execute([$nouveau_statut, $user_id]);
             }
             header("Location: admin_dashboard.php?success=statut_visibilite_maj");
             exit();
@@ -126,22 +126,22 @@ switch ($action) {
     // =================================================================
     case 'toggle_bannissement':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $id_user = intval($_POST['id_user'] ?? 0);
+            $user_id = intval($_POST['user_id'] ?? 0);
             $raison = trim($_POST['raison_ban'] ?? '');
 
-            if ($id_user > 0) {
-                // On récupère le statut actuel — ✅ BUG CORRIGÉ : id_user → id
+            if ($user_id > 0) {
+                // On récupère le statut actuel — ✅ BUG CORRIGÉ : user_id → id
                 $stmt = $pdo->prepare("SELECT statut FROM users WHERE id = ?");
-                $stmt->execute([$id_user]);
+                $stmt->execute([$user_id]);
                 $user = $stmt->fetch();
 
                 if ($user) {
                     if ($user['statut'] === 'actif') {
                         $update = $pdo->prepare("UPDATE users SET statut = 'banni', raison_ban = ? WHERE id = ?");
-                        $update->execute([$raison, $id_user]);
+                        $update->execute([$raison, $user_id]);
                     } else {
                         $update = $pdo->prepare("UPDATE users SET statut = 'actif', raison_ban = NULL WHERE id = ?");
-                        $update->execute([$id_user]);
+                        $update->execute([$user_id]);
                     }
                 }
                 header("Location: admin_dashboard.php?success=bannissement_maj");
@@ -155,24 +155,24 @@ switch ($action) {
     // =================================================================
     case 'valider_fraude_contournement':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $id_coiffeur = intval($_POST['coiffeur_id'] ?? 0);
+            $prestataire_id = intval($_POST['prestataire_id'] ?? 0);
             $id_client = intval($_POST['client_id'] ?? 0);
             $id_plainte = intval($_POST['plainte_id'] ?? 0);
 
-            if ($id_coiffeur > 0 && $id_client > 0 && $id_plainte > 0) {
+            if ($prestataire_id > 0 && $id_client > 0 && $id_plainte > 0) {
                 $pdo->beginTransaction();
                 try {
                     // 1. Bannir le coiffeur tricheur
-                    $stmt1 = $pdo->prepare("UPDATE users SET statut = 'banni', raison_ban = 'Contournement de plateforme avéré' WHERE id_user = ?");
-                    $stmt1->execute([$id_coiffeur]);
+                    $stmt1 = $pdo->prepare("UPDATE users SET statut = 'banni', raison_ban = 'Contournement de plateforme avéré' WHERE id = ?");
+                    $stmt1->execute([$prestataire_id]);
 
-                    // 2. Créditer le portefeuille du client dénonciateur (+2000 FCFA) — ✅ BUG CORRIGÉ : id_user → id
+                    // 2. Créditer le portefeuille du client dénonciateur (+2000 FCFA) — ✅ BUG CORRIGÉ : user_id → id
                     $stmt2 = $pdo->prepare("UPDATE users SET solde = solde + 2000 WHERE id = ?");
                     $stmt2->execute([$id_client]);
 
                     // 3. Envoyer une notification in-app au client
                     $msg_notif = "Félicitations ! Votre signalement a été validé par notre équipe. Un bonus de 2 000 FCFA a été ajouté à votre portefeuille.";
-                    $stmt3 = $pdo->prepare("INSERT INTO notifications (id_user, message, statut_lecture) VALUES (?, ?, 0)");
+                    $stmt3 = $pdo->prepare("INSERT INTO notifications (user_id, message, lu) VALUES (?, ?, 0)");
                     $stmt3->execute([$id_client, $msg_notif]);
 
                     // 4. Mettre à jour le statut de la plainte/dénonciation
@@ -201,10 +201,10 @@ switch ($action) {
 
             if (!empty($message)) {
                 if ($cible === 'tous') {
-                    $stmt = $pdo->prepare("INSERT INTO notifications (id_user, message, statut_lecture) SELECT id_user, ?, 0 FROM users WHERE role != 'admin'");
+                    $stmt = $pdo->prepare("INSERT INTO notifications (user_id, message, lu) SELECT id, ?, 0 FROM users WHERE role != 'admin'");
                     $stmt->execute([$message]);
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO notifications (id_user, message, statut_lecture) SELECT id_user, ?, 0 FROM users WHERE role = ?");
+                    $stmt = $pdo->prepare("INSERT INTO notifications (user_id, message, lu) SELECT id, ?, 0 FROM users WHERE role = ?");
                     $stmt->execute([$message, $cible]);
                 }
                 header("Location: admin_dashboard.php?success=notifications_envoyees");
@@ -217,20 +217,20 @@ switch ($action) {
     // ACTION 10 : Valider/Confirmer un abonnement (Paiement de 1500F accepté)
     // =================================================================
     case 'valider_abonnement':
-        $id_user = intval($_GET['id'] ?? 0);
-        if ($id_user > 0) {
+        $user_id = intval($_GET['id'] ?? 0);
+        if ($user_id > 0) {
             // Marquer l'abonnement comme actif et fixer date d'expiration (+1 mois)
             $stmt = $pdo->prepare("
-                UPDATE users 
-                SET abonnement_status = 1, 
+                UPDATE profils_prestataires 
+                SET abonnement_status = 'actif', 
                     date_expiration_abo = DATE_ADD(NOW(), INTERVAL 1 MONTH)
-                WHERE id = ?
+                WHERE user_id = ?
             ");
-            $stmt->execute([$id_user]);
+            $stmt->execute([$user_id]);
 
             // Notification au coiffeur
             require_once __DIR__ . '/../security/notifications.php';
-            notifier($pdo, $id_user,
+            notifier($pdo, $user_id,
                 'Votre abonnement de 1 500 F a été confirmé ! Vous avez accès à toutes les fonctionnalités pendant 1 mois.',
                 'success'
             );
@@ -244,20 +244,20 @@ switch ($action) {
     // ACTION 11 : Valider un retrait Mobile Money
     // =================================================================
     case 'valider_retrait':
-        $id_transaction = intval($_GET['id'] ?? 0);
-        if ($id_transaction > 0) {
+        $id = intval($_GET['id'] ?? 0);
+        if ($id > 0) {
             // Récupérer les infos de la transaction
-            $stmt = $pdo->prepare("SELECT user_id, montant_net FROM transactions_portefeuille WHERE id_transaction = ?");
-            $stmt->execute([$id_transaction]);
+            $stmt = $pdo->prepare("SELECT user_id, montant_net FROM transactions_portefeuille WHERE id = ?");
+            $stmt->execute([$id]);
             $transaction = $stmt->fetch();
 
             if ($transaction) {
                 $pdo->beginTransaction();
                 try {
-                    // 1. Marquer la transaction comme effectuée
-                    $update_trans = $pdo->prepare("UPDATE transactions_portefeuille SET statut_paiement = 'complete' WHERE id_transaction = ?");
-                    $update_trans->execute([$id_transaction]);
-
+                    // 1. Marquer la transaction comme terminée (pas de colonne status, donc commenté)
+                    // La table transactions_portefeuille n'a pas de colonne statut_paiement
+                    // On ne peut que logger dans un commentaire ou supprimer cette logique
+                    
                     // 2. Débiter le solde du coiffeur (retrait effectué)
                     $debit = $pdo->prepare("UPDATE users SET solde = solde - ? WHERE id = ?");
                     $debit->execute([$transaction['montant_net'], $transaction['user_id']]);
@@ -285,13 +285,13 @@ switch ($action) {
     // ACTION 12 : Approuver le diplôme d'un coiffeur
     // =================================================================
     case 'approuver_diplome':
-        $id_user = intval($_GET['id'] ?? 0);
-        if ($id_user > 0) {
-            $pdo->prepare("UPDATE users SET is_approved = 1 WHERE id = ?")->execute([$id_user]);
+        $user_id = intval($_GET['id'] ?? 0);
+        if ($user_id > 0) {
+            $pdo->prepare("UPDATE users SET is_approved = 1 WHERE id = ?")->execute([$user_id]);
 
             // Notification au coiffeur
             require_once __DIR__ . '/../security/notifications.php';
-            notifier($pdo, $id_user,
+            notifier($pdo, $user_id,
                 'Félicitations ! Votre diplôme a été approuvé par notre équipe. Votre profil est maintenant entièrement visible dans l\'annuaire.',
                 'success'
             );
@@ -305,11 +305,11 @@ switch ($action) {
     // ACTION 11 : Refuser le diplôme d'un coiffeur
     // =================================================================
     case 'refuser_diplome':
-        $id_user = intval($_GET['id'] ?? 0);
-        if ($id_user > 0) {
+        $user_id = intval($_GET['id'] ?? 0);
+        if ($user_id > 0) {
             // Pas de modification is_approved, juste notification
             require_once __DIR__ . '/../security/notifications.php';
-            notifier($pdo, $id_user,
+            notifier($pdo, $user_id,
                 'Votre document de certification n\'a pas pu être validé. Veuillez déposer un document lisible dans votre profil.',
                 'danger'
             );

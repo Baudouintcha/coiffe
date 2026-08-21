@@ -98,11 +98,11 @@ if (!function_exists('notifier_evenement')) {
      *
      * @param PDO    $pdo       Connexion PDO
      * @param string $evenement Constante NOTIF_*
-     * @param int    $id_user   Destinataire (0 = tous les admins)
+     * @param int    $user_id   Destinataire (0 = tous les admins)
      * @param array  $donnees   Données pour interpoler le message (date, heure, coiffeur, client…)
      * @return bool
      */
-    function notifier_evenement(PDO $pdo, string $evenement, int $id_user, array $donnees = []): bool
+    function notifier_evenement(PDO $pdo, string $evenement, int $user_id, array $donnees = []): bool
     {
         $tpl = _notif_template($evenement, $donnees);
 
@@ -118,6 +118,6 @@ if (!function_exists('notifier_evenement')) {
             return true;
         }
 
-        return notifier($pdo, $id_user, $tpl['message'], $tpl['type']);
+        return notifier($pdo, $user_id, $tpl['message'], $tpl['type']);
     }
 }

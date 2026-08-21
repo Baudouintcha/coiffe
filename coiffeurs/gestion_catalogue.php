@@ -11,14 +11,14 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'coiffeur') {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'prestataire') {
     echo "<script>window.location.href='/coiffons/access/connexion.php';</script>";
     exit();
 }
 
 require_once __DIR__ . '/../security/config.php';
 
-$prestataire_id = $_SESSION['id_user'];
+$prestataire_id = $_SESSION['user_id'];
 $message_type = '';
 $message_text = '';
 
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_prestation']))
     }
 
     if ($upload_ok) {
-        $stmt = $pdo->prepare("INSERT INTO prestations (prestataire_id, nom_service, prix, photo, description, duree) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO services (id_prestataire, nom_service, prix, photo, description, duree) VALUES (?, ?, ?, ?, ?, ?)");
         if ($stmt->execute([$prestataire_id, $nom_service, $prix, $photo_path, $description_complete, $duree])) {
             $message_type = 'success';
             $message_text = 'Prestation ajoutée avec succès !';
@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])
     $raw_description = $_POST['description'];
     $ancienne_photo = $_POST['ancienne_photo'];
 
-    $check = $pdo->prepare("SELECT id_service FROM prestations WHERE id_service = ? AND prestataire_id = ?");
+    $check = $pdo->prepare("SELECT id_service FROM services WHERE id_service = ? AND id_prestataire = ?");
     $check->execute([$id_service, $prestataire_id]);
 
     if ($check->rowCount() > 0) {
@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])
         }
 
         if ($upload_ok) {
-            $upd = $pdo->prepare("UPDATE prestations SET nom_service = ?, prix = ?, photo = ?, description = ?, duree = ? WHERE id_service = ?");
+            $upd = $pdo->prepare("UPDATE services SET nom_service = ?, prix = ?, photo = ?, description = ?, duree = ? WHERE id_service = ?");
             if ($upd->execute([$nom_service, $prix, $photo_path, $description_complete, $duree, $id_service])) {
                 $message_type = 'success';
                 $message_text = 'Prestation mise à jour avec succès !';
@@ -145,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['modifier_prestation'])
 if (isset($_GET['supprimer'])) {
     $id_service = intval($_GET['supprimer']);
 
-    $check = $pdo->prepare("SELECT photo FROM prestations WHERE id_service = ? AND prestataire_id = ?");
+    $check = $pdo->prepare("SELECT photo FROM services WHERE id_service = ? AND id_prestataire = ?");
     $check->execute([$id_service, $prestataire_id]);
     $prest = $check->fetch();
 
@@ -153,7 +153,7 @@ if (isset($_GET['supprimer'])) {
         if (!empty($prest['photo']) && file_exists(__DIR__ . '/../' . $prest['photo'])) {
             @unlink(__DIR__ . '/../' . $prest['photo']);
         }
-        $del = $pdo->prepare("DELETE FROM prestations WHERE id_service = ?");
+        $del = $pdo->prepare("DELETE FROM services WHERE id_service = ?");
         $del->execute([$id_service]);
         $redirect = $_SERVER['HTTP_REFERER'] ?? 'gestion_catalogue.php';
         echo "<script>alert('Prestation supprimée du catalogue.'); window.location.href='" . htmlspecialchars($redirect, ENT_QUOTES) . "';</script>";
@@ -162,7 +162,7 @@ if (isset($_GET['supprimer'])) {
 }
 
 // Récupération des prestations à jour
-$stmt = $pdo->prepare("SELECT * FROM prestations WHERE prestataire_id = ? ORDER BY id_service DESC");
+$stmt = $pdo->prepare("SELECT * FROM services WHERE id_prestataire = ? ORDER BY id_service DESC");
 $stmt->execute([$prestataire_id]);
 $prestations = $stmt->fetchAll();
 

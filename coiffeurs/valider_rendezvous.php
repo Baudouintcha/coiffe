@@ -13,12 +13,12 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../security/config.php';
 require_once __DIR__ . '/../security/notifications.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'coiffeur') {
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'prestataire') {
     header("Location: /coiffons/index.php?page=login");
     exit();
 }
 
-$coiffeur_id    = $_SESSION['id_user'];
+$prestataire_id    = $_SESSION['user_id'];
 $message_type   = '';
 $message_text   = '';
 
@@ -26,12 +26,12 @@ $message_text   = '';
 // 1. ROBOT AUTOMATIQUE : TRAITEMENT DES EXPIRATIONS (SQL inchangé)
 // =================================================================
 $stmt_verif_expiration = $pdo->prepare("
-    SELECT r.*, p.prix, p.id_coiffeur
+    SELECT r.*, s.prix, s.id_prestataire
     FROM rendez_vous r
-    JOIN prestations p ON r.coiffure_id = p.id_prestation
-    WHERE r.statut_rdv = 'en_attente' AND p.id_coiffeur = ?
+    JOIN services s ON r.service_id = s.id_service
+    WHERE r.statut_rdv = 'en_attente' AND s.id_prestataire = ?
 ");
-$stmt_verif_expiration->execute([$coiffeur_id]);
+$stmt_verif_expiration->execute([$prestataire_id]);
 $rdvs_en_attente = $stmt_verif_expiration->fetchAll();
 
 foreach ($rdvs_en_attente as $rdv) {
@@ -55,7 +55,7 @@ foreach ($rdvs_en_attente as $rdv) {
             }
 
             $msg_notif_client = "La demande de rendez-vous a expiré (sans réponse du coiffeur). Votre solde a été dégelé.";
-            $ins_notif_client = $pdo->prepare("INSERT INTO notifications (user_id, message, type, statut) VALUES (?, ?, 'danger', 'non_lu')");
+            $ins_notif_client = $pdo->prepare("INSERT INTO notifications (user_id, message, type, lu) VALUES (?, ?, 'danger', 0)");
             $ins_notif_client->execute([$rdv['client_id'], $msg_notif_client]);
             $pdo->commit();
         } catch (Exception $e) {
@@ -81,15 +81,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_rdv'], $_POST[
     $action = htmlspecialchars($_POST['action_rdv']);
     $id_rdv = intval($_POST['id_rdv']);
 
-    $verif = $pdo->prepare("SELECT r.*, p.prix FROM rendez_vous r JOIN prestations p ON r.coiffure_id = p.id_prestation WHERE r.id = ? AND p.id_coiffeur = ?");
-    $verif->execute([$id_rdv, $coiffeur_id]);
+    $verif = $pdo->prepare("SELECT r.*, s.prix FROM rendez_vous r JOIN services s ON r.service_id = s.id_service WHERE r.id = ? AND s.id_prestataire = ?");
+    $verif->execute([$id_rdv, $prestataire_id]);
     $rdv_valid = $verif->fetch();
 
     if ($rdv_valid && $rdv_valid['statut_rdv'] === 'en_attente') {
         $pdo->beginTransaction();
         try {
             if ($action === 'accepter') {
-                $stmt = $pdo->prepare("UPDATE rendez_vous SET statut_rdv = 'confirme', statut_paiement = 'paye' WHERE id = ?");
+                $stmt = $pdo->prepare("UPDATE rendez_vous SET statut_rdv = 'confirme' WHERE id = ?");
                 $stmt->execute([$id_rdv]);
 
                 $up_client = $pdo->prepare("UPDATE portefeuilles SET argent_gele = argent_gele - ? WHERE user_id = ?");
@@ -102,10 +102,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_rdv'], $_POST[
                 $gain_coiffeur = $rdv_valid['prix'] - $commission;
 
                 $up_coiffeur = $pdo->prepare("INSERT INTO portefeuilles (user_id, solde) VALUES (?, ?) ON DUPLICATE KEY UPDATE solde = solde + ?");
-                $up_coiffeur->execute([$coiffeur_id, $gain_coiffeur, $gain_coiffeur]);
+                $up_coiffeur->execute([$prestataire_id, $gain_coiffeur, $gain_coiffeur]);
 
                 $ins_t = $pdo->prepare("INSERT INTO transactions_portefeuille (user_id, type_transaction, montant, motif) VALUES (?, 'gain_prestation', ?, ?)");
-                $ins_t->execute([$coiffeur_id, $gain_coiffeur, "Gain prestation RDV #" . $id_rdv]);
+                $ins_t->execute([$prestataire_id, $gain_coiffeur, "Gain prestation RDV #" . $id_rdv]);
 
                 // Notifier le client — acceptation
                 $date_fmt   = date('d/m/Y', strtotime($rdv_valid['date_rdv'] ?? date('Y-m-d')));
@@ -149,15 +149,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_rdv'], $_POST[
 // =================================================================
 // 3. RÉCUPÉRATION DES RENDEZ-VOUS (SQL inchangé)
 // =================================================================
-$query = "SELECT r.*, u.nom AS nom_client, v.nom_ville, p.nom_style, p.prix
+$query = "SELECT r.*, u.nom AS nom_client, v.nom_ville, s.nom_service, s.prix
           FROM rendez_vous r
           JOIN users u ON r.client_id = u.id
-          JOIN villes v ON u.ville = v.id
-          JOIN prestations p ON r.coiffure_id = p.id_prestation
-          WHERE p.id_coiffeur = ?
+          JOIN villes v ON u.id_ville = v.id
+          JOIN services s ON r.service_id = s.id_service
+          WHERE s.id_prestataire = ?
           ORDER BY (r.statut_rdv = 'en_attente') DESC, r.date_rdv DESC, r.heure_debut DESC";
 $stmt = $pdo->prepare($query);
-$stmt->execute([$coiffeur_id]);
+$stmt->execute([$prestataire_id]);
 $mes_rendezvous = $stmt->fetchAll();
 
 include __DIR__ . '/../layout/header_coiffeur.php';

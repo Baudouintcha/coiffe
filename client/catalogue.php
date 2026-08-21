@@ -13,17 +13,17 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../security/config.php';
 
 // Identification du rôle courant — inchangé
-$prestataire_id_connecte = (isset($_SESSION['id_user']) && isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur')
-    ? intval($_SESSION['id_user'])
+$prestataire_id_connecte = (isset($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] === 'coiffeur')
+    ? intval($_SESSION['user_id'])
     : null;
 
 // Requête SQL — inchangée
 $stmt = $pdo->query("SELECT p.*, u.nom, u.prenom, u.telephone,
                             v.nom_ville AS ville,
                             q.nom_quartier AS quartier
-                     FROM prestations p
-                     JOIN users u ON p.prestataire_id = u.id
-                     LEFT JOIN villes v ON u.ville = v.id
+                     FROM services p
+                     JOIN users u ON p.id_prestataire = u.id
+                     LEFT JOIN villes v ON u.id_ville = v.id
                      LEFT JOIN quartiers q ON u.id_quartier = q.id
                      ORDER BY p.id_service DESC");
 $prestations = $stmt->fetchAll();

@@ -35,9 +35,9 @@ if ($id_service > 0 && isset($pdo)) {
         $stmt = $pdo->prepare("
             SELECT p.*, u.id AS prestataire_id, u.nom AS nom_coiffeur, u.prenom AS prenom_coiffeur,
                    v.nom_ville, q.nom_quartier
-            FROM prestations p
-            JOIN users u ON p.prestataire_id = u.id
-            LEFT JOIN villes v ON u.ville = v.id
+            FROM services p
+            JOIN users u ON p.id_prestataire = u.id
+            LEFT JOIN villes v ON u.id_ville = v.id
             LEFT JOIN quartiers q ON u.id_quartier = q.id
             WHERE p.id_service = ?
         ");
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($erreur)) {
     } elseif (isset($pdo)) {
         try {
             $pdo->prepare("
-                INSERT INTO rendez_vous (client_id, prestataire_id, id_service, date_rdv, heure_rdv, statut_rdv, date_creation)
+                INSERT INTO rendez_vous (client_id, prestataire_id, service_id, date_rdv, heure_debut, statut_rdv, date_demande)
                 VALUES (?, ?, ?, ?, ?, 'en_attente', NOW())
             ")->execute([$client_id, $prestataire_id, $id_service_post, $date_rdv, $heure_rdv]);
 
@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($erreur)) {
             $msg_notif = "Nouvelle demande de RDV de " . $prenom_client_notif . " " . $nom_client_notif
                        . " pour le " . $date_rdv . " à " . $heure_rdv . ".";
             try {
-                $pdo->prepare("INSERT INTO notifications (id_user, message, type, lu, date_notification) VALUES (?, ?, 'info', 0, NOW())")
+                $pdo->prepare("INSERT INTO notifications (user_id, message, type, lu, date_creation) VALUES (?, ?, 'info', 0, NOW())")
                     ->execute([$prestataire_id, $msg_notif]);
             } catch (Exception $e) {
                 // Notification non bloquante

@@ -153,7 +153,7 @@ $diplomes = $pdo->query("
             <h5 class="mt-3">Solution 2: Corriger les chemins en BD</h5>
             <div class="code">
 -- Si les fichiers existent mais chemins mauvais en BD, exécuter:
-UPDATE users SET diplome = CONCAT('/access/uploads/diplomes/', 
+UPDATE users SET /* diplome removed */ CONCAT('/access/uploads/diplomes/', 
     SUBSTRING_INDEX(diplome, '/', -1)) 
 WHERE role = 'coiffeur' AND diplome IS NOT NULL;
             </div>
@@ -161,7 +161,7 @@ WHERE role = 'coiffeur' AND diplome IS NOT NULL;
             <h5 class="mt-3">Solution 3: Tester avec une URL complète</h5>
             <div class="code">
 -- Remplacer les chemins par une URL complète:
-UPDATE users SET diplome = 
+UPDATE users SET /* diplome removed */ 
     CONCAT('http://localhost/coiffons/access/uploads/diplomes/', 
         SUBSTRING_INDEX(diplome, '/', -1)) 
 WHERE role = 'coiffeur' AND diplome IS NOT NULL;

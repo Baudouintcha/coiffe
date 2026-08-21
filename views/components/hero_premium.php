@@ -17,8 +17,8 @@ $hp_images             = $hp_images             ?? [];
 $hp_title              = $hp_title              ?? 'COIFFE CHEZ TOI';
 $hp_subtitle           = $hp_subtitle           ?? 'Réservez un coiffeur professionnel qui se déplace directement chez vous.';
 $hp_role_client_href   = $hp_role_client_href   ?? '/coiffons/filter/annuaire_coiffeurs.php';
-$hp_role_coiffeur_href = $hp_role_coiffeur_href ?? '/coiffons/index.php?page=register&role=coiffeur';
-$hp_login_href         = $hp_login_href         ?? '/coiffons/index.php?page=login';
+$hp_role_coiffeur_href = $hp_role_coiffeur_href ?? '/coiffons/index.php?metier=coiffure&page=register&role=coiffeur';
+$hp_login_href         = $hp_login_href         ?? '/coiffons/index.php?metier=coiffure&page=login';
 $hp_show_roles         = $hp_show_roles         ?? true;
 ?>
 
