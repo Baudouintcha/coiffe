@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmer_paiement'])
 }
 
 // Informations abonnement actuel
-$stmt = $pdo->prepare("SELECT abonnement_status, date_expiration_abo, solde FROM users WHERE id = ?");
+$stmt = $pdo->prepare("SELECT pp.abonnement_status, pp.date_expiration_abo, u.solde FROM profils_prestataires pp JOIN users u ON pp.user_id = u.id WHERE u.id = ?");
 $stmt->execute([$id_coiffeur]);
 $coiffeur = $stmt->fetch();
 $solde_actuel       = floatval($coiffeur['solde'] ?? 0);

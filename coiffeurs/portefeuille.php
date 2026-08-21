@@ -87,7 +87,7 @@ $total_gains_bruts = $brut_data['total_brut'] ?? 0;
 $total_commissions = $total_gains_bruts * $commission_pourcentage;
 
 // 7. HISTORIQUE — inchangé
-$stmt_complet = $pdo->prepare("SELECT * FROM transactions_portefeuille WHERE user_id = ? ORDER BY date_demande DESC");
+$stmt_complet = $pdo->prepare("SELECT * FROM transactions_portefeuille WHERE user_id = ? ORDER BY created_at DESC");
 $stmt_complet->execute([$prestataire_id]);
 $historique_complet = $stmt_complet->fetchAll();
 $historique_apercu  = array_slice($historique_complet, 0, 5);
@@ -171,13 +171,8 @@ else:
         $texte_actif .= ' — ' . $jours_restants . ' jour(s) restant';
     }
 
-    if ($info_coiffeur['renouvellement_auto']) {
-        $btn_label  = 'Désactiver renouvellement auto';
-        $btn_status = 0;
-    } else {
-        $btn_label  = 'Activer renouvellement auto';
-        $btn_status = 1;
-    }
+    $btn_label  = 'Gestion abonnement';
+    $btn_status = 1;
 
     $ib = [
         'variant' => 'success',

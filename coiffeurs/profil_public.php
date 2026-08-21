@@ -206,12 +206,25 @@ if (!$banner_photo_url) {
         box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     }
     .presta-card.selected .presta-card-check { display: flex; }
-    .presta-img { width:100%; height:180px; object-fit:cover; display:block; }
-    .presta-img-ph {
-        width:100%; height:180px;
+    .presta-img { 
+        width:100%; 
+        height:180px; 
+        object-fit:contain;
+        object-position:center;
+        display:block; 
         background: linear-gradient(135deg, var(--dark-3), var(--dark-4));
-        display:flex; align-items:center; justify-content:center;
-        color:rgba(255,255,255,.06); font-size:2.5rem;
+        padding: 12px;
+        box-sizing: border-box;
+    }
+    .presta-img-ph {
+        width:100%; 
+        height:180px;
+        background: linear-gradient(135deg, var(--dark-3), var(--dark-4));
+        display:flex; 
+        align-items:center; 
+        justify-content:center;
+        color:rgba(255,255,255,.06); 
+        font-size:2.5rem;
     }
     .presta-body { padding: 1rem 1.1rem; flex:1; display:flex; flex-direction:column; }
     .presta-name { font-weight:700; font-size:.92rem; color:var(--text-primary); margin-bottom:4px; }

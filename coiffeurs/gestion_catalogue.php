@@ -76,8 +76,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajouter_prestation']))
     }
 
     if ($upload_ok) {
-        $stmt = $pdo->prepare("INSERT INTO services (id_prestataire, nom_service, prix, photo, description, duree) VALUES (?, ?, ?, ?, ?, ?)");
-        if ($stmt->execute([$prestataire_id, $nom_service, $prix, $photo_path, $description_complete, $duree])) {
+        // Obtenir le premier id_metier disponible (ou créer un par défaut si absent)
+        $metier_check = $pdo->query("SELECT id FROM metiers LIMIT 1");
+        $metier = $metier_check->fetch();
+        $id_metier = $metier['id'] ?? 1;
+        
+        $stmt = $pdo->prepare("INSERT INTO services (id_prestataire, id_metier, nom_service, prix, photo, description, duree) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        if ($stmt->execute([$prestataire_id, $id_metier, $nom_service, $prix, $photo_path, $description_complete, $duree])) {
             $message_type = 'success';
             $message_text = 'Prestation ajoutée avec succès !';
         }

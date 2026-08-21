@@ -998,7 +998,8 @@ document.addEventListener('click', function(e) {
 <!-- ── FOOTER + IA ASSISTANT ── -->
 <?php
 $page_root = '/coiffons';
-include __DIR__ . '/../../views/components/footer_global.php';
+include __DIR__ . '/../../layout/footer_coiffeur.php';
+?>;
 include __DIR__ . '/../../views/components/ia_assistant.php';
 $current_page = 'dashboard_coiffeur';
 include __DIR__ . '/../../views/components/bottom_nav_client.php';

@@ -35,11 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->beginTransaction();
 
         // 1. Approche Ligne par Ligne : On nettoie d'abord TOUTES les lignes existantes de ce coiffeur
-        $delete_stmt = $pdo->prepare("DELETE FROM disponibilites WHERE coiffeur_id = ?");
+        $delete_stmt = $pdo->prepare("DELETE FROM disponibilites WHERE prestataire_id = ?");
         $delete_stmt->execute([$coiffeur_id]);
 
         // 2. Préparation de l'insertion propre pour les nouveaux choix
-        $insert_stmt = $pdo->prepare("INSERT INTO disponibilites (coiffeur_id, jour_semaine, heure_debut, heure_fin) VALUES (?, ?, ?, ?)");
+        $insert_stmt = $pdo->prepare("INSERT INTO disponibilites (prestataire_id, jour_semaine, heure_debut, heure_fin) VALUES (?, ?, ?, ?)");
 
         // 3. On parcourt les 7 jours pour insérer uniquement ceux qui ont été cochés
         foreach ($jours_semaine as $jour) {

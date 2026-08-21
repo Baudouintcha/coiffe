@@ -43,6 +43,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enregistrer_zones']))
         $pdo->commit();
         $message_type = 'success';
         $message_text = 'Vos zones d\'intervention ont été mises à jour avec succès !';
+        
+        // Recharger les zones pour l'affichage du récapitulatif
+        $mes_zones_stmt = $pdo->prepare("SELECT id_quartier FROM zones_prestataire WHERE id_prestataire = ?");
+        $mes_zones_stmt->execute([$prestataire_id]);
+        $raw_zones = $mes_zones_stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $mes_zones_actives = array_map('intval', $raw_zones);
+        $show_recap = true;
     } catch (Exception $e) {
         $pdo->rollBack();
         $message_type = 'danger';
@@ -151,6 +158,29 @@ endif; ?>
         </button>
     </div>
 </form>
+
+<!-- ── RÉCAPITULATIF APRÈS ENREGISTREMENT ── -->
+<?php if ($show_recap ?? false): ?>
+<div class="glass-cct p-5" style="max-width:600px;margin:3rem auto;text-align:center;background:rgba(212,175,55,0.08);border:2px solid rgba(212,175,55,0.3);">
+    <div style="font-size:2rem;margin-bottom:1rem;">✅</div>
+    <h3 style="color:var(--gold);font-weight:700;margin-bottom:1rem;font-family:var(--font-display);">Zones enregistrées</h3>
+    <p style="color:var(--text-muted);margin-bottom:2rem;">Vous pouvez maintenant recevoir des demandes dans ces zones:</p>
+    
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:2rem;">
+        <?php foreach ($tous_les_quartiers as $q):
+            if (in_array(intval($q['id']), $mes_zones_actives, true)): ?>
+            <div style="padding:12px;background:rgba(212,175,55,0.15);border-radius:8px;border:1px solid rgba(212,175,55,0.3);">
+                <div style="font-weight:600;color:var(--gold);font-size:0.9rem;"><?= htmlspecialchars($q['nom_quartier']) ?></div>
+                <div style="font-size:0.75rem;color:var(--text-muted);"><?= htmlspecialchars($q['nom_ville']) ?></div>
+            </div>
+            <?php endif; endforeach; ?>
+    </div>
+    
+    <a href="/coiffons/coiffeurs/mes_zones.php" class="btn-outline-gold" style="padding:10px 24px;display:inline-block;">
+        <i class="bi bi-pencil me-2" aria-hidden="true"></i> Modifier
+    </a>
+</div>
+<?php endif; ?>
 
 <style>
 /* Zone label — checkboxes stylisées */
