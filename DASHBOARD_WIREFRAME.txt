@@ -1,0 +1,266 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                         WIREFRAME — TABLEAU DE BORD ADMIN                      ║
+║                          AVEC DONNÉES DE TEST (5+5 USERS)                      ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+📊 DONNÉES EN BASE :
+   • Coiffeurs : 5 (IDs 7-11 : Diallo, Sow, Toure, Bah, Cisse)
+   • Clients : 5 (IDs 12-16 : Coulibaly, Traore, Kone, Diarra, Bah)
+   • Rendez-vous : 12 (mix de confirmé/en_attente)
+   • Soldes : 253,470 FCFA (distribuées)
+   • Commission estimée : 1,144 FCFA (5% des RDV confirmés)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─ HEADER NAVBAR ─────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  🔒 COIFFE CHEZ TOI | S.G. ADMIN          [Déconnexion] [Paramètres]       │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ SECTION 1 : CARTES KPIs (TOP) ─────────────────────────────────────────────┐
+│                                                                              │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐  ┌─────────────┐│
+│  │ 📊 Commission  │  │ 📊 Abonnements │  │ 👥 Coiffeurs   │  │ 💰 Trésor   ││
+│  │                │  │                │  │                │  │             ││
+│  │  1,144 FCFA    │  │  7,500 FCFA    │  │       5        │  │ 253,470 F  ││
+│  │                │  │ (5×1500)       │  │                │  │             ││
+│  │ Plateforme     │  │ Coiffeurs      │  │ Actifs/Inactif │  │ Séquestrée ││
+│  │ (5% des gains) │  │ abonnés        │  │                │  │             ││
+│  └────────────────┘  └────────────────┘  └────────────────┘  └─────────────┘│
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ SECTION 2 : GRAPHIQUES ────────────────────────────────────────────────────┐
+│                                                                              │
+│  Répartition Client/Coiffeur (Pie Chart)    │  Tendance (Sample)            │
+│  ┌──────────────────────────────────────┐   │  ┌────────────────────────┐   │
+│  │        ◉                             │   │  │ Mois     │ Clients RDV│   │
+│  │     ◉     ◉                          │   │  ├──────────┼────────────┤   │
+│  │   ◉           ◉   Femmes (68%)       │   │  │ Août     │ ▓▓▓▓  12  │   │
+│  │  ◉               │   Hommes (32%)    │   │  │ Sept     │ ▓▓▓   8   │   │
+│  │   ◉           ◉   │                  │   │  │ Oct      │ ▓▓▓▓▓ 15  │   │
+│  │     ◉     ◉       │                  │   │  └────────────────────────┘   │
+│  │        ◉                             │   │                              │
+│  └──────────────────────────────────────┘   │                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─ SECTION 3 : TOP 4 COIFFEURS ───────────────────────────────────────────────┐
+│                                                                              │
+│  Classement (par nombre de RDV)                                             │
+│                                                                              │
+│  🥇 Fatima Toure        │ 4 RDV  │ ⭐⭐⭐⭐⭐ (Meilleure)                   │
+│  🥈 Awa Bah             │ 3 RDV  │ ⭐⭐⭐⭐⭐                             │
+│  🥉 Aïssatou Diallo     │ 3 RDV  │ ⭐⭐⭐⭐☆                             │
+│  ⭐ Mariam Sow          │ 2 RDV  │ ⭐⭐⭐⭐☆                             │
+│                                                                              │
+│  [Utilité : Identifier les meilleures prestations + récompenser]            │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ SECTION 4 : TOP 4 PRESTATIONS ─────────────────────────────────────────────┐
+│                                                                              │
+│  Demandes les plus populaires                                               │
+│                                                                              │
+│  1. Lissage brésilien       │ 4 demandes │ ████ (35%)                      │
+│  2. Coupe classique         │ 3 demandes │ ███  (25%)                      │
+│  3. Traitement profond      │ 2 demandes │ ██   (18%)                      │
+│  4. Tressage africain       │ 1 demande  │ █    (8%)                       │
+│  5. Coloration              │ 2 demandes │ ██   (14%)                      │
+│                                                                              │
+│  [Utilité : Marketing + Inventaire + Pricing]                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─ SECTION 5 : ALERTES RENDEMENT ─────────────────────────────────────────────┐
+│                                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                      │
+│  │ ⚠️ INACTIFS  │  │ ⚠️ BUGS TX   │  │ ⚠️ S/RDV     │                      │
+│  │              │  │              │  │              │                      │
+│  │      1       │  │      0       │  │      0       │                      │
+│  │              │  │              │  │              │                      │
+│  │ Coiffeurs    │  │ Transactions │  │ Clients      │                      │
+│  │ sans RDV     │  │ échouées     │  │ sans RDV     │                      │
+│  │              │  │              │  │              │                      │
+│  │ [Relancer]   │  │ [Enquêter]   │  │ [Promouvoir] │                      │
+│  └──────────────┘  └──────────────┘  └──────────────┘                      │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─ ONGLETS SPÉCIALISÉS ───────────────────────────────────────────────────────┐
+│                                                                              │
+│  [DIPLÔMES]  [RDV]  [RETRAITS]  [ABONNEMENTS]  [COMPTES]  [FRAUDE]  [NOTIF] │
+│                                                                              │
+├─ ONGLET 1 : DIPLÔMES EN ATTENTE ───────────────────────────────────────────┤
+│                                                                              │
+│  ID │ Coiffeur            │ Téléphone      │ Date Demande │ Actions         │
+│  ───┼─────────────────────┼────────────────┼──────────────┼─────────────────│
+│  7  │ Aïssatou Diallo     │ +229 97654321  │ 2026-08-22   │ [✓ Approuver]  │
+│     │                     │                │              │ [✗ Refuser]    │
+│  ───┼─────────────────────┼────────────────┼──────────────┼─────────────────│
+│  8  │ Mariam Sow          │ +229 97654322  │ 2026-08-22   │ [✓ Approuver]  │
+│     │                     │                │              │ [✗ Refuser]    │
+│  ───┼─────────────────────┼────────────────┼──────────────┼─────────────────│
+│  9  │ Fatima Toure        │ +229 97654323  │ 2026-08-22   │ [✓ Approuver]  │
+│     │                     │                │              │ [✗ Refuser]    │
+│  ───┼─────────────────────┼────────────────┼──────────────┼─────────────────│
+│  10 │ Awa Bah             │ +229 97654324  │ 2026-08-22   │ [✓ Approuver]  │
+│     │                     │                │              │ [✗ Refuser]    │
+│  ───┼─────────────────────┼────────────────┼──────────────┼─────────────────│
+│  11 │ Khadidja Cisse      │ +229 97654325  │ 2026-08-22   │ [✓ Approuver]  │
+│     │                     │                │              │ [✗ Refuser]    │
+│  ───┴─────────────────────┴────────────────┴──────────────┴─────────────────│
+│                                                                              │
+│  ✅ ACTION DISPONIBLE : Cliquer "Approuver" → is_approved = 1              │
+│                        → Coiffeur visible dans annuaire                     │
+│                        → Notification envoyée au coiffeur                   │
+│                                                                              │
+├─ ONGLET 2 : RDV EN ATTENTE ────────────────────────────────────────────────┤
+│                                                                              │
+│  ID │ Client              │ Coiffeur        │ Service        │ Date   │ €    │
+│  ───┼─────────────────────┼─────────────────┼────────────────┼────────┼──────│
+│  3  │ Hawa Coulibaly      │ Aïssatou Diallo │ Coupe classique │ 26/08  │ 5000 │
+│  4  │ Fatoumata Diarra    │ Mariam Sow      │ Coloration      │ 27/08  │ 7500 │
+│  5  │ Lala Traore         │ Awa Bah         │ Lissage brazil  │ 28/08  │ 8000 │
+│  6  │ Ami Kone            │ Aïssatou Diallo │ Lissage brazil  │ 25/08  │ 6500 │
+│  ───┴─────────────────────┴─────────────────┴────────────────┴────────┴──────│
+│                                                                              │
+│  ✅ ACTION DISPONIBLE : Cliquer sur ligne → Voir détails complets          │
+│                        → Option pour relancer coiffeur ou annuler RDV      │
+│                                                                              │
+├─ ONGLET 3 : RELANCES WHATSAPP ────────────────────────────────────────────┤
+│                                                                              │
+│  Coiffeur        │ Téléphone     │ Client             │ RDV      │ Action   │
+│  ─────────────────┼───────────────┼────────────────────┼──────────┼──────────│
+│  Aïssatou Diallo  │ +229 97654321 │ Hawa Coulibaly     │ 26/08    │ [📱 WA] │
+│  Mariam Sow       │ +229 97654322 │ Fatoumata Diarra   │ 27/08    │ [📱 WA] │
+│  Awa Bah          │ +229 97654324 │ Lala Traore        │ 28/08    │ [📱 WA] │
+│  Aïssatou Diallo  │ +229 97654321 │ Ami Kone           │ 25/08    │ [📱 WA] │
+│  ─────────────────┴───────────────┴────────────────────┴──────────┴──────────│
+│                                                                              │
+│  ✅ ACTION DISPONIBLE : Cliquer [📱 WA]                                   │
+│    1. Marque whatsapp_envoye = 1 (dans la BD)                              │
+│    2. Ouvre wa.me/229XXXXXXXXX avec message pré-rédigé                    │
+│    3. Admin peut finir et envoyer le message                               │
+│                                                                              │
+├─ ONGLET 4 : ABONNEMENTS (Coiffeurs en retard) ──────────────────────────────┤
+│                                                                              │
+│  ID │ Coiffeur            │ Téléphone      │ Statut       │ Action          │
+│  ───┼─────────────────────┼────────────────┼──────────────┼─────────────────│
+│  7  │ Aïssatou Diallo     │ +229 97654321  │ ✅ Actif     │                 │
+│  8  │ Mariam Sow          │ +229 97654322  │ ✅ Actif     │                 │
+│  9  │ Fatima Toure        │ +229 97654323  │ ✅ Actif     │                 │
+│  10 │ Awa Bah             │ +229 97654324  │ ✅ Actif     │                 │
+│  11 │ Khadidja Cisse      │ +229 97654325  │ ✅ Actif     │                 │
+│  ───┴─────────────────────┴────────────────┴──────────────┴─────────────────│
+│                                                                              │
+│  ✅ ACTION DISPONIBLE : [Confirmer] → Marquer paiement validé             │
+│                        → date_expiration_abo = NOW() + 1 MOIS             │
+│                        → Notification au coiffeur                          │
+│                                                                              │
+├─ ONGLET 5 : RETRAITS MOBILE MONEY ────────────────────────────────────────┤
+│                                                                              │
+│  ID │ Coiffeur            │ Montant Retrait │ Statut       │ Action         │
+│  ───┼─────────────────────┼─────────────────┼──────────────┼────────────────│
+│  ?  │ (Aucun en attente)  │  -              │  -           │  -             │
+│  ───┴─────────────────────┴─────────────────┴──────────────┴────────────────│
+│                                                                              │
+│  ✅ ACTION DISPONIBLE : [Effectué] → Débiter solde coiffeur               │
+│                        → Envoyer notification "24h arrivée"               │
+│                                                                              │
+├─ ONGLET 6 : COMPTES & GESTION ────────────────────────────────────────────┤
+│                                                                              │
+│  ID │ Nom                 │ Email                      │ Rôle      │ Actions │
+│  ───┼─────────────────────┼────────────────────────────┼───────────┼─────────│
+│  7  │ Aïssatou Diallo     │ aissatou.diallo@...        │ Prest     │ [Toggle]│
+│  8  │ Mariam Sow          │ mariam.sow@...             │ Prest     │ [Toggle]│
+│  9  │ Fatima Toure        │ fatima.toure@...           │ Prest     │ [Toggle]│
+│  10 │ Awa Bah             │ awa.bah@...                │ Prest     │ [Toggle]│
+│  11 │ Khadidja Cisse      │ khadidja.cisse@...         │ Prest     │ [Toggle]│
+│  12 │ Hawa Coulibaly      │ hawa.coulibaly@...         │ Client    │ [Toggle]│
+│  13 │ Lala Traore         │ lala.traore@...            │ Client    │ [Toggle]│
+│  14 │ Ami Kone            │ ami.kone@...               │ Client    │ [Toggle]│
+│  15 │ Fatoumata Diarra    │ fatoumata.diarra@...       │ Client    │ [Toggle]│
+│  16 │ Zainab Bah          │ zainab.bah@...             │ Client    │ [Toggle]│
+│  ───┴─────────────────────┴────────────────────────────┴───────────┴─────────│
+│                                                                              │
+│  ✅ ACTION DISPONIBLE : [Toggle] → Show/Hide approbation publique        │
+│                        → Passer de is_approved = 0 à 1 (ou inverse)      │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─ FOOTER ────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  © 2026 Coiffe Chez Toi — Plateforme de services à domicile                │
+│  Support : support@domizi.local | Statut : 🟢 En ligne                     │
+│  Dernière mise à jour : 2026-08-22 14:35:42                                │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 RÉSUMÉ DES ACTIONS DISPONIBLES :
+
+1. ✅ APPROUVER DIPLÔMES → Onglet "Diplômes" → [✓ Approuver]
+   └─ Rend visible le profil du coiffeur dans l'annuaire
+
+2. ✅ RELANCER WHATSAPP → Section "Relances" → [📱 WA]
+   └─ Ouvre WhatsApp directement avec message pré-rédigé
+
+3. ✅ VALIDER ABONNEMENTS → Onglet "Abonnements" → [Confirmer]
+   └─ Confirme le paiement de 1500 FCFA
+
+4. ✅ VALIDER RETRAITS → Onglet "Retraits" → [Effectué]
+   └─ Approuve les demandes de retrait Mobile Money
+
+5. ✅ TOGGLE APPROBATION → Onglet "Comptes" → [Toggle]
+   └─ Affiche/Cache un profil publiquement
+
+6. ✅ BANNIR UTILISATEURS → (Via admin_actions.php)
+   └─ Sanctionne un utilisateur fraudeur
+
+7. ✅ ENVOYER NOTIFICATIONS → (Via admin_actions.php)
+   └─ Annonces globales ou ciblées
+
+... ET BIEN D'AUTRES !
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💾 DONNÉES INSÉRÉES : ✅ OPÉRATIONNELLES
+
+Coiffeurs (5) :
+  ✅ ID 7 : Aïssatou Diallo (aissatou.diallo@coiffons.com / Coiffeur123!)
+  ✅ ID 8 : Mariam Sow (mariam.sow@coiffons.com / Coiffeur123!)
+  ✅ ID 9 : Fatima Toure (fatima.toure@coiffons.com / Coiffeur123!)
+  ✅ ID 10 : Awa Bah (awa.bah@coiffons.com / Coiffeur123!)
+  ✅ ID 11 : Khadidja Cisse (khadidja.cisse@coiffons.com / Coiffeur123!)
+
+Clients (5) :
+  ✅ ID 12 : Hawa Coulibaly (hawa.coulibaly@email.com / Client123!)
+  ✅ ID 13 : Lala Traore (lala.traore@email.com / Client123!)
+  ✅ ID 14 : Ami Kone (ami.kone@email.com / Client123!)
+  ✅ ID 15 : Fatoumata Diarra (fatoumata.diarra@email.com / Client123!)
+  ✅ ID 16 : Zainab Bah (zainab.bah@email.com / Client123!)
+
+Rendez-vous (12) :
+  ✅ Mix de "confirme" et "en_attente"
+  ✅ Services variés (Coupe, Lissage, Tressage, Coloration, Traitement)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ POUR ACCÉDER AU DASHBOARD :
+
+URL : http://localhost/coiffons/first/admin_dashboard.php
+Email : admin@domizi.local
+Password : Admin2026!
+
+═══════════════════════════════════════════════════════════════════════════════

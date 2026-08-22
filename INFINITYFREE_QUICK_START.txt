@@ -1,0 +1,229 @@
+═══════════════════════════════════════════════════════════════════════════════
+              🚀 INFINITYFREE DEPLOYMENT — QUICK START GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+⏱️  TEMPS ESTIMÉ : 20-25 minutes
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ ÉTAPE 1 : CRÉER COMPTE (5 MIN)
+
+   1. Aller sur https://www.infinityfree.net/
+   2. Cliquer "Sign Up"
+   3. Entrer email + mot de passe
+   4. Confirmer email (lien reçu)
+   └─ ✅ Compte créé
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ ÉTAPE 2 : CRÉER HÉBERGEMENT (2 MIN)
+
+   1. Dashboard InfinityFree
+   2. Cliquer "Create Account"
+   3. Remplir :
+      - Account name : coiffetoi
+      - Password : [créer password]
+   4. Cliquer "Create Account"
+   └─ ✅ Hébergement activé
+
+   À RETENIR :
+   • Domaine : coiffetoi.infinityfreeapp.com
+   • FTP User : [votre_choix]@coiffetoi.infinityfreeapp.com
+   • FTP Pass : [votre_password]
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ ÉTAPE 3 : CRÉER BD MYSQL (3 MIN)
+
+   1. Aller dans cPanel
+   2. Chercher "MySQL Databases"
+   3. Créer base : domizi
+   4. Créer user : admin_coiffons (password robuste)
+   5. Ajouter user à base avec "All Privileges"
+   └─ ✅ Base créée
+
+   À RETENIR :
+   • DB User : admin_coiffons
+   • DB Pass : [votre_password]
+   • DB Host : localhost
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ ÉTAPE 4 : IMPORTER BD (2 MIN)
+
+   LOCAL (XAMPP) :
+   1. Ouvrir http://localhost/phpmyadmin
+   2. Sélectionner base "domizi"
+   3. Export → SQL → Go
+   4. Fichier "domizi.sql" téléchargé ✅
+
+   INFINITYFREE :
+   1. cPanel → phpMyAdmin
+   2. Login avec admin_coiffons + password
+   3. Sélectionner "domizi"
+   4. Import → Choisir fichier domizi.sql
+   5. Go
+   └─ ✅ Tables importées
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ ÉTAPE 5 : UPLOADER FICHIERS (5 MIN)
+
+   OPTION A : File Manager (cPanel)
+   1. cPanel → File Manager
+   2. Ouvrir dossier public_html
+   3. Upload dossier "coiffons/" (ZIP puis décompresser)
+
+   OPTION B : FileZilla (Recommandé)
+   1. Télécharger FileZilla : https://filezilla-project.org/
+   2. Configuration :
+      Host : ftp.coiffetoi.infinityfreeapp.com
+      User : [votre_user]@coiffetoi.infinityfreeapp.com
+      Pass : [votre_password]
+      Port : 21
+   3. Quickconnect
+   4. Glisser-déposer dossier coiffons/ → public_html
+   └─ ✅ Fichiers uploadés
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ ÉTAPE 6 : MODIFIER config.php (2 MIN)
+
+   FICHIER : public_html/coiffons/security/config.php
+
+   MODIFIER :
+   ─────────────────────────────────────────────────────
+   $db_host = 'localhost';          // Garder tel quel
+   $db_user = 'admin_coiffons';     // ← VOTRE USER MYSQL
+   $db_pass = '[votre_password]';   // ← VOTRE PASS MYSQL
+   $db_name = 'domizi';             // Garder tel quel
+   ─────────────────────────────────────────────────────
+
+   Via cPanel :
+   1. File Manager → config.php
+   2. Clic droit → Edit
+   3. Modifier les 2 lignes ci-dessus
+   4. Save
+   └─ ✅ Config mise à jour
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ ÉTAPE 7 : CONFIGURER PERMISSIONS (3 MIN)
+
+   1. File Manager → public_html/coiffons/
+   2. Créer dossiers :
+      ✓ access/uploads/diplomes/
+      ✓ access/uploads/profil/
+      ✓ images/
+      ✓ uploads/
+
+   3. Pour chaque dossier :
+      • Clic droit → Change Permissions
+      • Entrer : 755 (ou 777)
+      • Change Permissions
+   └─ ✅ Permissions configurées
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ ÉTAPE 8 : TESTER L'ACCÈS (1 MIN)
+
+   1. Ouvrir navigateur
+   2. Aller à : https://coiffetoi.infinityfreeapp.com/coiffons/
+   3. Vous devriez voir la page d'accueil
+
+   LOGIN ADMIN :
+   Email    : admin@domizi.local
+   Password : Admin2026!
+
+   Si ça marche :
+   └─ ✅ SUCCÈS ! Vous êtes en production
+
+   Si erreur BD :
+   ❌ Vérifier config.php (credentials MySQL)
+   ❌ Vérifier que domizi.sql a bien été importé
+   ❌ Vérifier user MySQL + permissions
+
+═══════════════════════════════════════════════════════════════════════════════
+
+❌ PROBLÈMES COURANTS
+
+   "Database Connection Failed"
+   → Vérifier credentials dans config.php
+   → Vérifier que base domizi existe
+   → Vérifier user a les permissions
+
+   "404 Not Found"
+   → Vérifier index.php existe
+   → Vérifier chemin : /coiffons/
+   → Vérifier permissions fichiers
+
+   "Upload ne marche pas"
+   → Permissions dossier uploads = 777
+   → Vérifier espace disque disponible
+   → Vérifier taille fichier limite
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 INFOS À GARDER (Sauvegardez !)
+
+DOMAINE PUBLIC :
+coiffetoi.infinityfreeapp.com/coiffons
+
+FTP CREDENTIALS :
+Host : ftp.coiffetoi.infinityfreeapp.com
+User : [votre_user]@coiffetoi.infinityfreeapp.com
+Pass : [votre_password_ftp]
+
+MySQL CREDENTIALS :
+Host : localhost
+User : admin_coiffons
+Pass : [votre_password_mysql]
+DB   : domizi
+
+ADMIN LOGIN :
+Email : admin@domizi.local
+Pass  : Admin2026!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ APRÈS DÉPLOIEMENT
+
+• Tester TOUS les parcours utilisateur
+• Tester login admin + actions
+• Tester création RDV
+• Tester paiements (KkiaPay test mode)
+• Tester uploads de diplômes
+• Vérifier emails notifications
+• Faire backup première BD
+• Configurer SSL (https) - gratuit sur InfinityFree
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚠️  LIMITATIONS INFINITYFREE (Hosting gratuit)
+
+✓ Espace disque : 5 GB
+✓ Bande passante : Illimitée
+✓ PHP 8.x support
+✓ MySQL support
+
+✗ Pas d'accès SSH/Terminal
+✗ Pub InfinityFree affichée
+✗ Lenteurs possibles (shared server)
+✗ Support basique
+
+👉 POUR PRODUCTION RECOMMANDÉ : Hostinger (~€5/mois) ou O2switch (~€5/mois)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📞 SUPPORT
+
+Documentation : https://docs.infinityfree.net/
+Forum : https://forum.infinityfree.net/
+Email support : support@infinityfree.net
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Besoin d'aide ? Tu as un guide complet dans :
+📄 DEPLOYMENT_INFINITYFREE.md (détails étape par étape)
+
+═══════════════════════════════════════════════════════════════════════════════
